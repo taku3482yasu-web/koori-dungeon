@@ -1,4 +1,4 @@
-// ゲームの進行のテスト (主人公をえらぶ・歩く・ダッシュ・階段・最後の階・戦い)
+// ゲームの進行のテスト (主人公・役職をえらぶ・歩く・ダッシュ・階段・最後の階・戦い・わざ・状態異常)
 // canvas は何もしない偽物、時間 (performance.now) はテストで進める
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,18 +11,20 @@ globalThis.KD = {};
 for (const f of ['rng.js', 'dungeon.js', 'units.js', 'art.js', 'game.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
 const { Dungeon: D, Units: U } = globalThis.KD;
 
-// opts: createGame に渡す ({ enemies: false } で敵なし)。hero: 0 こおりくん / 1 おにおに
-function setup(opts = { enemies: false }, hero = 0) {
+// opts: createGame に渡す ({ enemies: false } で敵なし)。hero: 0 こおりくん / 1 おにおに。role: 役職の番号
+function setup(opts = { enemies: false }, hero = 0, role = 0) {
     const noop = () => {};
-    const ctx = new Proxy({}, { get: (t, k) => (k in t ? t[k] : noop), set: (t, k, v) => { t[k] = v; return true; } });
+    const ctx = new Proxy({ measureText: t => ({ width: t.length * 9 }) }, { get: (t, k) => (k in t ? t[k] : noop), set: (t, k, v) => { t[k] = v; return true; } });
     const asks = [];
     const ui = { ask: (message, options, done) => asks.push({ message, options, done }), asking: () => asks.length > 0 };
-    const game = globalThis.KD.createGame({ getContext: () => ctx }, ui, opts);
+    const game = globalThis.KD.createGame({ getContext: () => ctx }, ui, { seed: 12345, ...opts });
     const run = ms => { for (let i = 0; i < ms; i += 16) { fakeNow += 16; game.draw(fakeNow); } };
     const answer = i => asks.shift().done(i);
-    // はじめに主人公をえらぶ
+    // はじめに主人公と役職をえらぶ
     assert.match(asks[0].message, /主人公/);
     answer(hero);
+    assert.match(asks[0].message, /役職/);
+    answer(role);
     run(1300);
     return { game, s: game.state, run, asks, answer };
 }
@@ -104,22 +106,31 @@ test('階に着くと敵がいる。はじめの部屋にはいない', () => {
     }
 });
 
-// 主人公のとなり (右か左) に敵を 1 体だけ置く
-function besideEnemy(s, kind = 'haribaby') {
+// 主人公のとなり (右か左。dist マス先) に敵を 1 体だけ置く
+function besideEnemy(game, s, kind = 'haribaby', dist = 1) {
     const p = s.player;
-    const dx = [1, -1].find(d => D.canMove(s.map, p.x, p.y, d, 0));
-    const st = U.enemyStats(kind, 1);
-    const e = { ...s.enemies[0], kind, name: U.ENEMIES[kind].name, ai: U.ENEMIES[kind].ai, speed: U.ENEMIES[kind].speed, awake: true,
-        stats: { hp: st.hp, atk: st.atk, def: st.def }, hp: st.hp, exp: st.exp, x: p.x + dx, y: p.y, fx: p.x + dx, fy: p.y, anim: null, goal: null };
+    const dx = [1, -1].find(d => [...Array(dist).keys()].every(i => D.canMove(s.map, p.x + d * i, p.y, d, 0)));
+    const e = game.makeEnemy(kind, 1, p.x + dx * dist, p.y);
+    e.awake = true;
     s.enemies.length = 0;
     s.enemies.push(e);
     p.dir = [dx, 0];
     return e;
 }
 
+// いちばん横に広い部屋のまんなかへ主人公を動かす
+function toWideSpot(s) {
+    const p = s.player;
+    const room = s.map.rooms.reduce((a, b) => (b.w > a.w ? b : a));
+    assert.ok(room.w >= 9, '広い部屋がある');
+    p.x = p.fx = room.x + Math.floor(room.w / 2);
+    p.y = p.fy = room.y;
+    s.visible = D.visibleFrom(s.map, p.x, p.y);
+}
+
 test('攻撃すると敵の HP が減り、たおすとけいけんちが入る。敵は 1 ターンに 1 回 攻撃してくる', () => {
     const { game, s, run } = setup({});
-    const e = besideEnemy(s);
+    const e = besideEnemy(game, s);
     const p = s.player;
     let turns = 0;
     while (s.enemies.includes(e) && turns < 30) {
@@ -135,15 +146,9 @@ test('攻撃すると敵の HP が減り、たおすとけいけんちが入る�
 
 test('はなれた敵は近づいてくる', () => {
     const { game, s, run } = setup({});
-    const e = besideEnemy(s);
+    toWideSpot(s);
+    const e = besideEnemy(game, s, 'haribaby', 3);
     const p = s.player;
-    // 同じ部屋の、主人公から 3 マス以上はなれたマスに置く
-    const room = s.map.rooms[s.map.roomAt[p.y * s.map.w + p.x]];
-    let far = null;
-    for (let y = room.y; y < room.y + room.h && !far; y++) for (let x = room.x; x < room.x + room.w; x++) {
-        if (Math.max(Math.abs(x - p.x), Math.abs(y - p.y)) >= 3) { far = [x, y]; break; }
-    }
-    [e.x, e.y] = [e.fx, e.fy] = far;
     const d0 = Math.max(Math.abs(e.x - p.x), Math.abs(e.y - p.y));
     game.wait();
     run(400);
@@ -152,7 +157,7 @@ test('はなれた敵は近づいてくる', () => {
 
 test('HP が 0 になるとたおれて、Lv はそのまま B1F からやり直し', () => {
     const { game, s, run, asks, answer } = setup({});
-    besideEnemy(s);
+    besideEnemy(game, s);
     const p = s.player;
     p.lv = 3;
     p.stats = U.heroStats(p.kind, 3);
@@ -169,6 +174,128 @@ test('HP が 0 になるとたおれて、Lv はそのまま B1F からやり直
     assert.equal(s.floor, 1);
     assert.equal(p.lv, 3);
     assert.equal(p.hp, p.stats.hp);
+});
+
+test('わざを使うと PP が減り、こおりはしぜんによく効く', () => {
+    const { game, s, run } = setup({});
+    const e = besideEnemy(game, s, 'donguriko');
+    e.stats.hp = e.hp = 999;
+    const p = s.player;
+    const sword = p.skills.findIndex(k => k.id === 'koori_sword');
+    assert.ok(sword >= 0, 'コオリソードを持っている');
+    const pp = p.skills[sword].pp;
+    for (let i = 0; i < 6; i++) { game.useSkill(sword); run(900); }
+    assert.equal(p.skills[sword].pp, pp - 6);
+    assert.ok(e.hp < 999);
+    assert.ok(s.messages.some(m => /ばつぐん/.test(m.text)) || s.turn > 0);
+    assert.equal(U.effect('こおり', 'しぜん'), 1.5);
+    assert.equal(U.effect('こおり', 'ほのお'), 0.67);
+    assert.equal(U.effect('ふつう', 'ふつう'), 1);
+    assert.equal(U.effect(null, 'しぜん'), 1);
+});
+
+test('直線のわざは はなれた敵に当たる。周りのわざは となりの敵みんなに当たる', () => {
+    const { game, s, run } = setup({});
+    toWideSpot(s);
+    const e = besideEnemy(game, s, 'haribaby', 3);
+    e.stats.hp = e.hp = 999;
+    e.ai = 'wait';
+    e.awake = false;
+    const p = s.player;
+    const breath = p.skills.findIndex(k => k.id === 'koori_breath');
+    for (let i = 0; i < 5 && e.hp === 999; i++) { game.useSkill(breath); run(900); }
+    assert.ok(e.hp < 999, 'こおりのいき が当たった');
+    // 周り: となりに 2 体置いて、四天王絶対殺す剣
+    p.skills[0] = U.newSkill('shitenno');
+    const a = game.makeEnemy('haribaby', 1, p.x - 1, p.y), b = game.makeEnemy('haribaby', 1, p.x + 1, p.y);
+    a.stats.hp = a.hp = b.stats.hp = b.hp = 999;
+    s.enemies.splice(0, s.enemies.length, a, b);
+    for (let i = 0; i < 4 && (a.hp === 999 || b.hp === 999); i++) { game.useSkill(0); run(900); }
+    assert.ok(a.hp < 999 && b.hp < 999, '両どなりに当たった');
+});
+
+test('ねむると自分では動けず、ターンがひとりでにすすむ。治ると動ける', () => {
+    const { game, s, run } = setup();
+    const p = s.player;
+    p.status = { id: 'sleep', turns: 3 };
+    const t0 = s.turn;
+    run(3000);
+    assert.equal(p.status, null, 'ねむりが治った');
+    assert.equal(s.turn - t0, 3);
+    assert.equal(game.busy(), false);
+});
+
+test('しばりのあいだは歩けない。どくは毎ターン HP が減る', () => {
+    const { game, s, run } = setup();
+    const p = s.player;
+    p.status = { id: 'bind', turns: 2 };
+    const [x, y] = [p.x, p.y];
+    const dx = [1, -1].find(d => D.canMove(s.map, p.x, p.y, d, 0));
+    game.moveInput(dx, 0);
+    run(600);
+    assert.deepEqual([p.x, p.y], [x, y]);
+    assert.equal(s.turn, 1, '1 ターンすすんだ');
+    p.status = { id: 'poison', turns: 5 };
+    const hp = p.hp;
+    game.wait();
+    run(300);
+    assert.ok(p.hp < hp);
+});
+
+test('ねむりごな でねむる。ヨフカシフクロウは ねむらない', () => {
+    const { game, s, run } = setup({});
+    const e = besideEnemy(game, s, 'nemuridake');
+    const p = s.player;
+    p.stats.hp = p.hp = 999;
+    e.rate = 1;   // かならず わざを使う
+    for (let i = 0; i < 10 && !p.status; i++) { game.wait(); run(700); }
+    assert.equal(p.status && p.status.id, 'sleep');
+    const owl = game.makeEnemy('yofukashi', 1, 0, 0);
+    assert.deepEqual(owl.immune, ['sleep']);
+});
+
+test('Lv が上がるとわざを覚える。5 つめは どれかを忘れるか聞く', () => {
+    const { game, s, run, asks, answer } = setup({});
+    const p = s.player;
+    assert.equal(p.skills.length, 3, '役職のわざ + Lv1 のわざ 2 つ');
+    const e = besideEnemy(game, s);
+    e.exp = 10000;
+    e.hp = 1;
+    p.buffs.kiai = true;
+    for (let i = 0; i < 5 && s.enemies.length; i++) { game.attack(); run(900); }
+    assert.ok(p.lv >= 6);
+    assert.equal(p.skills.length, 4);
+    assert.ok(p.skills.some(k => k.id === 'koori_hammer'));
+    assert.equal(asks.length, 1, '四天王絶対殺す剣を覚えたい');
+    assert.match(asks[0].message, /四天王絶対殺す剣/);
+    answer(0);   // 1 番めを忘れる
+    assert.equal(p.skills[0].id, 'shitenno');
+});
+
+test('役職で能力が変わる。役職のわざを持って始まる', () => {
+    const base = U.heroStats('koori', 5, 'supporter');
+    const atk = U.heroStats('koori', 5, 'attacker');
+    const def = U.heroStats('koori', 5, 'defender');
+    assert.ok(atk.atk > base.atk && atk.def < base.def);
+    assert.ok(def.hp > base.hp && def.def > base.def);
+    U.ROLE_IDS.forEach((id, i) => {
+        const { s } = setup({ enemies: false }, 1, i);
+        assert.equal(s.player.role, id);
+        assert.equal(s.player.skills[0].id, U.ROLES[id].skill);
+    });
+});
+
+test('ジャマー (はやい) は 2 回に 1 回だけ敵が動く。ディフェンダー (おそい) は敵が 2 回動く', () => {
+    const jam = setup({}, 0, U.ROLE_IDS.indexOf('jammer'));
+    for (let i = 0; i < 4; i++) { jam.game.wait(); jam.run(300); }
+    assert.equal(jam.s.turn, 2);
+    const df = setup({}, 0, U.ROLE_IDS.indexOf('defender'));
+    toWideSpot(df.s);
+    const e = besideEnemy(df.game, df.s, 'haribaby', 4);
+    const d0 = Math.abs(e.x - df.s.player.x);
+    df.game.wait();
+    df.run(600);
+    assert.equal(Math.abs(e.x - df.s.player.x), d0 - 2, '敵が 2 マス近づいた');
 });
 
 test('Lv が上がると能力が上がる', () => {

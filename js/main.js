@@ -4,8 +4,8 @@
 // 仕様書 15章:
 //   移動: 矢印キー・テンキー (斜めはテンキーか、矢印を2つ同時に。Shift を押しているあいだは斜めだけ)
 //   ダッシュ: B を押しながら移動 / 向きだけ変える: R を押しながら方向 / 足踏み: Space
-//   攻撃・決定: Z・Enter (階段の上なら「降りますか？」) / 戻る: X・Esc / ミニマップ: M
-//   スマホ: 十字ボタン (斜めあり。長押しでダッシュ)・攻撃・足踏み・ミニマップ
+//   攻撃・決定: Z・Enter (階段の上なら「降りますか？」) / わざ: 1〜4 / 戻る: X・Esc / ミニマップ: M
+//   スマホ: 十字ボタン (斜めあり。長押しでダッシュ)・攻撃・足踏み・ミニマップ・わざのボタン
 // =====================================================================
 (function (KD) {
     'use strict';
@@ -45,10 +45,11 @@
         }
         return {
             // place: 'bottom' で画面の下に出す (主人公をえらぶとき、絵を見せるため)。onMove: えらんでいるものが変わった
-            ask(message, options, done, { place = 'center', onMove = null } = {}) {
+            // list: 選ぶものを縦にならべる (わざを忘れるとき)
+            ask(message, options, done, { place = 'center', onMove = null, list = false } = {}) {
                 current = { options, index: 0, done, onMove };
                 text.textContent = message;
-                box.className = `ask ${place}`;
+                box.className = `ask ${place}${list ? ' list' : ''}`;
                 box.hidden = false;
                 moveTo(0);
             },
@@ -113,6 +114,7 @@
                 game.wait();
             } else if ((k === 'KeyZ' || k === 'Enter') && !e.repeat) game.confirm();
             else if (k === 'KeyM' && !e.repeat) game.toggleMinimap();
+            else if (/^(Digit|Numpad)[1-4]$/.test(k) && !e.repeat && !NUMPAD[k]) game.useSkill(Number(k.slice(-1)) - 1);
         });
         window.addEventListener('keyup', e => {
             const k = e.code;
@@ -152,6 +154,32 @@
         tap('btn-wait', () => (ask.asking() ? ask.key('back') : game.wait()));
         tap('btn-map', () => game.toggleMinimap());
 
+        // ----- わざのボタン (変わったときだけ作り直す) -----
+        const skillBox = document.getElementById('skills');
+        let skillKey = '';
+        function renderSkills() {
+            const list = game.skills();
+            const key = JSON.stringify(list);
+            if (key === skillKey) return;
+            skillKey = key;
+            skillBox.innerHTML = '';
+            list.forEach((s, i) => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.title = s.note;
+                b.innerHTML = `<span class="no">${i + 1}</span><span class="nm"></span><span class="inf"></span><span class="pp"></span>`;
+                b.querySelector('.nm').textContent = s.name;
+                b.querySelector('.inf').textContent = s.info;
+                b.querySelector('.pp').textContent = `PP ${s.pp}`;
+                if (s.pp.startsWith('0/')) b.classList.add('empty');
+                b.addEventListener('pointerdown', e => {
+                    e.preventDefault();
+                    if (!ask.asking()) game.useSkill(i);
+                });
+                skillBox.appendChild(b);
+            });
+        }
+
         // ----- 毎フレーム: 押している方向に動く -----
         function frame(now) {
             if (!game.busy() && !needRelease) {
@@ -176,6 +204,7 @@
                 }
             }
             game.draw(now);
+            renderSkills();
             requestAnimationFrame(frame);
         }
         requestAnimationFrame(frame);

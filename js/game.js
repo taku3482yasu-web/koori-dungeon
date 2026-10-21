@@ -1,12 +1,13 @@
 // =====================================================================
-// ゲームの進行 (段階 2: 主人公をえらんで、敵と戦いながら階段で下の階へ降りる)
+// ゲームの進行 (段階 3: 主人公と役職をえらんで、わざ・属性・状態異常のある戦いをしながら降りる)
 // ---------------------------------------------------------------------
 // 仕様書 4章 (マップ・見える範囲・ミニマップ・階段)・5章 (ターン・移動・斜め・ダッシュ)・
-// 6章 (能力・Lv)・15章 (操作)。キャラの数字と計算は units.js。
+// 6章 (能力・Lv・属性・役職)・7章 (わざ・状態異常)・15章 (操作)。キャラの数字と計算は units.js。
 // 状態は state にまとめ、draw() で毎フレーム canvas に描く。入力は main.js から届く。
 //
 // ターンの流れ: 主人公が 1 回動く → 敵が 1 回 (はやい敵は 2 回) 動く。
 //   歩くのは みんな同時に動いて見せ、攻撃は 1 つずつ順に見せる (queue に入れて、時間をおいて実行)。
+//   役職のすばやさ: はやい (+1) なら 2 回に 1 回だけ敵が動き、おそい (-1) なら敵が 2 倍動く。
 // =====================================================================
 (function (KD) {
     'use strict';
@@ -18,15 +19,20 @@
     const STEP_MS = 110, DASH_MS = 45;            // 1 マス動くのにかける時間 (ふつう・ダッシュ)
     const FADE_MS = 1100;                         // 階が変わるときの暗転
     const ATTACK_MS = 240, SHOOT_MS = 300;        // 攻撃 1 回を見せる時間
+    const PASS_MS = 380;                          // 動けないターン (ねむり・まひ など) を見せる時間
     const SPAWN_EVERY = 36, MAX_ENEMIES = 10;     // 敵が増える間かく (ターン)・1 つの階にいる敵の最大
     const SHOOT_RANGE = 6;                        // 「撃つ」敵の届くマス数
+    const LINE_RANGE = 10;                        // 直線のわざの届くマス数
+    const GUARD_TURNS = 5;                        // まもりのかまえ が続くターン
     const DIRS8 = [[0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]];
     const FONT = '"BIZ UDPGothic", "Yu Gothic", sans-serif';
+    const RANGE_NAMES = { front: '正面', line: '直線', around: '周り', self: '自分' };
+    const ELEMENT_COLORS = { 'こおり': '#bff0ff', 'ほのお': '#ff9a4a', 'みず': '#6ab8ff', 'しぜん': '#9ae07a', 'かぜ': '#e8f4ff', 'ふしぎ': '#d8a8ff', 'ふつう': '#ffffff' };
 
-    // ダンジョン (段階 2 はハリーの森だけ。仕様書 12章)
+    // ダンジョン (段階 3 はハリーの森だけ。仕様書 12章)
     const DUNGEONS = [{ id: 'forest', name: 'ハリーの森', floors: 5, theme: 'forest', table: U.FOREST_TABLE }];
 
-    // opts: { enemies: false で敵を出さない (テスト用) }
+    // opts: { enemies: false で敵を出さない・seed で同じ階にする (テスト用) }
     function createGame(canvas, ui, opts = {}) {
         const ctx = canvas.getContext('2d');
         canvas.width = W;
@@ -34,8 +40,9 @@
         ctx.imageSmoothingEnabled = false;
 
         const state = {
-            phase: 'select',  // select 主人公をえらぶ / play
-            pick: 0,          // えらんでいる主人公 (0 こおりくん / 1 おにおに)
+            phase: 'select',  // select 主人公・役職をえらぶ / play
+            selectStep: 'hero',
+            pick: 0,          // えらんでいるもの (主人公 / 役職の番号)
             dungeon: DUNGEONS[0],
             floor: 1,
             map: null,
@@ -47,14 +54,16 @@
             queue: [],        // 順に見せる攻撃など。関数を呼ぶと、見せる時間 (ms) を返す
             waitUntil: 0,
             arrived: false,   // 主人公が 1 マス動いた (動き終わったらダッシュの続き・階段)
+            fastSkip: false,  // はやい主人公: 敵が動かない番
             phaseId: 0,
             turn: 0,
             messages: [],
             popups: [],       // ダメージの数字
             shots: [],        // 飛んでいくわざ
+            rings: [],        // 周りに当たるわざ
             fade: null,       // { at, label, then }
             mini: true,
-            seed: (Date.now() ^ (Math.random() * 1e9)) >>> 0,
+            seed: opts.seed || (Date.now() ^ (Math.random() * 1e9)) >>> 0,
             done: false,
             over: false       // 主人公がたおれた
         };
@@ -62,27 +71,43 @@
 
         function say(text) {
             state.messages.push({ text, at: performance.now() });
-            if (state.messages.length > 3) state.messages.shift();
+            if (state.messages.length > 4) state.messages.shift();
         }
 
-        // ----- 主人公をえらぶ (仕様書 6.2) -----
+        // ----- 主人公と役職をえらぶ (仕様書 6.2・6.3) -----
         const HERO_IDS = ['koori', 'onioni'];
         function selectHero() {
             state.phase = 'select';
+            state.selectStep = 'hero';
             ui.ask('主人公をえらんでください。\n（えらばなかったほうは、あとで最初の仲間になります）', HERO_IDS.map(id => U.HEROES[id].name), i => {
-                state.player = makeHero(HERO_IDS[i]);
+                selectRole(HERO_IDS[i]);
+            }, { place: 'bottom', onMove: i => { state.pick = i; } });
+        }
+
+        // 役職は本当は町のバトルツリーで開放して切りかえる (段階 6)。それまでは、はじめにえらんで試せる
+        function selectRole(heroId) {
+            state.selectStep = 'role';
+            state.heroPick = heroId;
+            ui.ask('役職をえらんでください。\n（町ができる段階 6 までの おためし。あとからはバトルツリーで開放します）', U.ROLE_IDS.map(id => U.ROLES[id].name), i => {
+                state.player = makeHero(heroId, U.ROLE_IDS[i]);
                 state.phase = 'play';
                 changeFloor(1, `${state.dungeon.name}  B1F`);
             }, { place: 'bottom', onMove: i => { state.pick = i; } });
         }
 
-        function makeHero(id) {
-            const stats = U.heroStats(id, 1);
-            return { kind: id, name: U.HEROES[id].name, hero: true, lv: 1, exp: 0, stats, hp: stats.hp, regen: 0, ...body(0, 0) };
+        function makeHero(id, role) {
+            const stats = U.heroStats(id, 1, role);
+            return {
+                kind: id, name: U.HEROES[id].name, hero: true, element: U.HEROES[id].element, role,
+                lv: 1, exp: 0, stats, hp: stats.hp, regen: 0, skills: U.startSkills(id, role), ...body(0, 0)
+            };
         }
 
-        // 位置と見た目 (主人公・敵 共通)
-        const body = (x, y) => ({ x, y, fx: x, fy: y, dir: [0, 1], flip: false, step: 0, anim: null, lunge: null, hurtAt: 0 });
+        // 位置・見た目・状態 (主人公・敵 共通)
+        const body = (x, y) => ({
+            x, y, fx: x, fy: y, dir: [0, 1], flip: false, step: 0, anim: null, lunge: null, hurtAt: 0,
+            status: null, flinch: false, buffs: { kiai: false, guard: 0 }
+        });
 
         // ----- 階 -----
         function enterFloor(n) {
@@ -99,6 +124,7 @@
             state.queue = [];
             state.waitUntil = 0;
             state.arrived = false;
+            state.fastSkip = false;
             state.turn = 0;
             look();
             if (opts.enemies !== false) {
@@ -130,17 +156,21 @@
 
         function clear() {
             state.done = true;
-            ui.ask(`${state.dungeon.name}を突破した！\n（段階 2 はここまで。ボスのハリーや道具は、このあとの段階で）`, ['もう一度'], () => {
+            ui.ask(`${state.dungeon.name}を突破した！\n（段階 3 はここまで。ボスのハリーや道具は、このあとの段階で）`, ['もう一度'], () => {
                 state.done = false;
                 restart();
             });
         }
 
-        // B1F からやり直す。Lv はそのまま (仕様書 1章・10章)
+        // B1F からやり直す。Lv とわざはそのまま (仕様書 1章・10章)。HP・PP は元に戻る
         function restart() {
             const p = state.player;
             p.hp = p.stats.hp;
             p.regen = 0;
+            p.status = null;
+            p.flinch = false;
+            p.buffs = { kiai: false, guard: 0 };
+            p.skills.forEach(s => { s.pp = s.max; });
             state.seed = (state.seed * 16807 + 1) >>> 0;
             changeFloor(1, `${state.dungeon.name}  B1F`);
         }
@@ -149,8 +179,20 @@
         const idx = (x, y) => y * state.map.w + x;
         const roomOf = (x, y) => state.map.roomAt[idx(x, y)];
         const enemyAt = (x, y) => state.enemies.find(e => e.x === x && e.y === y);
-        const occupied = (x, y) => Boolean(enemyAt(x, y)) || (state.player.x === x && state.player.y === y);
+        const unitAt = (x, y) => enemyAt(x, y) || (state.player.x === x && state.player.y === y ? state.player : null);
+        const occupied = (x, y) => Boolean(unitAt(x, y));
         const cheb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+        const seen = u => u.hero || Boolean(state.visible[idx(u.x, u.y)]);
+
+        function makeEnemy(kind, lv, x, y) {
+            const data = U.ENEMIES[kind];
+            const st = U.enemyStats(kind, lv);
+            return {
+                kind, name: data.name, element: data.element, ai: data.ai, speed: data.speed, move: data.move || null, rate: data.rate || 0,
+                immune: data.immune || [], lv, exp: st.exp, stats: { hp: st.hp, atk: st.atk, def: st.def, spa: st.spa, spd: st.spd }, hp: st.hp,
+                awake: data.ai !== 'wait', goal: null, seen: null, ...body(x, y)
+            };
+        }
 
         // 見えていない部屋のどこかに敵を 1 体出す (avoidRoom の部屋には出さない)
         function spawnEnemy(avoidRoom) {
@@ -161,16 +203,9 @@
                 const x = room.x + rng.int(0, room.w - 1), y = room.y + rng.int(0, room.h - 1);
                 if (roomOf(x, y) === avoidRoom || state.visible[idx(x, y)] || occupied(x, y)) continue;
                 if (x === map.stairs.x && y === map.stairs.y) continue;
-                const kind = rng.pick(table);
-                const data = U.ENEMIES[kind];
                 // 敵の Lv: B1F は 1、B5F で 3〜4 (ハリーの森はチュートリアルなので弱め)
                 const lv = Math.max(1, Math.ceil(state.floor * 0.7) - 1 + rng.int(0, 1));
-                const st = U.enemyStats(kind, lv);
-                state.enemies.push({
-                    kind, name: data.name, ai: data.ai, speed: data.speed, lv, exp: st.exp,
-                    stats: { hp: st.hp, atk: st.atk, def: st.def }, hp: st.hp,
-                    awake: data.ai !== 'wait', goal: null, seen: null, ...body(x, y)
-                });
+                state.enemies.push(makeEnemy(rng.pick(table), lv, x, y));
                 return true;
             }
             return false;
@@ -239,12 +274,23 @@
             return true;
         }
 
+        const canHit = (a, b) => cheb(a, b) === 1 && D.canMove(state.map, a.x, a.y, b.x - a.x, b.y - a.y);
+
         // 敵 1 体の 1 回ぶんの行動
         function act(e, dist, ms) {
             const p = state.player;
+            if (e.flinch) return void (e.flinch = false);
+            const st = e.status && e.status.id;
+            if (st === 'sleep' || (st === 'para' && rng.chance(0.5))) return;
             if (!e.awake) {
                 if (cheb(e, p) > 2) return;   // 「まつ」敵は、近くに来るまで動かない
                 e.awake = true;
+            }
+            // こんらん: 半分の確率で、でたらめな方向へ歩く
+            if (st === 'confuse' && rng.chance(0.5)) {
+                const [dx, dy] = rng.pick(DIRS8);
+                if (D.canMove(state.map, e.x, e.y, dx, dy) && !occupied(e.x + dx, e.y + dy)) moveUnit(e, dx, dy, ms);
+                return;
             }
             const sees = state.visible[idx(e.x, e.y)] === 1;   // こちらから見えている敵は、こちらも見えている
             if (sees) {
@@ -252,16 +298,20 @@
                 e.goal = null;
             }
             const fleeing = e.ai === 'flee' && sees && e.hp < e.stats.hp / 2;
-            if (!fleeing && cheb(e, p) === 1 && D.canMove(state.map, e.x, e.y, p.x - e.x, p.y - e.y)) {
+            const move = e.move && U.SKILLS[e.move];
+            if (!fleeing && canHit(e, p)) {
                 face(e, p.x - e.x, p.y - e.y);
-                state.queue.push(() => attack(e, p));
+                // わざ (正面) を使うこともある
+                if (move && move.range === 'front' && rng.chance(e.rate)) state.queue.push(() => enemySkill(e));
+                else state.queue.push(() => attack(e, p));
                 return;
             }
-            if (e.ai === 'shoot' && sees && lineTo(e, p)) {
+            if (e.ai === 'shoot' && move && sees && lineTo(e, p)) {
                 face(e, p.x - e.x, p.y - e.y);
-                state.queue.push(() => shoot(e, p));
+                state.queue.push(() => enemySkill(e));
                 return;
             }
+            if (st === 'bind') return;   // しばり: その場から動けない
             if (fleeing) return void stepAlong(e, dist, ms, true);
             if (sees) return void stepAlong(e, dist, ms);
             if (!e.goal || (e.x === e.goal.x && e.y === e.goal.y)) {
@@ -271,71 +321,202 @@
             if (!stepAlong(e, e.goal.dist, ms)) e.goal = null;
         }
 
-        // 敵の番 (主人公が 1 回動いたあと)
-        function enemyTurn(ms) {
+        // 敵のわざ (順番が来たときに、まだ届くか確かめる)
+        function enemySkill(e) {
+            const p = state.player;
+            if (e.hp <= 0 || p.hp <= 0) return 0;
+            const move = U.SKILLS[e.move];
+            if (move.range === 'front' ? !canHit(e, p) : !lineTo(e, p)) return 0;
+            return useMove(e, e.move, [Math.sign(p.x - e.x), Math.sign(p.y - e.y)]);
+        }
+
+        // 主人公が動いたあと。役職のすばやさで、敵が動く回数が変わる
+        function afterPlayer(ms) {
+            const speed = U.ROLES[state.player.role].speed;
+            if (speed > 0) {
+                state.fastSkip = !state.fastSkip;
+                if (state.fastSkip) return;
+            }
+            enemyTurn(ms, speed < 0 ? 2 : 1);
+        }
+
+        // 敵の番。times: 敵がふだんの何倍動くか
+        function enemyTurn(ms, times = 1) {
             if (state.over) return;
             state.turn++;
             state.phaseId++;
+            tickStatus();
+            if (state.over) return;
             regen(state.player);
             const dist = distances(state.player.x, state.player.y);
-            for (let round = 0; round < 2; round++) {
-                for (const e of state.enemies.slice()) if (e.hp > 0 && e.speed > round) act(e, dist, ms);
+            for (let round = 0; round < 2 * times; round++) {
+                for (const e of state.enemies.slice()) if (e.hp > 0 && e.speed * times > round) act(e, dist, ms);
             }
             // 時間がたつと敵が増える (仕様書 4.3)
             if (opts.enemies !== false && state.turn % SPAWN_EVERY === 0 && state.enemies.length < MAX_ENEMIES) spawnEnemy(-1);
         }
 
-        // 歩くと HP が少しずつ戻る (仕様書 6章)
+        // 1 ターンたった: 状態異常・まもりのかまえ が切れる。どくは HP が減る
+        function tickStatus() {
+            for (const u of [state.player, ...state.enemies]) {
+                if (u.buffs.guard && --u.buffs.guard === 0 && u.hero) say(`${u.name}の まもりのかまえが 切れた。`);
+                if (!u.status) continue;
+                if (u.status.id === 'poison') {
+                    const n = Math.max(1, Math.floor(u.stats.hp / 16));
+                    if (seen(u)) say(`${u.name}は どくで ${n} のダメージ！`);
+                    hurt(u, n, null);
+                    if (u.hp <= 0) continue;
+                }
+                if (--u.status.turns <= 0) {
+                    if (seen(u)) say(`${u.name}の ${U.STATUS[u.status.id].name}が 治った。`);
+                    u.status = null;
+                }
+            }
+        }
+
+        // 歩くと HP が少しずつ戻る (仕様書 6章)。どくのあいだは戻らない
         function regen(u) {
-            if (u.hp >= u.stats.hp) return void (u.regen = 0);
+            if (u.hp >= u.stats.hp || (u.status && u.status.id === 'poison')) return void (u.regen = 0);
             u.regen += u.stats.hp / 80;
             const n = Math.floor(u.regen);
             u.regen -= n;
             u.hp = Math.min(u.stats.hp, u.hp + n);
         }
 
-        // ----- 攻撃 -----
+        // ----- 攻撃・わざ -----
         function face(u, dx, dy) {
             u.dir = [Math.sign(dx), Math.sign(dy)];
             if (dx) u.flip = dx < 0;
         }
 
+        // a が t に与えるダメージ (属性の相性・同じ属性・きあいため・まもりのかまえ)
+        function deal(a, t, { power = 1, element = null, special = false } = {}) {
+            const atk = special ? a.stats.spa : a.stats.atk, def = special ? t.stats.spd : t.stats.def;
+            let { dmg, eff } = U.hitDamage(rng, atk, def, { power, element, self: a.element, target: t.element });
+            if (a.buffs.kiai) {
+                dmg *= 2;
+                a.buffs.kiai = false;
+            }
+            if (t.buffs.guard) dmg = Math.max(1, Math.round(dmg / 2));
+            return { dmg, eff };
+        }
+        const effText = eff => (eff > 1 ? ' こうかは ばつぐんだ！' : eff < 1 ? ' こうかは いまひとつ…' : '');
+
         // ふつうの攻撃 (となりのマス)。見せる時間を返す
         function attack(a, t) {
-            if (a.hp <= 0 || t.hp <= 0 || cheb(a, t) !== 1 || !D.canMove(state.map, a.x, a.y, t.x - a.x, t.y - a.y)) return 0;
+            if (a.hp <= 0 || t.hp <= 0 || !canHit(a, t)) return 0;
             face(a, t.x - a.x, t.y - a.y);
             a.lunge = { at: performance.now(), dir: a.dir };
             if (!rng.chance(U.HIT)) {
                 say(`${a.name}の こうげき！ ${t.name}は よけた。`);
                 popup(t, 'MISS', '#c8d8e8');
             } else {
-                const n = U.damage(rng, a.stats.atk, t.stats.def);
-                say(`${a.name}の こうげき！ ${t.name}に ${n} のダメージ！`);
-                hurt(t, n, a);
+                const { dmg } = deal(a, t);
+                say(`${a.name}の こうげき！ ${t.name}に ${dmg} のダメージ！`);
+                hurt(t, dmg, a);
             }
             return ATTACK_MS;
         }
 
-        // 「撃つ」敵のわざ (ヨフカシフクロウの羽ばたきの風)。まっすぐ飛ぶ
-        function shoot(a, t) {
-            if (a.hp <= 0 || t.hp <= 0 || !lineTo(a, t)) return 0;
-            face(a, t.x - a.x, t.y - a.y);
-            state.shots.push({ from: [a.x, a.y], to: [t.x, t.y], at: performance.now(), ms: SHOOT_MS });
-            if (!rng.chance(U.HIT)) {
-                say(`${a.name}の はばたき！ ${t.name}は よけた。`);
-                popup(t, 'MISS', '#c8d8e8');
-            } else {
-                const n = U.damage(rng, Math.round(a.stats.atk * 0.8), t.stats.def);
-                say(`${a.name}の はばたき！ ${t.name}に ${n} のダメージ！`);
-                hurt(t, n, a);
+        // わざの当たる相手 (仕様書 7章: 正面 1 マス / 前方の直線 / 周り 8 マス)
+        function targetsOf(u, range, [dx, dy]) {
+            const foe = t => t && t.hero !== u.hero;
+            if (range === 'front') return D.canMove(state.map, u.x, u.y, dx, dy) && foe(unitAt(u.x + dx, u.y + dy)) ? [unitAt(u.x + dx, u.y + dy)] : [];
+            if (range === 'line') {
+                for (let i = 0, x = u.x, y = u.y; i < LINE_RANGE && D.canMove(state.map, x, y, dx, dy); i++) {
+                    x += dx;
+                    y += dy;
+                    const t = unitAt(x, y);
+                    if (t) return foe(t) ? [t] : [];
+                }
+                return [];
             }
-            return SHOOT_MS;
+            if (range === 'around') return [state.player, ...state.enemies].filter(t => foe(t) && canHit(u, t));
+            return [];
+        }
+
+        // 直線のわざが止まるマス (飛んでいくところを見せる)
+        function lineEnd(u, [dx, dy]) {
+            let x = u.x, y = u.y;
+            for (let i = 0; i < LINE_RANGE && D.canMove(state.map, x, y, dx, dy); i++) {
+                x += dx;
+                y += dy;
+                if (unitAt(x, y)) break;
+            }
+            return [x, y];
+        }
+
+        // わざを使う (主人公も敵も)。見せる時間を返す
+        function useMove(u, id, dir) {
+            const mv = U.SKILLS[id];
+            face(u, dir[0], dir[1]);
+            u.lunge = { at: performance.now(), dir: u.dir };
+            say(`${u.name}の ${mv.name}！`);
+            if (mv.range === 'self') {
+                selfMove(u, mv);
+                return ATTACK_MS;
+            }
+            const targets = targetsOf(u, mv.range, u.dir);
+            const color = ELEMENT_COLORS[mv.element] || '#ffffff';
+            if (mv.range === 'line') state.shots.push({ from: [u.x, u.y], to: targets[0] ? [targets[0].x, targets[0].y] : lineEnd(u, u.dir), at: performance.now(), ms: SHOOT_MS, color });
+            if (mv.range === 'around') state.rings.push({ x: u.x, y: u.y, at: performance.now(), color });
+            if (!targets.length) say('しかし だれにも 当たらなかった。');
+            for (const t of targets) {
+                if (t.hp <= 0) continue;
+                if (!rng.chance(mv.acc)) {
+                    say(`${t.name}は よけた。`);
+                    popup(t, 'MISS', '#c8d8e8');
+                    continue;
+                }
+                if (mv.power > 0) {
+                    const { dmg, eff } = deal(u, t, mv);
+                    say(`${t.name}に ${dmg} のダメージ！${effText(eff)}`);
+                    hurt(t, dmg, u);
+                }
+                if (t.hp > 0 && mv.status && rng.chance(mv.chance)) inflict(t, mv.status, mv.power === 0);
+            }
+            return mv.range === 'line' ? SHOOT_MS : ATTACK_MS;
+        }
+
+        // 自分に使うわざ (役職のわざ)
+        function selfMove(u, mv) {
+            if (mv.buff === 'kiai') {
+                u.buffs.kiai = true;
+                say(`${u.name}は きあいを ためた！ つぎの攻撃は 2 倍だ。`);
+            } else if (mv.buff === 'guard') {
+                u.buffs.guard = GUARD_TURNS;
+                say(`${u.name}は まもりを かためた！`);
+            } else if (mv.heal) {
+                const n = Math.min(u.stats.hp - u.hp, Math.round(u.stats.hp * mv.heal));
+                u.hp += n;
+                popup(u, `+${n}`, '#7ae07a');
+                say(u.status ? `HP が ${n} 回復して、${U.STATUS[u.status.id].name}も 治った！` : `HP が ${n} 回復した！`);
+                u.status = null;
+            } else if (mv.reveal) {
+                const { stairs } = state.map;
+                state.explored[idx(stairs.x, stairs.y)] = 1;
+                say('階段の場所が わかった！ (ミニマップの青い印)');
+            }
+        }
+
+        // 状態異常にする。loud なら、かからなかったときも言う (状態異常だけのわざ)
+        function inflict(t, id, loud) {
+            if (id === 'flinch') {
+                t.flinch = true;
+                return say(`${t.name}は ひるんだ！`);
+            }
+            if (t.status || t.immune && t.immune.includes(id)) return loud ? say(`${t.name}には 効かなかった。`) : undefined;
+            const [a, b] = U.STATUS[id].turns;
+            t.status = { id, turns: rng.int(a, b) };
+            if (id === 'sleep') t.awake = true;
+            say(`${t.name}は ${U.STATUS[id].name}状態に なった！`);
         }
 
         function hurt(t, n, from) {
             t.hp = Math.max(0, t.hp - n);
             t.hurtAt = performance.now();
             popup(t, String(n), t.hero ? '#ff8a8a' : '#ffffff');
+            if (!t.hero) t.awake = true;
             if (t.hp > 0) return;
             if (t.hero) down();
             else defeat(t, from);
@@ -344,16 +525,35 @@
         function defeat(e, from) {
             state.enemies.splice(state.enemies.indexOf(e), 1);
             state.dying.push({ ...e, at: performance.now() });
-            if (!from.hero) return say(`${e.name}を たおした！`);
+            if (!from || !from.hero) return say(`${e.name}を たおした！`);
             say(`${e.name}を たおした！ けいけんち +${e.exp}`);
             const p = from;
-            const maxBefore = p.stats.hp;
+            const maxBefore = p.stats.hp, lvBefore = p.lv;
             if (U.gainExp(p, e.exp)) {
-                p.stats = U.heroStats(p.kind, p.lv);
+                p.stats = U.heroStats(p.kind, p.lv, p.role);
                 p.hp = Math.min(p.stats.hp, p.hp + p.stats.hp - maxBefore);
                 say(`${p.name}は Lv${p.lv} に 上がった！`);
                 popup(p, 'Lv UP!', '#ffe680');
+                U.learnedBetween(p.kind, lvBefore, p.lv).forEach(id => learn(p, id));
             }
+        }
+
+        // わざを覚える。4 つ持っていたら、どれかを忘れるか聞く (仕様書 7章)
+        function learn(p, id) {
+            const name = U.SKILLS[id].name;
+            if (p.skills.some(s => s.id === id)) return;
+            if (p.skills.length < U.MAX_SKILLS) {
+                p.skills.push(U.newSkill(id));
+                return say(`${p.name}は ${name}を 覚えた！`);
+            }
+            state.queue.push(() => {
+                ui.ask(`${p.name}は ${name}を 覚えたい！\nかわりに どれかを 忘れますか？`, [...p.skills.map(s => U.SKILLS[s.id].name), `${name}を 覚えない`], i => {
+                    if (i >= p.skills.length) return say(`${name}を 覚えなかった。`);
+                    say(`${U.SKILLS[p.skills[i].id].name}を 忘れて、${name}を 覚えた！`);
+                    p.skills[i] = U.newSkill(id);
+                }, { list: true });
+                return 0;
+            });
         }
 
         // 主人公がたおれた (段階 6 で町に戻るようにする。今は B1F からやり直し)
@@ -376,9 +576,37 @@
             state.popups.push({ x: u.x, y: u.y, text, color, at: performance.now() });
         }
 
-        // ----- 動く -----
+        // ----- 主人公の行動 -----
         const onStairs = () => state.player.x === state.map.stairs.x && state.player.y === state.map.stairs.y;
         const moving = () => Boolean(state.player.anim) || state.enemies.some(e => e.anim);
+        const hasStatus = (u, id) => Boolean(u.status && u.status.id === id);
+        const paralyzed = u => hasStatus(u, 'para') && rng.chance(0.5);
+
+        // 動けないまま 1 ターンすすむ
+        function passTurn(text) {
+            state.phaseId++;
+            state.queue.push(() => {
+                say(text);
+                return PASS_MS;
+            }, () => {
+                afterPlayer(STEP_MS);
+                return 0;
+            });
+        }
+
+        // 攻撃・わざなど、その場でする行動。まひなら半分の確率で動けない
+        function playerTurn(action) {
+            const p = state.player;
+            if (paralyzed(p)) return passTurn(`${p.name}は からだが しびれて 動けない！`);
+            state.phaseId++;
+            state.queue.push(action, () => {
+                afterPlayer(STEP_MS);
+                return 0;
+            });
+        }
+
+        // こんらんなら、半分の確率で でたらめな向きになる
+        const confusedDir = (u, dir) => (hasStatus(u, 'confuse') && rng.chance(0.5) ? rng.pick(DIRS8) : dir);
 
         // u を (dx, dy) へ 1 マス動かし、動くところを見せる。1 ターンに 2 回動いたら、つなげて見せる
         function moveUnit(u, dx, dy, ms) {
@@ -407,12 +635,19 @@
         // 主人公が 1 マス動く。動けたら true (敵がいるマスには入れない)
         function step(dx, dy, ms) {
             const p = state.player;
+            const confused = hasStatus(p, 'confuse');
+            [dx, dy] = confusedDir(p, [dx, dy]);
             if (dx || dy) face(p, dx, dy);
-            if (!D.canMove(state.map, p.x, p.y, dx, dy) || enemyAt(p.x + dx, p.y + dy)) return false;
+            if (hasStatus(p, 'bind')) return void passTurn(`${p.name}は からまって 動けない！`);
+            if (paralyzed(p)) return void passTurn(`${p.name}は からだが しびれて 動けない！`);
+            if (!D.canMove(state.map, p.x, p.y, dx, dy) || enemyAt(p.x + dx, p.y + dy)) {
+                if (confused) passTurn(`${p.name}は ふらふらしている…`);
+                return false;
+            }
             moveUnit(p, dx, dy, ms);
             look();
             state.arrived = true;
-            enemyTurn(ms);
+            afterPlayer(ms);
             return true;
         }
 
@@ -421,7 +656,7 @@
         function dashNext() {
             const p = state.player;
             const map = state.map;
-            if (onStairs() || state.over || enemyInSight()) return false;
+            if (onStairs() || state.over || p.status || enemyInSight()) return false;
             const inRoom = roomOf(p.x, p.y) >= 0;
             let { dx, dy } = dash;
             if (!inRoom && !(dx && dy)) {
@@ -454,23 +689,42 @@
         // 足踏み (1 ターンすすむ)
         function wait() {
             if (busy()) return;
-            enemyTurn(STEP_MS);
+            state.phaseId++;
+            afterPlayer(STEP_MS);
         }
 
         // 攻撃 (向いている方向のとなり)。だれもいなくても 1 ターンすすむ
         function attackFront() {
             if (busy()) return;
             const p = state.player;
-            const target = enemyAt(p.x + p.dir[0], p.y + p.dir[1]);
-            state.phaseId++;
-            state.queue.push(() => {
+            const dir = confusedDir(p, p.dir);
+            playerTurn(() => {
+                face(p, dir[0], dir[1]);
+                const target = enemyAt(p.x + dir[0], p.y + dir[1]);
                 if (target && attack(p, target)) return ATTACK_MS;
                 p.lunge = { at: performance.now(), dir: p.dir };
                 return ATTACK_MS * 0.7;
-            }, () => {
-                enemyTurn(STEP_MS);
-                return 0;
             });
+        }
+
+        // わざを使う (i: 何番目のわざか)
+        function useSkill(i) {
+            if (busy()) return;
+            const p = state.player;
+            const s = p.skills[i];
+            if (!s) return;
+            if (s.pp <= 0) return say(`${U.SKILLS[s.id].name}は PP が もうない！`);
+            const dir = confusedDir(p, p.dir);
+            playerTurn(() => {
+                s.pp--;
+                return useMove(p, s.id, dir);
+            });
+        }
+
+        // わざのえらび方 (画面のボタン・キーボード 1〜4) に出す説明
+        function skillLabel(s) {
+            const mv = U.SKILLS[s.id];
+            return { name: mv.name, info: `${mv.element || '―'}・${RANGE_NAMES[mv.range]}`, pp: `${s.pp}/${s.max}`, note: mv.note || '' };
         }
 
         // 決定: 階段の上で前に敵がいなければ「降りますか？」、それ以外は攻撃
@@ -491,7 +745,7 @@
                 state.enemies.forEach(e => animate(e, now));
                 if (state.waitUntil && now >= state.waitUntil) state.waitUntil = 0;
                 // 順番待ちの攻撃などを、歩き終わってから 1 つずつ
-                while (!state.waitUntil && !moving() && state.queue.length) {
+                while (!state.waitUntil && !moving() && !ui.asking() && state.queue.length) {
                     const ms = state.queue.shift()();
                     if (ms) state.waitUntil = now + ms;
                 }
@@ -499,7 +753,15 @@
                     state.arrived = false;
                     // ダッシュの続き。止まったら、階段の上なら聞く
                     if (dash && !dashNext()) dash = null;
-                    if (!state.player.anim && onStairs() && !state.over) askStairs();
+                    if (!state.player.anim && onStairs() && !state.over && !ui.asking()) askStairs();
+                }
+                // ねむり・ひるみ のあいだは、ひとりでにターンがすすむ
+                const p = state.player;
+                if (!busy() && (p.flinch || hasStatus(p, 'sleep'))) {
+                    if (p.flinch) {
+                        p.flinch = false;
+                        passTurn(`${p.name}は ひるんで 動けない！`);
+                    } else passTurn(`${p.name}は ぐっすり ねむっている…`);
                 }
             }
             if (state.fade && now - state.fade.at > FADE_MS / 2 && state.fade.then) {
@@ -509,13 +771,15 @@
             if (state.fade && now - state.fade.at > FADE_MS) state.fade = null;
             state.popups = state.popups.filter(p => now - p.at < 800);
             state.shots = state.shots.filter(s => now - s.at < s.ms);
+            state.rings = state.rings.filter(r => now - r.at < 300);
             state.dying = state.dying.filter(d => now - d.at < 450);
         }
 
         function draw(now) {
             update(now);
             if (!state.map) {
-                drawSelect(now);
+                if (state.selectStep === 'role') drawRoles(now);
+                else drawSelect(now);
                 if (state.fade) drawFade(now);
                 return;
             }
@@ -550,6 +814,7 @@
             const units = [...state.enemies.filter(e => state.visible[idx(e.x, e.y)]), p].sort((a, b) => a.fy - b.fy);
             state.dying.forEach(d => drawDying(d, camX, camY, now));
             units.forEach(u => drawUnit(u, camX, camY, now));
+            drawRings(camX, camY, now);
             drawShots(camX, camY, now);
             drawPopups(camX, camY, now);
             drawHud();
@@ -575,7 +840,8 @@
             // ダメージを受けたら点滅
             const hurt = now - u.hurtAt;
             if (u.hurtAt && hurt < 360 && Math.floor(hurt / 60) % 2 === 0) return;
-            const frame = u.hero ? u.step % 2 : (u.step + Math.floor(now / 450)) % 2;
+            // ねむっているあいだは足が止まる
+            const frame = hasStatus(u, 'sleep') ? 0 : u.hero ? u.step % 2 : (u.step + Math.floor(now / 450)) % 2;
             A.drawSprite(ctx, u.kind, frame, sx, sy - 2, { flip: u.flip });
             // 敵は HP が減っていたら小さなバー
             if (!u.hero && u.hp < u.stats.hp) {
@@ -583,6 +849,21 @@
                 ctx.fillRect(sx + 2, sy + 15, 12, 2);
                 ctx.fillStyle = u.hp / u.stats.hp > 0.3 ? '#7ae07a' : '#ff6a5a';
                 ctx.fillRect(sx + 2, sy + 15, Math.max(1, Math.round(12 * u.hp / u.stats.hp)), 2);
+            }
+            // 状態異常の印 (頭の上)
+            if (u.status) {
+                const st = U.STATUS[u.status.id];
+                ctx.font = `bold 7px ${FONT}`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = 'rgba(0,0,0,.8)';
+                const y = sy - 4 + (Math.floor(now / 400) % 2);
+                ctx.strokeText(st.mark, sx + 8, y);
+                ctx.fillStyle = st.color;
+                ctx.fillText(st.mark, sx + 8, y);
+                ctx.textAlign = 'left';
+                ctx.lineWidth = 1;
             }
         }
 
@@ -613,14 +894,31 @@
                 const k = (now - s.at) / s.ms;
                 const x = (s.from[0] + (s.to[0] - s.from[0]) * k) * T - camX + T / 2;
                 const y = (s.from[1] + (s.to[1] - s.from[1]) * k) * T - camY + T / 2;
-                ctx.fillStyle = 'rgba(220,240,255,.85)';
+                ctx.fillStyle = s.color || '#dcf0ff';
+                ctx.globalAlpha = 0.9;
                 ctx.beginPath();
                 ctx.arc(x, y, 3, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.fillStyle = 'rgba(220,240,255,.4)';
+                ctx.globalAlpha = 0.4;
                 ctx.beginPath();
                 ctx.arc(x, y, 5, 0, Math.PI * 2);
                 ctx.fill();
+                ctx.globalAlpha = 1;
+            });
+        }
+
+        // 周り 8 マスのわざ: 広がる輪
+        function drawRings(camX, camY, now) {
+            state.rings.forEach(r => {
+                const k = (now - r.at) / 300;
+                ctx.strokeStyle = r.color;
+                ctx.globalAlpha = 1 - k;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(r.x * T - camX + T / 2, r.y * T - camY + T / 2, 6 + k * 18, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+                ctx.lineWidth = 1;
             });
         }
 
@@ -642,7 +940,7 @@
             ctx.lineWidth = 1;
         }
 
-        // 上の帯 (仕様書 14章。満腹・借金は段階 4・6 から)
+        // 上の帯 (仕様書 14章: 階・Lv・役職・HP・状態。満腹・借金は段階 4・6 から)
         function drawHud() {
             const p = state.player;
             ctx.fillStyle = 'rgba(0,0,0,.6)';
@@ -652,17 +950,32 @@
             ctx.fillStyle = '#ffe680';
             ctx.fillText(`B${state.floor}F`, 4, 7);
             ctx.fillStyle = '#ffffff';
-            ctx.fillText(`Lv${p.lv}`, 30, 7);
-            ctx.fillText('HP', 62, 7);
+            ctx.fillText(`Lv${p.lv}`, 28, 7);
+            ctx.fillStyle = '#8fd6f7';
+            ctx.fillText(U.ROLES[p.role].name, 56, 7);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText('HP', 130, 7);
             const k = p.hp / p.stats.hp;
             ctx.fillStyle = '#3a1010';
-            ctx.fillRect(78, 4, 60, 6);
+            ctx.fillRect(146, 4, 50, 6);
             ctx.fillStyle = k > 0.5 ? '#6ae06a' : k > 0.25 ? '#f0d040' : '#ff5a4a';
-            ctx.fillRect(78, 4, Math.round(60 * k), 6);
+            ctx.fillRect(146, 4, Math.round(50 * k), 6);
             ctx.fillStyle = '#ffffff';
-            ctx.fillText(`${p.hp}/${p.stats.hp}`, 142, 7);
+            ctx.fillText(`${p.hp}/${p.stats.hp}`, 200, 7);
+            // 状態異常・きあいため・まもりのかまえ
+            const tags = [];
+            if (p.status) tags.push([U.STATUS[p.status.id].name, U.STATUS[p.status.id].color]);
+            if (p.buffs.kiai) tags.push(['きあい', '#ffb060']);
+            if (p.buffs.guard) tags.push(['まもり', '#8fd6f7']);
+            let x = 246;
+            ctx.font = `9px ${FONT}`;
+            tags.forEach(([t, c]) => {
+                ctx.fillStyle = c;
+                ctx.fillText(t, x, 7);
+                x += ctx.measureText(t).width + 6;
+            });
+            ctx.font = `10px ${FONT}`;
             ctx.fillStyle = '#c8d8e8';
-            ctx.fillText(state.dungeon.name, 196, 7);
             ctx.textAlign = 'right';
             ctx.fillText(`ターン ${state.turn}`, W - 4, 7);
             ctx.textAlign = 'left';
@@ -698,7 +1011,7 @@
             }
         }
 
-        // メッセージ (下。新しいものから3行、時間がたつと消える)
+        // メッセージ (下。新しいものから4行、時間がたつと消える)
         function drawMessages(now) {
             const list = state.messages.filter(m => now - m.at < 4000);
             if (!list.length) return;
@@ -749,6 +1062,38 @@
             ctx.textAlign = 'left';
         }
 
+        // 役職をえらぶ画面 (5 つの役職と、能力の変わり方・役職のわざ)
+        function drawRoles(now) {
+            ctx.fillStyle = '#0a1420';
+            ctx.fillRect(0, 0, W, H);
+            ctx.textBaseline = 'middle';
+            ctx.font = `bold 12px ${FONT}`;
+            ctx.fillStyle = '#8fd6f7';
+            ctx.textAlign = 'center';
+            ctx.fillText('役職をえらんでね', W / 2, 12);
+            ctx.textAlign = 'left';
+            A.drawSprite(ctx, state.heroPick, Math.floor(now / 300) % 2, 8, 4, { scale: 1 });
+            U.ROLE_IDS.forEach((id, i) => {
+                const r = U.ROLES[id];
+                const on = state.pick === i;
+                const y = 24 + i * 25;
+                ctx.fillStyle = on ? '#1c3450' : '#142436';
+                ctx.fillRect(10, y, W - 20, 23);
+                ctx.strokeStyle = on ? '#ffe680' : '#3a6a8a';
+                ctx.strokeRect(10.5, y + 0.5, W - 21, 22);
+                ctx.font = `bold 10px ${FONT}`;
+                ctx.fillStyle = on ? '#ffe680' : '#ffffff';
+                ctx.fillText(r.name, 16, y + 7);
+                ctx.font = `9px ${FONT}`;
+                ctx.fillStyle = '#c8d8e8';
+                ctx.fillText(`${r.good}／わざ：${U.SKILLS[r.skill].name}（${U.SKILLS[r.skill].note}）`, 16, y + 17);
+                ctx.fillStyle = '#9ad0f0';
+                ctx.textAlign = 'right';
+                ctx.fillText(U.roleText(id), W - 16, y + 7);
+                ctx.textAlign = 'left';
+            });
+        }
+
         // 階が変わるときの暗転と、ダンジョンの名前と階
         function drawFade(now) {
             const k = (now - state.fade.at) / FADE_MS;
@@ -768,7 +1113,8 @@
 
         selectHero();
         return {
-            state, draw, moveInput, wait, confirm, attack: attackFront, busy,
+            state, draw, moveInput, wait, confirm, attack: attackFront, useSkill, busy, makeEnemy,
+            skills: () => (state.player ? state.player.skills.map(skillLabel) : []),
             toggleMinimap() { state.mini = !state.mini; }
         };
     }
