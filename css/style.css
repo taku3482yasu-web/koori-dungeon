@@ -1,0 +1,118 @@
+:root {
+    --bg: #0a1420;
+    --panel: #142436;
+    --line: #3a6a8a;
+    --text: #e8f4ff;
+    --accent: #8fd6f7;
+    --hot: #ffe680;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "BIZ UDPGothic", "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif;
+}
+
+.app {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 12px 16px 24px;
+}
+
+h1 {
+    margin: 0 0 10px;
+    font-size: 20px;
+    color: var(--accent);
+    letter-spacing: .04em;
+}
+h1 small { display: block; font-size: 13px; color: var(--text); font-weight: normal; }
+
+.stage {
+    position: relative;
+    border: 3px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    background: #000;
+    line-height: 0;
+}
+
+#screen {
+    width: 100%;
+    height: auto;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    display: block;
+}
+
+/* 聞く画面 (はい / いいえ) */
+.ask {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(86%, 420px);
+    padding: 16px 18px;
+    background: rgba(10, 20, 34, .94);
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    line-height: 1.6;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
+}
+.ask[hidden] { display: none; }
+.ask-text { margin: 0 0 12px; white-space: pre-line; font-size: 15px; }
+.ask-choices { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+.ask-choices button {
+    min-width: 96px;
+    padding: 8px 14px;
+    font: inherit;
+    font-size: 15px;
+    color: var(--text);
+    background: var(--panel);
+    border: 2px solid var(--line);
+    border-radius: 6px;
+    cursor: pointer;
+}
+.ask-choices button.on { border-color: var(--hot); color: var(--hot); }
+
+/* スマホの操作 */
+.pad {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-top: 12px;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+}
+.dpad {
+    display: grid;
+    grid-template-columns: repeat(3, 52px);
+    grid-template-rows: repeat(3, 52px);
+    gap: 4px;
+}
+.pad button {
+    font: inherit;
+    font-size: 18px;
+    color: var(--text);
+    background: var(--panel);
+    border: 2px solid var(--line);
+    border-radius: 8px;
+    touch-action: none;
+    cursor: pointer;
+}
+.pad button:active { background: #24405a; border-color: var(--accent); }
+.acts { display: flex; flex-direction: column; gap: 8px; }
+.acts button { width: 96px; height: 44px; font-size: 15px; }
+#btn-ok { border-color: var(--hot); }
+
+.keys { margin: 12px 0 0; font-size: 12px; color: #a8c0d8; line-height: 1.6; }
+
+/* パソコン (マウス) では十字ボタンを小さく */
+@media (hover: hover) and (pointer: fine) {
+    .dpad { grid-template-columns: repeat(3, 40px); grid-template-rows: repeat(3, 40px); }
+    .acts button { height: 36px; }
+}
