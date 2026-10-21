@@ -1,5 +1,6 @@
 // =====================================================================
-// ゲームの進行 (段階 7: タイトル → 町 → ダンジョン 7 つ (いちばん下にボス) → 町。仲間といっしょに わざ・道具を使って戦う)
+// ゲームの進行 (段階 8: タイトル → 町 → ダンジョン 7 つ (いちばん下にボス) → 町。仲間といっしょに わざ・道具を使って戦う)
+// 段階 8: 音 (sound.js)・演出 (画面のゆれ・光・ボスのカットイン)・口ぐせの吹き出し・ハプニング・図鑑と実績の記録 (collection.js)
 // ---------------------------------------------------------------------
 // 仕様書 4章 (マップ・見える範囲・ミニマップ・階段・ワナ)・5章 (ターン・移動・斜め・ダッシュ)・
 // 6章 (能力・Lv・属性・役職・満腹度)・7章 (わざ・状態異常)・8章 (仲間)・9章 (道具・お金)・15章 (操作)。
@@ -38,10 +39,15 @@
     const DG = KD.Dungeons;
     const DUNGEONS = DG.LIST.map(d => ({ items: I.FOREST_ITEMS, trapKinds: I.FOREST_TRAPS, ...d }));
     const has = (u, trait) => Boolean(u.traits && u.traits.includes(trait));
+    const C = KD.Collection;
+    const sfx = name => KD.Sound && KD.Sound.play(name);
+    // ダンジョンの BGM (ボスが起きたら boss)
+    const DUNGEON_BGM = { forest: 'forest', coast: 'cave', temple: 'deep', mansion: 'forest', moon: 'cave', mountain: 'deep', aso: 'deep' };
 
     // opts (テスト用): enemies: false で敵を出さない・things: false で道具とワナを置かない・partner: false で最初の仲間なし・
     //   recruit: false で敵が仲間にならない (数なら その確率)・seed で同じ階にする・
     //   start: 'dungeon' でタイトルと町を飛ばして すぐダンジョンへ (dungeon: どのダンジョンか)・role: はじめの役職 (開放もする)・save: false でセーブしない
+    //   happen: false でハプニングなし (名前なら そのハプニングを かならず)
     function createGame(canvas, ui, opts = {}) {
         const ctx = canvas.getContext('2d');
         canvas.width = W;
@@ -75,6 +81,12 @@
             turn: 0,
             messages: [],
             popups: [],       // ダメージの数字
+            bubbles: [],      // 口ぐせの吹き出し: { u, text, at }
+            toasts: [],       // 実績などの お知らせ: { text, at }
+            shake: null,      // 画面のゆれ: { at, mag }
+            flash: null,      // 画面が光る: { at, color }
+            cutin: null,      // ボスのカットイン: { kind, name, at }
+            house: -1,        // モンスターハウスの部屋 (入ると 敵がいっせいに起きる)
             shots: [],        // 飛んでいくわざ
             rings: [],        // 周りに当たるわざ
             fade: null,       // { at, label, then }
@@ -184,6 +196,9 @@
             state.turn = 0;
             state.boss = null;
             state.bossDown = false;
+            state.house = -1;
+            state.bubbles = [];
+            party().forEach(u => { u.pinched = false; });
             const last = n >= state.dungeon.floors;
             // 月の迷宮: しばらくすると 階の形が変わる (いちばん下の階は変わらない)
             state.shiftAt = state.dungeon.shift && !last ? state.dungeon.shift : 0;
@@ -194,15 +209,97 @@
                 const startRoom = roomOf(p.x, p.y);
                 for (let i = 0; i < 3 + Math.min(4, Math.ceil(n / 2)); i++) spawnEnemy(startRoom);
                 if (last && state.dungeon.boss) spawnBoss();
+                else maybeHappen();
             }
+            if (KD.Sound) KD.Sound.bgm(DUNGEON_BGM[state.dungeon.id] || 'forest');
             say(`${state.dungeon.name} B${n}F に着いた。`);
             // 中断セーブ (各階に着いたとき。仕様書 16章)
             state.run = { dungeon: state.dungeon.id, floor: n, seed: state.seed };
             if (state.town) {
                 town.save();
                 town.onFloor(n, state.dungeon.id);
+                town.check();
             }
         }
+
+        // ----- ハプニング (仕様書 17章: 階に着いたとき まれに起こる) -----
+        function maybeHappen() {
+            if (opts.happen === false || !state.town) return;
+            const forced = typeof opts.happen === 'string' ? opts.happen : null;
+            if (!forced && !rng.chance(C.HAPPEN_RATE)) return;
+            const id = forced || I.weighted(rng, C.HAPPENINGS);
+            const p = state.player;
+            const startRoom = roomOf(p.x, p.y);
+            const rooms = state.map.rooms.map((r, i) => i).filter(i => i !== startRoom);
+            const ri = rng.pick(rooms);
+            const room = state.map.rooms[ri];
+            const lv = DG.levelFor(state.dungeon, state.floor);
+            const cells = [];
+            for (let y = room.y; y < room.y + room.h; y++) for (let x = room.x; x < room.x + room.w; x++) if (D.at(state.map, x, y) === D.FLOOR) cells.push([x, y]);
+            const free = () => rng.shuffle(cells).find(([x, y]) => !occupied(x, y) && !itemAt(x, y) && !trapAt(x, y) && !(x === state.map.stairs.x && y === state.map.stairs.y));
+            sfx('happen');
+            if (id === 'rival') {
+                const team = rng.pick(Object.keys(C.RIVALS));
+                C.RIVALS[team].forEach(kind => {
+                    const spot = free();
+                    if (!spot) return;
+                    const e = makeEnemy(kind, lv + 1, spot[0], spot[1]);
+                    e.team = team;
+                    state.enemies.push(e);
+                });
+                say(`ハプニング！ ライバル探検隊「${team}」が この階に いるらしい……`);
+            } else if (id === 'treasure') {
+                for (let i = rng.int(6, 9); i > 0; i--) {
+                    const spot = free();
+                    if (!spot) break;
+                    if (rng.chance(0.15)) {
+                        const m = makeEnemy('takaramimic', lv, spot[0], spot[1]);
+                        state.enemies.push(m);
+                    } else state.items.push({ x: spot[0], y: spot[1], item: I.rollItem(rng, state.dungeon.items) });
+                }
+                say('ハプニング！ この階には 宝の部屋が あるらしい！');
+            } else if (id === 'call') {
+                const gift = rng.pick(['onigiri', 'ice_shard', 'ice_shard', 'big_onigiri', 'revive_seed']);
+                say('ハプニング！ ふるカワから 通信だ。');
+                if (p.bag.length < I.BAG_MAX) {
+                    p.bag.push({ id: gift, n: 1 });
+                    say(`ふるカワ「がんばってね！ ${I.ITEMS[gift].name}を 送るよ！」`);
+                } else {
+                    state.explored[idx(state.map.stairs.x, state.map.stairs.y)] = 1;
+                    say('ふるカワ「荷物が いっぱいだね。かわりに 階段の場所を 教えるよ！」');
+                }
+            } else if (id === 'collect') {
+                // おにおにの取り立て: 持っているお金の 2 割を、借金の返済に
+                const n = Math.floor(p.money * 0.2);
+                say('ハプニング！ おにおにの声「金返せ！」');
+                if (n > 0) {
+                    p.money -= n;
+                    town.repay(n);
+                    say(`${n}えん 借金の返済に 取られた……（借金は 減った）`);
+                } else say('おにおに「……なんだ、持ってないのか」');
+            } else if (id === 'house') {
+                // モンスターハウス (仕様書 4.3): 入るまで ねむっている
+                for (let i = rng.int(6, 9); i > 0; i--) {
+                    const spot = free();
+                    if (!spot) break;
+                    const e = makeEnemy(rng.pick(DG.tableFor(state.dungeon, state.floor)), Math.max(1, lv), spot[0], spot[1]);
+                    e.awake = false;
+                    e.house = true;
+                    state.enemies.push(e);
+                }
+                state.house = ri;
+            }
+        }
+
+        // ----- 演出 -----
+        function bubble(u, text) {
+            if (!text || u.hp <= 0) return;
+            state.bubbles = state.bubbles.filter(b => b.u !== u);
+            state.bubbles.push({ u, text, at: performance.now() });
+        }
+        const shake = mag => { state.shake = { at: performance.now(), mag }; };
+        const flash = color => { state.flash = { at: performance.now(), color }; };
+        const toast = text => { state.toasts.push({ text, at: performance.now() }); };
 
         // u を (x, y) のいちばん近くの あいているマスに置く (仲間がいっしょに階に着く・仲間になる)
         function placeNear(u, x, y) {
@@ -252,6 +349,14 @@
             const p = state.player;
             state.visible = D.visibleFrom(state.map, p.x, p.y);
             state.visible.forEach((v, i) => { if (v) state.explored[i] = 1; });
+            if (state.house >= 0 && roomOf(p.x, p.y) === state.house) {
+                state.house = -1;
+                state.enemies.forEach(e => { if (e.house) e.awake = true; });
+                say('モンスターハウスだ！');
+                sfx('boss');
+                shake(4);
+                if (state.town) town.stat('houses');
+            }
             // サポーターは、見えているワナに気づく (仕様書 6.3)
             if (p.role !== 'supporter') return;
             state.traps.forEach(t => {
@@ -272,6 +377,7 @@
             if (state.boss && state.boss.hp > 0) return say(`${state.boss.name}を たおさないと、先へ 進めない！`);
             ui.ask(last ? `階段がある。降りると${state.dungeon.name}を抜けられそうだ。降りますか？` : '階段がある。降りますか？', ['はい', 'いいえ'], choice => {
                 if (choice !== 0) return say('降りるのをやめた。');
+                sfx('stairs');
                 if (last) return clear();
                 changeFloor(state.floor + 1, `${state.dungeon.name}  B${state.floor + 1}F`);
             });
@@ -519,11 +625,18 @@
             if (sees) {
                 e.seen = [p.x, p.y];
                 e.goal = null;
+                if (!e.spoke) {
+                    e.spoke = true;
+                    if (state.town) town.seen(e.kind);
+                    if (rng.chance(e.team ? 1 : 0.2)) bubble(e, U.ENEMIES[e.kind].line);
+                }
             }
-            // ツキウサギ: 仲間の敵を回復
-            if (has(e, 'healer') && rng.chance(0.4)) {
-                const other = state.enemies.find(o => o !== e && o.hp > 0 && o.hp < o.stats.hp * 0.6 && cheb(o, e) <= 2);
-                if (other) return void state.queue.push(() => enemyHeal(e, other));
+            // ツキウサギ: けがをした仲間の敵を回復する (はなれていれば 近づく)
+            if (has(e, 'healer')) {
+                const other = state.enemies.filter(o => o !== e && o.hp > 0 && o.hp < o.stats.hp * 0.6 && cheb(o, e) <= 6)
+                    .sort((a, b) => cheb(a, e) - cheb(b, e))[0];
+                if (other && cheb(other, e) <= 2 && rng.chance(0.6)) return void state.queue.push(() => enemyHeal(e, other));
+                if (other && cheb(other, e) > 2 && st !== 'bind' && stepAlong(e, distances(other.x, other.y), ms)) return;
             }
             // ツボマジン・ハリー・大魔王ASO: 仲間を呼ぶ
             if (has(e, 'summon') && sees && rng.chance(e.boss ? 0.15 : 0.12) && state.enemies.length < MAX_ENEMIES + 4) {
@@ -568,8 +681,14 @@
             if (has(e, 'disguise') || has(e, 'mimic')) say(`${e.name}が 化けていた！「${U.ENEMIES[e.kind].line}」`);
             if (e.boss && !e.met) {
                 e.met = true;
+                // ボスのカットイン・BGM
+                state.cutin = { kind: e.kind, name: e.name, at: performance.now() };
+                sfx('boss');
+                if (KD.Sound) KD.Sound.bgm('boss');
+                if (state.town) town.seen(e.kind);
                 const lines = state.dungeon.story && state.dungeon.story.boss;
-                state.queue.push(() => {
+                // カットインが終わってから 台詞
+                state.queue.push(() => 1300, () => {
                     talk(lines || [`${e.name}「${U.ENEMIES[e.kind].line}」`]);
                     return 0;
                 });
@@ -646,6 +765,7 @@
             say(`${e.name}「${U.ENEMIES[e.kind].line}」 ドカーン！`);
             state.rings.push({ x: e.x, y: e.y, at: performance.now(), color: '#ffb030' });
             const n = Math.round(e.stats.atk * 1.5);
+            shake(5);
             [...party(), ...state.enemies].filter(u => u !== e && u.hp > 0 && cheb(u, e) === 1).forEach(u => {
                 say(`${u.name}に ${n} のダメージ！`);
                 hurt(u, n, e);
@@ -778,6 +898,7 @@
                 ui.ask(`${e.name}が 仲間になりたそうに こちらを見ている！\n仲間にしますか？`, ['はい', 'いいえ'], i => {
                     if (i !== 0) return say(`${e.name}は さみしそうに 去っていった…`);
                     const a = makeAlly(e.kind, e.lv);
+                    if (state.town) town.stat('recruited');
                     if (party().length < partyMax() && placeNear(a, state.player.x, state.player.y)) {
                         state.allies.push(a);
                         say(`${a.name}が 仲間になった！（役職：${U.ROLES[a.role].name}）`);
@@ -925,12 +1046,15 @@
             if (a.hp <= 0 || t.hp <= 0 || !canHit(a, t)) return 0;
             face(a, t.x - a.x, t.y - a.y);
             a.lunge = { at: performance.now(), dir: a.dir };
+            if (a.side === 'party' && rng.chance(0.12)) bubble(a, C.lineFor(a.kind, 'attack', rng));
             if (!rng.chance(hitRate(a, t, U.HIT))) {
                 say(`${a.name}の こうげき！ ${t.name}は よけた。`);
                 popup(t, 'MISS', '#c8d8e8');
+                sfx('miss');
             } else {
                 const { dmg } = deal(a, t);
                 say(`${a.name}の こうげき！ ${t.name}に ${dmg} のダメージ！`);
+                sfx('hit');
                 hurt(t, dmg, a);
             }
             return ATTACK_MS;
@@ -970,6 +1094,9 @@
             face(u, dir[0], dir[1]);
             u.lunge = { at: performance.now(), dir: u.dir };
             say(`${u.name}の ${mv.name}！`);
+            sfx(mv.heal ? 'heal' : 'skill');
+            if (u.side === 'party' && rng.chance(0.15)) bubble(u, C.lineFor(u.kind, 'attack', rng));
+            if (mv.role && U.SKILLS[id] && /奥義/.test(mv.note || '')) flash('rgba(255,240,180,.5)');
             if (mv.range === 'self') {
                 selfMove(u, mv);
                 return ATTACK_MS;
@@ -1045,6 +1172,7 @@
             const [a, b] = U.STATUS[id].turns;
             t.status = { id, turns: rng.int(a, b) };
             if (id === 'sleep') t.awake = true;
+            if (id === 'colitis' && t.hero && state.town) town.stat('colitis');
             say(`${t.name}は ${U.STATUS[id].name}状態に なった！`);
         }
 
@@ -1057,6 +1185,15 @@
                 if (seen(t)) say(`${t.name}の こおりが とけた！`);
             }
             if (t.side === 'enemy' && !t.awake) wake(t);
+            if (t.side === 'party') {
+                sfx('hurt');
+                if (n >= t.stats.hp * 0.2) shake(t.hero ? 3 : 2);
+                if (t.hp > 0 && t.hp < t.stats.hp * 0.25 && !t.pinched) {
+                    t.pinched = true;
+                    bubble(t, C.lineFor(t.kind, 'pinch', rng));
+                }
+                if (t.hero && t.hp === 1 && state.town) town.stat('clutch');
+            }
             if (t.hp > 0) return void (t.side === 'enemy' && reactHurt(t));
             // ナンドモスライム: 1 回だけ復活
             if (has(t, 'revive') && !t.revived) {
@@ -1101,6 +1238,7 @@
                 dropItem(e.x, e.y, e.loot);
                 say(`${e.name}は ${I.label(e.loot)}を 落とした。`);
             }
+            if (state.town) town.check();
             if (e.money) dropItem(e.x, e.y, { id: 'money', n: e.money });
             // キンメンコイヌ・ゴールド金面犬: たくさんのお金 / タカラミミック: 良い道具
             if (has(e, 'rich') && dropItem(e.x, e.y, { id: 'money', n: Math.round(60 * e.lv * (e.big ? 6 : 1)) })) say(`${e.name}は お金を たくさん 落とした！`);
@@ -1108,8 +1246,21 @@
                 const good = rng.pick(['gold_band', 'revive_seed', 'omamori', 'moon_drop', 'lucky_coin']);
                 if (dropItem(e.x, e.y, { id: good, n: 1 })) say(`${e.name}は ${I.ITEMS[good].name}を 落とした！`);
             }
+            sfx('defeat');
+            if (state.town) {
+                town.beat(e.kind);
+                if (from && from.side === 'party') town.stat('kills');
+            }
+            // ライバル探検隊: みんな たおしたら
+            if (e.team && !state.enemies.some(o => o.team === e.team)) {
+                say(`${e.team}「覚えてろ～！」 ライバル探検隊を やっつけた！`);
+                if (state.town) town.stat('rivals');
+            }
+            if (from && from.side === 'party' && rng.chance(0.1)) bubble(from, C.lineFor(from.kind, 'win', rng));
             if (e.boss) {
                 state.bossDown = true;
+                flash('rgba(255,255,255,.8)');
+                shake(6);
                 state.queue.push(() => 500, () => {
                     say('階段が 使えるようになった！');
                     return 0;
@@ -1132,9 +1283,12 @@
             const maxBefore = u.stats.hp, lvBefore = u.lv;
             if (!U.gainExp(u, n)) return;
             recalc(u);
-            u.hp = Math.min(u.stats.hp, u.hp + u.stats.hp - maxBefore);
+            u.hp = Math.min(u.stats.hp, Math.max(1, u.hp + u.stats.hp - maxBefore));
             say(`${u.name}は Lv${u.lv} に 上がった！`);
             popup(u, 'Lv UP!', '#ffe680');
+            sfx('levelup');
+            bubble(u, C.lineFor(u.kind, 'levelup', rng));
+            if (u.hero) flash('rgba(255,240,160,.45)');
             if (U.HEROES[u.kind]) U.learnedBetween(u.kind, lvBefore, u.lv).forEach(id => (u.hero ? learn(u, id) : allyLearn(u, id)));
         }
 
@@ -1323,6 +1477,7 @@
                 const n = Math.round(item.n * (p.role === 'supporter' ? 1.5 : 1) * (coin || 1));
                 p.money += n;
                 state.items.splice(state.items.indexOf(fi), 1);
+                sfx('money');
                 return say(`${n}えん 拾った！`);
             }
             const stack = I.ITEMS[item.id].count && p.bag.find(it => it.id === item.id);
@@ -1330,6 +1485,8 @@
             if (stack) stack.n += item.n;
             else p.bag.push({ ...item });
             state.items.splice(state.items.indexOf(fi), 1);
+            sfx('pickup');
+            if (state.town) town.noteItem(item.id);
             say(`${I.label(item)}を 拾った。`);
         }
 
@@ -1338,6 +1495,7 @@
             const p = state.player;
             if (p.hp <= 0) return 0;
             say(`${I.TRAPS[tr.id].name}を 踏んでしまった！`);
+            sfx('trap');
             if (tr.id === 'spike') {
                 const n = 5 + state.floor * 2;
                 say(`トゲが ささって ${n} のダメージ！`);
@@ -1672,6 +1830,7 @@
             if (state.phase === 'title' || state.phase === 'town') {
                 town.draw(ctx, now, W, H);
                 if (state.fade) drawFade(now);
+                drawToasts(now);
                 return;
             }
             if (!state.map) {
@@ -1685,7 +1844,17 @@
             ctx.fillStyle = th.void;
             ctx.fillRect(0, 0, W, H);
             // 主人公が画面のまんなかに来るように
-            const camX = Math.round(p.fx * T - (W - T) / 2), camY = Math.round(p.fy * T - (H - T) / 2);
+            // 画面のゆれ (大きなダメージ・爆発・ボス)
+            let sx0 = 0, sy0 = 0;
+            if (state.shake) {
+                const k = (now - state.shake.at) / 300;
+                if (k >= 1) state.shake = null;
+                else {
+                    sx0 = Math.round((Math.random() * 2 - 1) * state.shake.mag * (1 - k));
+                    sy0 = Math.round((Math.random() * 2 - 1) * state.shake.mag * (1 - k));
+                }
+            }
+            const camX = Math.round(p.fx * T - (W - T) / 2) + sx0, camY = Math.round(p.fy * T - (H - T) / 2) + sy0;
             const x0 = Math.floor(camX / T), y0 = Math.floor(camY / T);
             for (let ty = y0; ty <= y0 + VIEW_H + 1; ty++) {
                 for (let tx = x0; tx <= x0 + VIEW_W + 1; tx++) {
@@ -1722,12 +1891,85 @@
             drawRings(camX, camY, now);
             drawShots(camX, camY, now);
             drawPopups(camX, camY, now);
+            drawBubbles(camX, camY, now);
+            drawFlash(now);
             drawHud();
             drawParty();
             drawBossBar();
             if (state.mini) drawMinimap(th);
             drawMessages(now);
+            drawCutin(now);
             if (state.fade) drawFade(now);
+            drawToasts(now);
+        }
+
+        // 口ぐせの吹き出し (1.6 秒)
+        function drawBubbles(camX, camY, now) {
+            state.bubbles = state.bubbles.filter(b => now - b.at < 1600 && b.u.hp > 0);
+            ctx.font = `8px ${FONT}`;
+            ctx.textBaseline = 'middle';
+            state.bubbles.forEach(b => {
+                const w = Math.ceil(ctx.measureText(b.text).width) + 8;
+                const x = Math.max(2, Math.min(W - w - 2, Math.round(b.u.fx * T - camX + 8 - w / 2)));
+                const y = Math.round(b.u.fy * T - camY) - (b.u.boss ? 30 : b.u.big || U.HEROES[b.u.kind] ? 22 : 16);
+                ctx.fillStyle = 'rgba(255,255,255,.92)';
+                ctx.fillRect(x, y - 6, w, 12);
+                ctx.fillRect(x + w / 2 - 2, y + 6, 4, 2);
+                ctx.fillStyle = '#1a2a3a';
+                ctx.fillText(b.text, x + 4, y);
+            });
+        }
+
+        function drawFlash(now) {
+            if (!state.flash) return;
+            const k = (now - state.flash.at) / 400;
+            if (k >= 1) return void (state.flash = null);
+            ctx.globalAlpha = 1 - k;
+            ctx.fillStyle = state.flash.color;
+            ctx.fillRect(0, 0, W, H);
+            ctx.globalAlpha = 1;
+        }
+
+        // ボスのカットイン (1.4 秒): 大きな絵が横から入って、名前
+        function drawCutin(now) {
+            if (!state.cutin) return;
+            const k = (now - state.cutin.at) / 1400;
+            if (k >= 1) return void (state.cutin = null);
+            const a = k < 0.15 ? k / 0.15 : k > 0.85 ? (1 - k) / 0.15 : 1;
+            ctx.globalAlpha = a;
+            ctx.fillStyle = 'rgba(30,0,0,.75)';
+            ctx.fillRect(0, H / 2 - 40, W, 80);
+            ctx.fillStyle = '#ff5a4a';
+            ctx.fillRect(0, H / 2 - 40, W, 2);
+            ctx.fillRect(0, H / 2 + 38, W, 2);
+            const slide = Math.min(1, k / 0.25);
+            KD.BigArt.drawBig(ctx, state.cutin.kind, Math.floor(now / 300) % 2, Math.round(W + 40 - slide * (W / 2 + 10)), H / 2 + 36, { height: 72, alpha: a });
+            ctx.font = `bold 16px ${FONT}`;
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#ffe680';
+            ctx.fillText(state.cutin.name, 24, H / 2 - 6);
+            ctx.font = `10px ${FONT}`;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(`${state.dungeon.name}の ボス`, 24, H / 2 + 14);
+            ctx.globalAlpha = 1;
+        }
+
+        // お知らせ (実績など。上のまんなかに 2.5 秒)
+        function drawToasts(now) {
+            state.toasts = state.toasts.filter(t => now - t.at < 2500);
+            ctx.font = `bold 10px ${FONT}`;
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'center';
+            state.toasts.forEach((t, i) => {
+                const w = Math.ceil(ctx.measureText(t.text).width) + 20, y = 30 + i * 18;
+                ctx.fillStyle = 'rgba(40,30,0,.85)';
+                ctx.fillRect((W - w) / 2, y - 8, w, 16);
+                ctx.strokeStyle = '#ffd84a';
+                ctx.strokeRect((W - w) / 2 + 0.5, y - 7.5, w - 1, 15);
+                ctx.fillStyle = '#ffe680';
+                ctx.fillText(t.text, W / 2, y);
+            });
+            ctx.textAlign = 'left';
         }
 
         function drawUnit(u, camX, camY, now) {
@@ -2083,7 +2325,7 @@
         // 町 (townui.js) に渡す中身
         const town = KD.createTown({
             state, opts, say, later: fn => state.queue.push(() => { fn(); return 0; }),
-            selectHero, makeHero, makeAlly, recalc, learnNow, startDungeon, resume, backToTown, partyMax, talk
+            selectHero, makeHero, makeAlly, recalc, learnNow, startDungeon, resume, backToTown, partyMax, talk, toast
         }, ui);
 
         if (opts.start === 'dungeon') {
@@ -2095,7 +2337,12 @@
         return {
             state, town, draw, moveInput, wait, confirm, attack: attackFront, useSkill, itemMenu, tacticMenu, busy, makeEnemy, makeAlly, spawnBoss,
             skills: () => (state.player && state.phase === 'play' ? state.player.skills.map(skillLabel) : []),
-            toggleMinimap() { state.mini = !state.mini; }
+            toggleMinimap() { state.mini = !state.mini; },
+            toggleSound() {
+                const on = KD.Sound ? KD.Sound.toggle() : false;
+                toast(on ? '音: オン' : '音: オフ');
+                return on;
+            }
         };
     }
 

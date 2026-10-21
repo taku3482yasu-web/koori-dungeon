@@ -5,6 +5,7 @@
 // 町の操作は ui.ask (えらぶ画面) のくり返し。施設をえらぶ → その施設の画面 → 終わったら町のメニューに戻る。
 // 町のデータは state.town にまとめ、セーブ (localStorage) するときもこれを書き出す。
 // 施設は 借金を返した合計で開く (town.js の UNLOCK)。ダンジョンは ボスをたおすと 次が現れる (dungeons.js)。
+// 図鑑・実績 (collection.js) も ここで記録する。
 // =====================================================================
 (function (KD) {
     'use strict';
@@ -31,7 +32,10 @@
 
     function createTown(g, ui) {
         const { state } = g;
-        let view = 'town';   // town 町 / tree バトルツリー / title タイトル / loading つないでいる
+        let view = 'town';   // town 町 / tree バトルツリー / title タイトル / loading つないでいる / dex 図鑑
+        let dexKind = null;  // 図鑑で えらんでいる敵
+        const C = KD.Collection;
+        const bgm = name => KD.Sound && KD.Sound.bgm(name);
         let pick = 0;
         const DG = KD.Dungeons;
         // 交易所のオンライン (config.js に Supabase の URL と鍵があれば)
@@ -48,9 +52,48 @@
             state.town = {
                 seed, day: 1, debt: TW.DEBT_START, paid: 0, bp: 0, bank: 0, storage: [], quests: [], owned: [],
                 board: [], shop: [], rare: [], market: [], listings: [], news: [], ended: false,
-                cleared: 0, seen: {}, storyEnd: false
+                cleared: 0, seen: {}, storyEnd: false, ...collectionData()
             };
             refreshDay();
+        }
+
+        // 図鑑・実績・数 (たおした数など)
+        const collectionData = () => ({ dex: { seen: {}, beat: {} }, dexItems: {}, ach: {}, stats: C.newStats() });
+
+        function seen(kind) {
+            t().dex.seen[kind] = (t().dex.seen[kind] || 0) + 1;
+        }
+        function beat(kind) {
+            t().dex.beat[kind] = (t().dex.beat[kind] || 0) + 1;
+        }
+        function noteItem(id) {
+            t().dexItems[id] = true;
+        }
+        function stat(name, n = 1) {
+            t().stats[name] = (t().stats[name] || 0) + n;
+            check();
+        }
+        // 実績を しらべる。新しく手に入れたら お知らせ
+        function check() {
+            const town = t();
+            if (!town || !p()) return;
+            const c = { town, player: p(), allies: state.allies, stats: town.stats };
+            C.ACHIEVEMENTS.forEach(a => {
+                if (town.ach[a.id] || !a.test(c)) return;
+                town.ach[a.id] = town.day;
+                g.toast(`実績「${a.name}」を 手に入れた！`);
+                if (KD.Sound) KD.Sound.play('ach');
+            });
+        }
+        // 借金を返す (返済所・おにおにの取り立て)。もらえた BP を返す
+        function repay(n) {
+            const town = t();
+            const bp = TW.bpFor(town.paid, n);
+            town.debt -= n;
+            town.paid += n;
+            town.bp += bp;
+            check();
+            return bp;
         }
 
         // 日がかわると、掲示板・お店・交易所が入れかわる。出品していた物が売れることもある
@@ -65,6 +108,7 @@
             town.listings = town.listings.filter(l => {
                 if (!r.chance(TW.sellChance(l))) return true;
                 p().money += l.price;
+                town.stats.sold = (town.stats.sold || 0) + 1;
                 town.news.push(`出品していた ${I.label(l)}が ${r.pick(TW.RIVALS)}に 売れた！ +${money(l.price)}`);
                 return false;
             });
@@ -74,6 +118,7 @@
         function title() {
             state.phase = 'title';
             view = 'title';
+            bgm('title');
             const saved = load(true);
             ask('こおりくんの大冒険～ダンジョンドタバタ大道中～', saved ? ['つづきから', 'はじめから'] : ['はじめから'], i => {
                 if (saved && i === 0) return load();
@@ -156,6 +201,8 @@
         function menu() {
             state.phase = 'town';
             view = 'town';
+            bgm('town');
+            check();
             const town = t();
             const news = town.news.splice(0);
             const done = town.quests.filter(questDone).length;
@@ -236,6 +283,7 @@
                 t().quests.splice(t().quests.indexOf(q), 1);
                 p().money += q.money;
                 lines.push(`「${q.text}」 → ${money(q.money)}`);
+                t().stats.quests = (t().stats.quests || 0) + 1;
                 if (q.item) {
                     giveItem({ id: q.item, n: 1 }, true);
                     t().owned.push(q.item);
@@ -263,11 +311,8 @@
                     const want = [1000, 5000, 10000, Infinity][i];
                     const n = Math.min(want, p().money, town.debt);
                     if (n <= 0) return ask('おにおに「お金が ないじゃないか！」', ['もどる'], debt);
-                    const bp = TW.bpFor(town.paid, n);
                     p().money -= n;
-                    town.debt -= n;
-                    town.paid += n;
-                    town.bp += bp;
+                    const bp = repay(n);
                     save();
                     if (town.debt <= 0 && !town.ended) return ending();
                     // 返した合計で 施設が開く
@@ -351,6 +396,7 @@
         }
         // 道具を持たせる。持ちきれなければ倉庫へ
         function giveItem(item, quiet) {
+            noteItem(item.id);
             const bag = p().bag;
             const stack = stackable(item.id) && bag.find(it => it.id === item.id);
             if (stack) stack.n += item.n;
@@ -433,6 +479,8 @@
                     }
                     takeItems(r.need);
                     p().money -= r.cost;
+                    t().stats.crafted = (t().stats.crafted || 0) + 1;
+                    check();
                     const where = giveItem({ id: r.make, n: r.n || 1 }, true);
                     save();
                     ask(`カン！ カン！ ……${d.name}${r.n > 1 ? ` ×${r.n}` : ''}が できた！${where === 'storage' ? '（倉庫へ）' : ''}\n${d.note}`, ['もどる'], smith, { list: false });
@@ -466,6 +514,7 @@
                 if (!sold.length) return tradeMenu();
                 const total = sold.reduce((n, r) => n + r.price, 0);
                 p().money += total;
+                stat('sold', sold.length);
                 save();
                 ask(['出品していた道具が 売れていた！', ...sold.map(r => `${I.label({ id: r.item_id, n: r.n })} → ${r.buyer_name || 'だれか'}（+${money(r.price)}）`)].join('\n'),
                     ['もどる'], tradeMenu, { list: false });
@@ -657,7 +706,7 @@
 
         // ----- 家 (仕様書 13章: セーブ・1 日がすすむ) -----
         function home() {
-            ask('家', ['セーブする', '1 日すすめる（クエスト・お店・交易所が入れかわる）', 'タイトルへ', 'やめる'], i => {
+            ask('家', ['セーブする', '1 日すすめる（クエスト・お店・交易所が入れかわる）', '図鑑', '実績', '音 オン・オフ', 'タイトルへ', 'やめる'], i => {
                 if (i === 0) return ask(save() ? 'セーブした。' : 'セーブできなかった。（ブラウザの設定で 保存が止められているかも）', ['もどる'], menu, { list: false });
                 if (i === 1) {
                     t().day++;
@@ -665,12 +714,58 @@
                     save();
                     return menu();
                 }
-                if (i === 2) {
+                if (i === 2) return dexMenu();
+                if (i === 3) return achList();
+                if (i === 4) {
+                    const on = KD.Sound ? KD.Sound.toggle() : false;
+                    return ask(`音を ${on ? 'オン' : 'オフ'} にした。（ダンジョンでは S キー・「音」ボタン）`, ['もどる'], home, { list: false });
+                }
+                if (i === 5) {
                     save();
                     return title();
                 }
                 menu();
             });
+        }
+
+        // ----- 図鑑 (敵・道具) -----
+        function dexMenu() {
+            const order = C.dexOrder();
+            const nSeen = order.filter(k => t().dex.seen[k]).length, nBeat = order.filter(k => t().dex.beat[k]).length;
+            const items = Object.keys(I.ITEMS);
+            const nItems = items.filter(id => t().dexItems[id]).length;
+            ask(`図鑑　敵：見た ${nSeen}・たおした ${nBeat} / ${order.length}　道具：${nItems} / ${items.length}`, ['敵の図鑑', '道具の図鑑', 'もどる'], i => {
+                if (i === 0) return enemyDex();
+                if (i === 1) return itemDex();
+                home();
+            }, { list: false });
+        }
+
+        function enemyDex() {
+            const order = C.dexOrder();
+            const label = kind => {
+                const e = U.ENEMIES[kind];
+                const no = e.no ? `No.${e.no}` : e.boss ? 'ボス' : e.rival ? 'ライバル' : '強敵';
+                if (!t().dex.seen[kind]) return `${no}　？？？`;
+                return `${no}　${e.name}${t().dex.beat[kind] ? `　たおした ${t().dex.beat[kind]}` : ''}`;
+            };
+            view = 'dex';
+            dexKind = order[0];
+            ui.ask('敵の図鑑（えらぶと 上に くわしく出る）', [...order.map(label), 'もどる'], () => {
+                view = 'town';
+                dexMenu();
+            }, { place: 'bottom', list: true, onMove: i => { dexKind = order[i] || null; } });
+        }
+
+        function itemDex() {
+            const ids = Object.keys(I.ITEMS);
+            ask('道具の図鑑', [...ids.map(id => (t().dexItems[id] ? `${I.ITEMS[id].name}　${I.ITEMS[id].note}` : '？？？')), 'もどる'], () => dexMenu());
+        }
+
+        function achList() {
+            const list = C.ACHIEVEMENTS;
+            const got = list.filter(a => t().ach[a.id]).length;
+            ask(`実績 ${got} / ${list.length}`, [...list.map(a => (t().ach[a.id] ? `★ ${a.name}　${a.note}` : `　 ？？？　${a.note}`)), 'もどる'], () => home());
         }
 
         const PLACE_FN = { dungeon: goDungeon, guild, debt, tree, shop, smith, trade, storage, plaza, home };
@@ -747,7 +842,8 @@
             state.allies = data.allies.map(ally);
             state.roster = data.roster.map(ally);
             state.tactic = data.tactic || 'fight';
-            state.town = { cleared: 0, seen: {}, storyEnd: false, ...data.town };
+            state.town = { cleared: 0, seen: {}, storyEnd: false, ...collectionData(), ...data.town };
+            state.town.stats = { ...C.newStats(), ...state.town.stats };
             // ダンジョンの中でやめていたら、その階の はじめから (中断セーブ。仕様書 16章)
             if (data.run) return g.resume(data.run);
             menu();
@@ -758,6 +854,7 @@
         function draw(ctx, now, W, H) {
             if (view === 'title') return drawTitle(ctx, now, W, H);
             if (view === 'tree') return drawTree(ctx, now, W, H);
+            if (view === 'dex') return drawDex(ctx, now, W, H);
             drawTown(ctx, now, W, H);
             if (view === 'loading') {
                 ctx.fillStyle = 'rgba(0,0,0,.6)';
@@ -859,6 +956,45 @@
             ctx.textAlign = 'left';
         }
 
+        // 図鑑: えらんでいる敵の絵と くわしいこと (見ていない敵は 影だけ)
+        function drawDex(ctx, now, W, H) {
+            ctx.fillStyle = '#101a24';
+            ctx.fillRect(0, 0, W, H);
+            const kind = dexKind;
+            if (!kind || !U.ENEMIES[kind]) return;
+            const e = U.ENEMIES[kind];
+            const known = t().dex.seen[kind];
+            ctx.fillStyle = '#1c2c3c';
+            ctx.fillRect(12, 10, 84, 84);
+            if (known) {
+                if (A.SPRITES[kind]) A.drawSprite(ctx, kind, Math.floor(now / 400) % 2, 30, 28, { scale: 3 });
+                else KD.BigArt.drawBig(ctx, kind, Math.floor(now / 400) % 2, 54, 88, { height: e.boss || e.big ? 70 : 54 });
+            } else {
+                ctx.font = `bold 30px ${FONT}`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#3a4a5a';
+                ctx.fillText('？', 54, 52);
+                ctx.textAlign = 'left';
+            }
+            ctx.textBaseline = 'middle';
+            ctx.font = `bold 12px ${FONT}`;
+            ctx.fillStyle = '#ffe680';
+            ctx.fillText(known ? e.name : '？？？', 108, 20);
+            ctx.font = `9px ${FONT}`;
+            ctx.fillStyle = '#c8d8e8';
+            if (!known) return void ctx.fillText('まだ 見たことがない。', 108, 40);
+            const traits = (e.traits || []).map(x => C.TRAIT_NAMES[x]).filter(Boolean);
+            const rows = [
+                `属性：${e.element}　役職：${U.ROLES[e.role] ? U.ROLES[e.role].name : '―'}`,
+                `わざ：${(e.moves || []).map(([m]) => U.SKILLS[m].name).join('・') || 'なし'}`,
+                `とくちょう：${traits.join('・') || 'なし'}`,
+                `「${e.line}」`,
+                `見た ${known}　たおした ${t().dex.beat[kind] || 0}`
+            ];
+            rows.forEach((row, i) => ctx.fillText(row, 108, 40 + i * 14));
+        }
+
         // バトルツリー: まんなかから 5 つの枝。開放したマスは金色、開放できるマスは水色
         function drawTree(ctx, now, W, H) {
             ctx.fillStyle = '#0a1a14';
@@ -907,7 +1043,7 @@
             ctx.fillText(`BP ${t().bp}　役職：${U.ROLES[hero.role].name}`, 6, 10);
         }
 
-        return { title, enter, menu, draw, onKill, onFloor, onClear, save, load, newTown, giveItem, countHave, questDone };
+        return { title, enter, menu, draw, onKill, onFloor, onClear, save, load, newTown, giveItem, countHave, questDone, seen, beat, noteItem, stat, check, repay };
     }
 
     KD.createTown = createTown;

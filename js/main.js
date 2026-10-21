@@ -4,8 +4,9 @@
 // 仕様書 15章:
 //   移動: 矢印キー・テンキー (斜めはテンキーか、矢印を2つ同時に。Shift を押しているあいだは斜めだけ)
 //   ダッシュ: B を押しながら移動 / 向きだけ変える: R を押しながら方向 / 足踏み: Space
-//   攻撃・決定: Z・Enter (階段の上なら「降りますか？」) / わざ: 1〜4 / 道具: X (えらぶ画面では戻る) / 作戦: T / 戻る: Esc / ミニマップ: M
-//   スマホ: 十字ボタン (斜めあり。長押しでダッシュ)・攻撃・道具・作戦・足踏み・ミニマップ・わざのボタン
+//   攻撃・決定: Z・Enter (階段の上なら「降りますか？」) / わざ: 1〜4 / 道具: X (えらぶ画面では戻る) / 作戦: T / 戻る: Esc / ミニマップ: M / 音: S
+//   スマホ: 十字ボタン (斜めあり。長押しでダッシュ)・攻撃・道具・作戦・足踏み・ミニマップ・音・わざのボタン
+// 音はブラウザの決まりで、最初にキーかボタンを押したときから鳴る
 // =====================================================================
 (function (KD) {
     'use strict';
@@ -39,11 +40,13 @@
             else if (bottom > choices.scrollTop + choices.clientHeight) choices.scrollTop = bottom - choices.clientHeight;
         }
         function moveTo(i) {
+            if (current.index !== i && KD.Sound) KD.Sound.play('cursor');
             current.index = i;
             render();
             if (current.onMove) current.onMove(i);
         }
         function choose(i) {
+            if (KD.Sound) KD.Sound.play('ok');
             const c = current;
             current = null;
             box.hidden = true;
@@ -98,7 +101,11 @@
             return [Math.sign(dx), Math.sign(dy)];
         }
 
+        // 最初の操作で 音を鳴らせるようにする
+        const unlock = () => KD.Sound && KD.Sound.unlock();
+        window.addEventListener('pointerdown', unlock);
         window.addEventListener('keydown', e => {
+            unlock();
             const k = e.code;
             if (ask.asking()) {
                 const map = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'up', ArrowRight: 'down', KeyZ: 'ok', Enter: 'ok', Space: 'ok', KeyX: 'back', Escape: 'back' };
@@ -123,6 +130,7 @@
             else if (k === 'KeyM' && !e.repeat) game.toggleMinimap();
             else if (k === 'KeyX' && !e.repeat) game.itemMenu();
             else if (k === 'KeyT' && !e.repeat) game.tacticMenu();
+            else if (k === 'KeyS' && !e.repeat) game.toggleSound();
             else if (/^(Digit|Numpad)[1-4]$/.test(k) && !e.repeat && !NUMPAD[k]) game.useSkill(Number(k.slice(-1)) - 1);
         });
         window.addEventListener('keyup', e => {
@@ -164,6 +172,7 @@
         tap('btn-map', () => game.toggleMinimap());
         tap('btn-item', () => (ask.asking() ? ask.key('back') : game.itemMenu()));
         tap('btn-tactic', () => (ask.asking() ? ask.key('back') : game.tacticMenu()));
+        tap('btn-sound', () => game.toggleSound());
 
         // ----- わざのボタン (変わったときだけ作り直す) -----
         const skillBox = document.getElementById('skills');

@@ -9,7 +9,7 @@ import vm from 'node:vm';
 let fakeNow = 1000;
 globalThis.performance = { now: () => fakeNow };
 globalThis.KD = {};
-for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'config.js', 'market.js', 'townui.js', 'game.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
+for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
 const { Dungeon: D, Units: U, Items: I } = globalThis.KD;
 
 // opts: createGame に渡す ({ enemies: false } で敵なし。道具・ワナは things: true のときだけ)。hero: 0 こおりくん / 1 おにおに。role: 役職の番号
@@ -19,7 +19,7 @@ function setup(opts = { enemies: false }, hero = 0, role = 0) {
     const ctx = new Proxy({ measureText: t => ({ width: t.length * 9 }), createLinearGradient: () => ({ addColorStop() {} }) }, { get: (t, k) => (k in t ? t[k] : noop), set: (t, k, v) => { t[k] = v; return true; } });
     const asks = [];
     const ui = { ask: (message, options, done) => asks.push({ message, options, done }), asking: () => asks.length > 0 };
-    const game = globalThis.KD.createGame({ getContext: () => ctx }, ui, { seed: 12345, things: false, partner: false, recruit: false, start: 'dungeon', save: false, market: false, role, ...opts });
+    const game = globalThis.KD.createGame({ getContext: () => ctx }, ui, { seed: 12345, things: false, partner: false, recruit: false, start: 'dungeon', save: false, market: false, happen: false, role, ...opts });
     const run = ms => { for (let i = 0; i < ms; i += 16) { fakeNow += 16; game.draw(fakeNow); } };
     const answer = i => asks.shift().done(i);
     // はじめに主人公をえらぶ

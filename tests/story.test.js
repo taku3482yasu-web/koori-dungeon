@@ -9,7 +9,7 @@ globalThis.performance = { now: () => fakeNow };
 const store = new Map();
 globalThis.localStorage = { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
 globalThis.KD = {};
-for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'config.js', 'market.js', 'townui.js', 'game.js']) {
+for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) {
     vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
 }
 const { Units: U, Items: I, Town: TW, Dungeon: D, Dungeons: DG, createRng } = globalThis.KD;
@@ -23,7 +23,7 @@ function setup(opts = {}, { town = false } = {}) {
     store.clear();
     const asks = [];
     const ui = { ask: (message, options, done) => asks.push({ message, options, done }), asking: () => asks.length > 0 };
-    const base = town ? { seed: 99, things: false, recruit: false, market: false } : { seed: 4321, things: false, partner: false, recruit: false, start: 'dungeon', save: false, market: false };
+    const base = town ? { seed: 99, things: false, recruit: false, market: false, happen: false } : { seed: 4321, things: false, partner: false, recruit: false, start: 'dungeon', save: false, market: false, happen: false };
     const game = globalThis.KD.createGame({ getContext: fakeCtx }, ui, { ...base, ...opts });
     const run = ms => { for (let i = 0; i < ms; i += 16) { fakeNow += 16; game.draw(fakeNow); } };
     const choose = label => {

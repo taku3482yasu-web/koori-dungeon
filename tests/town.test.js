@@ -11,7 +11,7 @@ globalThis.performance = { now: () => fakeNow };
 const store = new Map();
 globalThis.localStorage = { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
 globalThis.KD = {};
-for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'config.js', 'market.js', 'townui.js', 'game.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
+for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
 const { Units: U, Items: I, Town: TW, Dungeon: D } = globalThis.KD;
 
 // タイトルから はじめて、はじまりの話を読み、町のメニューまで進める
@@ -21,7 +21,7 @@ function setup(opts = {}, { fresh = true, hero = 0 } = {}) {
     const ctx = new Proxy({ measureText: t => ({ width: t.length * 9 }), createLinearGradient: () => ({ addColorStop() {} }) }, { get: (t, k) => (k in t ? t[k] : noop), set: (t, k, v) => { t[k] = v; return true; } });
     const asks = [];
     const ui = { ask: (message, options, done) => asks.push({ message, options, done }), asking: () => asks.length > 0 };
-    const game = globalThis.KD.createGame({ getContext: () => ctx }, ui, { seed: 777, things: false, recruit: false, unlockAll: true, market: false, ...opts });
+    const game = globalThis.KD.createGame({ getContext: () => ctx }, ui, { seed: 777, things: false, recruit: false, unlockAll: true, market: false, happen: false, ...opts });
     const run = ms => { for (let i = 0; i < ms; i += 16) { fakeNow += 16; game.draw(fakeNow); } };
     // label ではじまる選択肢をえらぶ
     const choose = label => {
