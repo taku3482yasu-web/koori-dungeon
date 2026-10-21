@@ -1,8 +1,9 @@
 // =====================================================================
-// ゲームの進行 (段階 3: 主人公と役職をえらんで、わざ・属性・状態異常のある戦いをしながら降りる)
+// ゲームの進行 (段階 4: 主人公と役職をえらんで、わざ・道具を使って戦いながら降りる)
 // ---------------------------------------------------------------------
-// 仕様書 4章 (マップ・見える範囲・ミニマップ・階段)・5章 (ターン・移動・斜め・ダッシュ)・
-// 6章 (能力・Lv・属性・役職)・7章 (わざ・状態異常)・15章 (操作)。キャラの数字と計算は units.js。
+// 仕様書 4章 (マップ・見える範囲・ミニマップ・階段・ワナ)・5章 (ターン・移動・斜め・ダッシュ)・
+// 6章 (能力・Lv・属性・役職・満腹度)・7章 (わざ・状態異常)・9章 (道具・お金)・15章 (操作)。
+// キャラの数字と計算は units.js、道具とワナのデータは items.js。
 // 状態は state にまとめ、draw() で毎フレーム canvas に描く。入力は main.js から届く。
 //
 // ターンの流れ: 主人公が 1 回動く → 敵が 1 回 (はやい敵は 2 回) 動く。
@@ -12,7 +13,7 @@
 (function (KD) {
     'use strict';
 
-    const { Dungeon: D, Art: A, Units: U } = KD;
+    const { Dungeon: D, Art: A, Units: U, Items: I } = KD;
     const T = A.T;
     const VIEW_W = 24, VIEW_H = 15;               // 画面に出すマスの数 (横・縦)
     const W = VIEW_W * T, H = VIEW_H * T;         // canvas の大きさ (ドット)
@@ -30,9 +31,9 @@
     const ELEMENT_COLORS = { 'こおり': '#bff0ff', 'ほのお': '#ff9a4a', 'みず': '#6ab8ff', 'しぜん': '#9ae07a', 'かぜ': '#e8f4ff', 'ふしぎ': '#d8a8ff', 'ふつう': '#ffffff' };
 
     // ダンジョン (段階 3 はハリーの森だけ。仕様書 12章)
-    const DUNGEONS = [{ id: 'forest', name: 'ハリーの森', floors: 5, theme: 'forest', table: U.FOREST_TABLE }];
+    const DUNGEONS = [{ id: 'forest', name: 'ハリーの森', floors: 5, theme: 'forest', table: U.FOREST_TABLE, items: I.FOREST_ITEMS, traps: I.FOREST_TRAPS }];
 
-    // opts: { enemies: false で敵を出さない・seed で同じ階にする (テスト用) }
+    // opts: { enemies: false で敵を出さない・things: false で道具とワナを置かない・seed で同じ階にする (テスト用) }
     function createGame(canvas, ui, opts = {}) {
         const ctx = canvas.getContext('2d');
         canvas.width = W;
@@ -50,6 +51,8 @@
             visible: null,    // 今見えているマス
             player: null,
             enemies: [],
+            items: [],        // 床に落ちている道具・お金: { x, y, item: { id, n } } (お金は id 'money')
+            traps: [],        // ワナ: { x, y, id, seen }
             dying: [],        // たおれた敵 (消えるところを見せる)
             queue: [],        // 順に見せる攻撃など。関数を呼ぶと、見せる時間 (ms) を返す
             waitUntil: 0,
@@ -99,8 +102,24 @@
             const stats = U.heroStats(id, 1, role);
             return {
                 kind: id, name: U.HEROES[id].name, hero: true, element: U.HEROES[id].element, role,
-                lv: 1, exp: 0, stats, hp: stats.hp, regen: 0, skills: U.startSkills(id, role), ...body(0, 0)
+                lv: 1, exp: 0, stats, hp: stats.hp, regen: 0, skills: U.startSkills(id, role),
+                belly: I.BELLY_MAX, money: 0,
+                // はじめの持ち物 (案。段階 6 からは町で準備する)
+                bag: [{ id: 'onigiri', n: 1 }, { id: 'ice_shard', n: 1 }],
+                ...body(0, 0)
             };
+        }
+
+        const equipped = p => p.bag.find(it => it.eq);
+
+        // 能力を計算しなおす (Lv・役職・装備)
+        function recalc(p) {
+            const s = U.heroStats(p.kind, p.lv, p.role);
+            const g = equipped(p);
+            const bonus = g && I.ITEMS[g.id].bonus;
+            if (bonus) for (const k of Object.keys(bonus)) s[k] += bonus[k];
+            p.stats = s;
+            p.hp = Math.min(p.hp, s.hp);
         }
 
         // 位置・見た目・状態 (主人公・敵 共通)
@@ -120,12 +139,15 @@
             p.y = p.fy = state.map.start.y;
             p.anim = p.lunge = null;
             state.enemies = [];
+            state.items = [];
+            state.traps = [];
             state.dying = [];
             state.queue = [];
             state.waitUntil = 0;
             state.arrived = false;
             state.fastSkip = false;
             state.turn = 0;
+            placeThings(n);
             look();
             if (opts.enemies !== false) {
                 const startRoom = roomOf(p.x, p.y);
@@ -134,10 +156,46 @@
             say(`${state.dungeon.name} B${n}F に着いた。`);
         }
 
+        // 道具・お金・ワナを置く
+        function placeThings(n) {
+            if (opts.things === false) return;
+            const d = state.dungeon;
+            const last = n >= d.floors;
+            for (let i = rng.int(4, 7); i > 0; i--) placeAt(spot => state.items.push({ ...spot, item: I.rollItem(rng, d.items) }));
+            for (let i = rng.int(2, 4); i > 0; i--) placeAt(spot => state.items.push({ ...spot, item: { id: 'money', n: I.rollMoney(rng, n) } }));
+            for (let i = rng.int(2, 4); i > 0; i--) {
+                let id = I.weighted(rng, d.traps);
+                if (id === 'pit' && last) id = 'spike';   // いちばん下の階に落とし穴はない
+                placeAt(spot => state.traps.push({ ...spot, id, seen: false }));
+            }
+        }
+
+        // 部屋の床の、何もないマスをえらんで put に渡す
+        function placeAt(put) {
+            const map = state.map;
+            for (let tries = 0; tries < 60; tries++) {
+                const room = rng.pick(map.rooms);
+                const x = room.x + rng.int(0, room.w - 1), y = room.y + rng.int(0, room.h - 1);
+                if ((x === map.stairs.x && y === map.stairs.y) || (x === map.start.x && y === map.start.y) || itemAt(x, y) || trapAt(x, y)) continue;
+                return void put({ x, y });
+            }
+        }
+
+        const itemAt = (x, y) => state.items.find(it => it.x === x && it.y === y);
+        const trapAt = (x, y) => state.traps.find(t => t.x === x && t.y === y);
+
         function look() {
             const p = state.player;
             state.visible = D.visibleFrom(state.map, p.x, p.y);
             state.visible.forEach((v, i) => { if (v) state.explored[i] = 1; });
+            // サポーターは、見えているワナに気づく (仕様書 6.3)
+            if (p.role !== 'supporter') return;
+            state.traps.forEach(t => {
+                if (state.visible[idx(t.x, t.y)] && !t.seen) {
+                    t.seen = true;
+                    say(`${I.TRAPS[t.id].name}を 見つけた！`);
+                }
+            });
         }
 
         function changeFloor(n, label) {
@@ -156,16 +214,17 @@
 
         function clear() {
             state.done = true;
-            ui.ask(`${state.dungeon.name}を突破した！\n（段階 3 はここまで。ボスのハリーや道具は、このあとの段階で）`, ['もう一度'], () => {
+            ui.ask(`${state.dungeon.name}を突破した！\n（段階 4 はここまで。仲間は段階 5、町とボスのハリーは このあとの段階で）`, ['もう一度'], () => {
                 state.done = false;
                 restart();
             });
         }
 
-        // B1F からやり直す。Lv とわざはそのまま (仕様書 1章・10章)。HP・PP は元に戻る
+        // B1F からやり直す。Lv・わざ・持ち物はそのまま (仕様書 1章・10章)。HP・PP・満腹度は元に戻る
         function restart() {
             const p = state.player;
             p.hp = p.stats.hp;
+            p.belly = I.BELLY_MAX;
             p.regen = 0;
             p.status = null;
             p.flinch = false;
@@ -190,6 +249,7 @@
             return {
                 kind, name: data.name, element: data.element, ai: data.ai, speed: data.speed, move: data.move || null, rate: data.rate || 0,
                 immune: data.immune || [], lv, exp: st.exp, stats: { hp: st.hp, atk: st.atk, def: st.def, spa: st.spa, spd: st.spd }, hp: st.hp,
+                steal: Boolean(data.steal), loot: null,
                 awake: data.ai !== 'wait', goal: null, seen: null, ...body(x, y)
             };
         }
@@ -281,7 +341,7 @@
             const p = state.player;
             if (e.flinch) return void (e.flinch = false);
             const st = e.status && e.status.id;
-            if (st === 'sleep' || (st === 'para' && rng.chance(0.5))) return;
+            if (st === 'sleep' || (st === 'para' && rng.chance(0.5)) || cramped(e)) return;
             if (!e.awake) {
                 if (cheb(e, p) > 2) return;   // 「まつ」敵は、近くに来るまで動かない
                 e.awake = true;
@@ -297,12 +357,15 @@
                 e.seen = [p.x, p.y];
                 e.goal = null;
             }
-            const fleeing = e.ai === 'flee' && sees && e.hp < e.stats.hp / 2;
+            // にげる敵: HP が半分を切ったか、道具をぬすんだら逃げる
+            const fleeing = e.ai === 'flee' && sees && (e.hp < e.stats.hp / 2 || Boolean(e.loot));
             const move = e.move && U.SKILLS[e.move];
             if (!fleeing && canHit(e, p)) {
                 face(e, p.x - e.x, p.y - e.y);
+                // ペコリス: 道具をぬすむ
+                if (e.steal && !e.loot && p.bag.some(it => !it.eq) && rng.chance(0.5)) state.queue.push(() => steal(e));
                 // わざ (正面) を使うこともある
-                if (move && move.range === 'front' && rng.chance(e.rate)) state.queue.push(() => enemySkill(e));
+                else if (move && move.range === 'front' && rng.chance(e.rate)) state.queue.push(() => enemySkill(e));
                 else state.queue.push(() => attack(e, p));
                 return;
             }
@@ -321,6 +384,19 @@
             if (!stepAlong(e, e.goal.dist, ms)) e.goal = null;
         }
 
+        // 道具をぬすむ (つけている装備はぬすめない)
+        function steal(e) {
+            const p = state.player;
+            const list = p.bag.filter(it => !it.eq);
+            if (e.hp <= 0 || p.hp <= 0 || !canHit(e, p) || !list.length) return 0;
+            const it = rng.pick(list);
+            p.bag.splice(p.bag.indexOf(it), 1);
+            e.loot = it;
+            e.lunge = { at: performance.now(), dir: e.dir };
+            say(`${e.name}「${U.ENEMIES[e.kind].line}」 ${I.label(it)}を ぬすまれた！`);
+            return ATTACK_MS;
+        }
+
         // 敵のわざ (順番が来たときに、まだ届くか確かめる)
         function enemySkill(e) {
             const p = state.player;
@@ -332,12 +408,27 @@
 
         // 主人公が動いたあと。役職のすばやさで、敵が動く回数が変わる
         function afterPlayer(ms) {
+            hunger(state.player);
+            if (state.over) return;
             const speed = U.ROLES[state.player.role].speed;
             if (speed > 0) {
                 state.fastSkip = !state.fastSkip;
                 if (state.fastSkip) return;
             }
             enemyTurn(ms, speed < 0 ? 2 : 1);
+        }
+
+        // おなかが減る (仕様書 6章)。0 になると HP が減っていく
+        function hunger(p) {
+            const before = p.belly;
+            let rate = I.HUNGER * (p.role === 'supporter' ? 0.6 : 1);
+            const g = equipped(p);
+            if (g && I.ITEMS[g.id].hunger) rate *= I.ITEMS[g.id].hunger;
+            p.belly = Math.max(0, p.belly - rate);
+            if (before > 20 && p.belly <= 20) say('おなかが すいてきた…');
+            else if (before > 10 && p.belly <= 10) say('おなかが ぺこぺこだ！ はやく何か食べないと…');
+            else if (before > 0 && p.belly === 0) say('おなかが へって ふらふらだ… HP が 減っていく！');
+            if (p.belly === 0) hurt(p, 1, null);
         }
 
         // 敵の番。times: 敵がふだんの何倍動くか
@@ -376,7 +467,7 @@
 
         // 歩くと HP が少しずつ戻る (仕様書 6章)。どくのあいだは戻らない
         function regen(u) {
-            if (u.hp >= u.stats.hp || (u.status && u.status.id === 'poison')) return void (u.regen = 0);
+            if (u.hp >= u.stats.hp || (u.status && u.status.id === 'poison') || u.belly === 0) return void (u.regen = 0);
             u.regen += u.stats.hp / 80;
             const n = Math.floor(u.regen);
             u.regen -= n;
@@ -525,12 +616,16 @@
         function defeat(e, from) {
             state.enemies.splice(state.enemies.indexOf(e), 1);
             state.dying.push({ ...e, at: performance.now() });
+            if (e.loot) {
+                dropItem(e.x, e.y, e.loot);
+                say(`${e.name}は ${I.label(e.loot)}を 落とした。`);
+            }
             if (!from || !from.hero) return say(`${e.name}を たおした！`);
             say(`${e.name}を たおした！ けいけんち +${e.exp}`);
             const p = from;
             const maxBefore = p.stats.hp, lvBefore = p.lv;
             if (U.gainExp(p, e.exp)) {
-                p.stats = U.heroStats(p.kind, p.lv, p.role);
+                recalc(p);
                 p.hp = Math.min(p.stats.hp, p.hp + p.stats.hp - maxBefore);
                 say(`${p.name}は Lv${p.lv} に 上がった！`);
                 popup(p, 'Lv UP!', '#ffe680');
@@ -559,12 +654,27 @@
         // 主人公がたおれた (段階 6 で町に戻るようにする。今は B1F からやり直し)
         function down() {
             const p = state.player;
+            // ふっかつのたね・ふるカワのお守り を持っていたら 1 回だけ復活 (仕様書 9章)
+            const rv = p.bag.find(it => it.id === 'revive_seed') || p.bag.find(it => it.id === 'omamori');
+            if (rv) {
+                p.bag.splice(p.bag.indexOf(rv), 1);
+                p.hp = p.stats.hp;
+                p.status = null;
+                popup(p, '復活！', '#ffe680');
+                return say(`${I.ITEMS[rv.id].name}の 力で 復活した！`);
+            }
             state.over = true;
             state.queue.length = 0;
             dash = null;
             say(`${p.name}は たおれてしまった…`);
             state.queue.push(() => 900, () => {
-                ui.ask(`${p.name}は たおれてしまった…\n（町に戻るのは段階 6 から。今は Lv${p.lv} のまま B1F からやり直し）`, ['もう一度'], () => {
+                // お金はすべて、道具は半分なくす (仕様書 10章)
+                const lost = Math.floor(p.bag.length / 2);
+                for (let i = 0; i < lost; i++) p.bag.splice(rng.int(0, p.bag.length - 1), 1);
+                const money = p.money;
+                p.money = 0;
+                recalc(p);
+                ui.ask(`${p.name}は たおれてしまった…\nお金（${money}えん）と、道具を ${lost} 個 なくした。\n（町に戻るのは段階 6 から。今は Lv${p.lv} のまま B1F からやり直し）`, ['もう一度'], () => {
                     state.over = false;
                     restart();
                 });
@@ -581,6 +691,8 @@
         const moving = () => Boolean(state.player.anim) || state.enemies.some(e => e.anim);
         const hasStatus = (u, id) => Boolean(u.status && u.status.id === id);
         const paralyzed = u => hasStatus(u, 'para') && rng.chance(0.5);
+        // 大腸炎: 3 ターンに 1 回 動けない
+        const cramped = u => hasStatus(u, 'colitis') && u.status.turns % 3 === 0;
 
         // 動けないまま 1 ターンすすむ
         function passTurn(text) {
@@ -598,6 +710,7 @@
         function playerTurn(action) {
             const p = state.player;
             if (paralyzed(p)) return passTurn(`${p.name}は からだが しびれて 動けない！`);
+            if (cramped(p)) return passTurn(`${p.name}は おなかが ぐるぐる… 動けない！`);
             state.phaseId++;
             state.queue.push(action, () => {
                 afterPlayer(STEP_MS);
@@ -640,6 +753,7 @@
             if (dx || dy) face(p, dx, dy);
             if (hasStatus(p, 'bind')) return void passTurn(`${p.name}は からまって 動けない！`);
             if (paralyzed(p)) return void passTurn(`${p.name}は からだが しびれて 動けない！`);
+            if (cramped(p)) return void passTurn(`${p.name}は おなかが ぐるぐる… 動けない！`);
             if (!D.canMove(state.map, p.x, p.y, dx, dy) || enemyAt(p.x + dx, p.y + dy)) {
                 if (confused) passTurn(`${p.name}は ふらふらしている…`);
                 return false;
@@ -647,9 +761,247 @@
             moveUnit(p, dx, dy, ms);
             look();
             state.arrived = true;
+            underfoot(p);
             afterPlayer(ms);
             return true;
         }
+
+        // 足元: 道具・お金を拾う。ワナを踏む (どちらもダッシュが止まる)
+        let stopDash = false;
+        function underfoot(p) {
+            const fi = itemAt(p.x, p.y);
+            if (fi) {
+                stopDash = true;
+                pickUp(p, fi);
+            }
+            const tr = trapAt(p.x, p.y);
+            if (tr) {
+                stopDash = true;
+                tr.seen = true;
+                state.queue.push(() => springTrap(tr));
+            }
+        }
+
+        function pickUp(p, fi) {
+            const { item } = fi;
+            if (item.id === 'money') {
+                // サポーターは お金が多く拾える (仕様書 6.3)
+                const n = Math.round(item.n * (p.role === 'supporter' ? 1.5 : 1));
+                p.money += n;
+                state.items.splice(state.items.indexOf(fi), 1);
+                return say(`${n}えん 拾った！`);
+            }
+            const stack = I.ITEMS[item.id].count && p.bag.find(it => it.id === item.id);
+            if (!stack && p.bag.length >= I.BAG_MAX) return say(`${I.label(item)}が 落ちている。でも、もう持てない。`);
+            if (stack) stack.n += item.n;
+            else p.bag.push({ ...item });
+            state.items.splice(state.items.indexOf(fi), 1);
+            say(`${I.label(item)}を 拾った。`);
+        }
+
+        // ワナ (仕様書 4.4)。見せる時間を返す
+        function springTrap(tr) {
+            const p = state.player;
+            if (p.hp <= 0) return 0;
+            say(`${I.TRAPS[tr.id].name}を 踏んでしまった！`);
+            if (tr.id === 'spike') {
+                const n = 5 + state.floor * 2;
+                say(`トゲが ささって ${n} のダメージ！`);
+                hurt(p, n, null);
+            } else if (tr.id === 'warp') {
+                warpUnit(p);
+                say('どこかへ 飛ばされた！');
+            } else if (tr.id === 'colitis') {
+                p.belly = Math.max(0, p.belly - 30);
+                say('おなかが きゅうに 減った！');
+            } else if (tr.id === 'sleep') {
+                inflict(p, 'sleep', true);
+            } else if (tr.id === 'pit') {
+                hurt(p, 3, null);
+                if (p.hp > 0) {
+                    say('下の階に 落ちてしまった！');
+                    state.queue.length = 0;
+                    dash = null;
+                    changeFloor(state.floor + 1, `${state.dungeon.name}  B${state.floor + 1}F`);
+                }
+            } else if (tr.id === 'debt') {
+                const n = Math.min(p.money, Math.max(10, Math.floor(p.money * 0.1)));
+                p.money -= n;
+                say(n ? `おにおにの声「金返せ！」 ${n}えん 取られた…` : 'おにおにの声「金返せ！」 …でも、お金を持っていなかった。');
+            }
+            return PASS_MS;
+        }
+
+        // 同じ階の、何もないどこかへ飛ぶ
+        function warpUnit(u) {
+            const map = state.map;
+            for (let tries = 0; tries < 80; tries++) {
+                const room = rng.pick(map.rooms);
+                const x = room.x + rng.int(0, room.w - 1), y = room.y + rng.int(0, room.h - 1);
+                if (occupied(x, y) || trapAt(x, y) || (x === map.stairs.x && y === map.stairs.y)) continue;
+                u.x = u.fx = x;
+                u.y = u.fy = y;
+                u.anim = null;
+                if (u.hero) look();
+                return;
+            }
+        }
+
+        // 床に道具を置く。ふさがっていたら 2 マス以内のあいているマスへ。どこもなければなくなる
+        function dropItem(x, y, item) {
+            const map = state.map;
+            const dist = distances(x, y);
+            let best = null;
+            for (let i = 0; i < dist.length; i++) {
+                if (dist[i] < 0 || dist[i] > 2 || (best && dist[i] >= best[2])) continue;
+                const tx = i % map.w, ty = Math.floor(i / map.w);
+                if (itemAt(tx, ty) || trapAt(tx, ty) || (tx === map.stairs.x && ty === map.stairs.y)) continue;
+                best = [tx, ty, dist[i]];
+            }
+            if (best) state.items.push({ x: best[0], y: best[1], item });
+            return Boolean(best);
+        }
+
+        // ----- 道具を使う (仕様書 9章) -----
+        // 1 つだけ取り出す (小石などは数を減らす)。装備ならはずれる
+        function takeOne(p, it) {
+            if (it.n > 1) {
+                it.n--;
+                return { id: it.id, n: 1 };
+            }
+            p.bag.splice(p.bag.indexOf(it), 1);
+            if (it.eq) {
+                it.eq = false;
+                recalc(p);
+            }
+            return it;
+        }
+
+        // 道具の画面: 持ち物 → することをえらぶ
+        function itemMenu() {
+            if (busy()) return;
+            const p = state.player;
+            if (!p.bag.length) return say('道具を 持っていない。');
+            ui.ask(`道具（${p.bag.length}/${I.BAG_MAX}）　${p.money}えん`, [...p.bag.map(I.label), 'やめる'], i => {
+                if (i < p.bag.length) itemActions(p.bag[i]);
+            }, { list: true });
+        }
+
+        function itemActions(it) {
+            const p = state.player;
+            const d = I.ITEMS[it.id];
+            const acts = [];
+            if (d.kind === 'gear') acts.push([it.eq ? 'はずす' : 'つける', () => playerTurn(() => equip(p, it))]);
+            else if (['food', 'seed'].includes(d.kind) || it.id === 'revive_seed') acts.push(['食べる', () => playerTurn(() => useItem(p, it))]);
+            else if (['heal', 'orb'].includes(d.kind)) acts.push(['使う', () => playerTurn(() => useItem(p, it))]);
+            acts.push(['投げる', () => {
+                const dir = confusedDir(p, p.dir);
+                playerTurn(() => throwItem(p, it, dir));
+            }]);
+            acts.push(['置く', () => {
+                if (itemAt(p.x, p.y) || trapAt(p.x, p.y) || onStairs()) return say('ここには 置けない。');
+                playerTurn(() => putItem(p, it));
+            }]);
+            ui.ask(`${I.label(it)}\n${d.note}`, [...acts.map(a => a[0]), 'やめる'], j => {
+                if (j < acts.length) acts[j][1]();
+            });
+        }
+
+        // 足元に置く (小石などは まとめて置く)
+        function putItem(p, it) {
+            if (!p.bag.includes(it)) return 0;
+            p.bag.splice(p.bag.indexOf(it), 1);
+            if (it.eq) {
+                it.eq = false;
+                recalc(p);
+            }
+            state.items.push({ x: p.x, y: p.y, item: it });
+            say(`${I.label(it)}を 足元に 置いた。`);
+            return PASS_MS;
+        }
+
+        // 装備は 1 つだけ (仕様書 9章)
+        function equip(p, it) {
+            if (!p.bag.includes(it)) return 0;
+            const was = it.eq;
+            p.bag.forEach(b => { b.eq = false; });
+            it.eq = !was;
+            recalc(p);
+            say(was ? `${I.ITEMS[it.id].name}を はずした。` : `${I.ITEMS[it.id].name}を つけた！`);
+            return PASS_MS;
+        }
+
+        // 食べる・使う
+        function useItem(p, it) {
+            if (!p.bag.includes(it)) return 0;
+            const d = I.ITEMS[it.id];
+            takeOne(p, it);
+            say(`${p.name}は ${d.name}を ${d.kind === 'heal' || d.kind === 'orb' ? '使った' : '食べた'}。`);
+            if (d.belly) {
+                p.belly = Math.min(I.BELLY_MAX, p.belly + d.belly);
+                say(p.belly >= I.BELLY_MAX ? 'おなかが いっぱいになった！' : `満腹度が ${d.belly} ふえた。`);
+            }
+            if (d.heal) {
+                const n = Math.min(p.stats.hp - p.hp, d.heal);
+                p.hp += n;
+                popup(p, `+${n}`, '#7ae07a');
+                say(`HP が ${n} 回復した！`);
+            }
+            if (d.status) inflict(p, d.status, true);
+            if (d.orb === 'warp') {
+                warpUnit(p);
+                say('どこかへ 飛んだ！');
+            } else if (d.orb === 'escape') {
+                escape();
+            } else if (d.orb === 'sweep') {
+                const list = state.enemies.filter(e => state.visible[idx(e.x, e.y)]);
+                if (!list.length) say('しかし 敵は いなかった。');
+                state.rings.push({ x: p.x, y: p.y, at: performance.now(), color: '#ff7a5a' });
+                list.forEach(e => {
+                    say(`${e.name}に ${d.dmg} のダメージ！`);
+                    hurt(e, d.dmg, p);
+                });
+            }
+            return ATTACK_MS;
+        }
+
+        // あなぬけ玉: ダンジョンから出る (段階 6 からは町に戻る)
+        function escape() {
+            state.done = true;
+            state.queue.length = 0;
+            ui.ask(`${state.dungeon.name}から 脱出した！\n（町に戻るのは段階 6 から。今は 持ち物はそのまま B1F から）`, ['もう一度'], () => {
+                state.done = false;
+                restart();
+            });
+        }
+
+        // 投げる: まっすぐ飛んで、最初に当たったキャラに効く。だれにも当たらなければ落ちる
+        function throwItem(p, it, dir) {
+            if (!p.bag.includes(it)) return 0;
+            const one = takeOne(p, it);
+            const d = I.ITEMS[one.id];
+            face(p, dir[0], dir[1]);
+            p.lunge = { at: performance.now(), dir: p.dir };
+            say(`${p.name}は ${d.name}を 投げた！`);
+            const [t] = targetsOf(p, 'line', p.dir);
+            const to = t ? [t.x, t.y] : lineEnd(p, p.dir);
+            state.shots.push({ from: [p.x, p.y], to, at: performance.now(), ms: SHOOT_MS, color: d.hit && d.hit.element ? ELEMENT_COLORS[d.hit.element] : '#d8d0b8' });
+            if (!t) {
+                if (!dropItem(to[0], to[1], one)) say(`${d.name}は どこかへ 行ってしまった。`);
+                return SHOOT_MS;
+            }
+            // 投げて効く道具でなければ、ぶつかって 1 のダメージ
+            const hit = d.hit || { dmg: 1 };
+            if (hit.dmg) {
+                const eff = U.effect(hit.element, t.element);
+                const n = Math.max(1, Math.round(hit.dmg * eff));
+                say(`${t.name}に ${n} のダメージ！${effText(eff)}`);
+                hurt(t, n, p);
+            }
+            if (hit.status && t.hp > 0) inflict(t, hit.status, true);
+            return SHOOT_MS;
+        }
+
 
         // ダッシュ (仕様書 5章): 敵が見えたら・分かれ道・部屋の出入り・階段で止まる。通路の曲がり角は曲がって進む
         let dash = null;   // { dx, dy }
@@ -666,7 +1018,9 @@
                 [dx, dy] = ways[0];
             }
             const before = roomOf(p.x, p.y);
+            stopDash = false;
             if (!step(dx, dy, DASH_MS)) return false;
+            if (stopDash) return false;
             dash = { dx, dy };
             const after = roomOf(p.x, p.y);
             // 部屋に入った・部屋から出たら止まる
@@ -809,6 +1163,13 @@
                     }
                 }
             }
+            // 見つけたワナと、一度見た場所の道具・お金
+            state.traps.forEach(t => {
+                if (t.seen && state.explored[idx(t.x, t.y)]) A.drawTrap(ctx, t.id, t.x * T - camX, t.y * T - camY);
+            });
+            state.items.forEach(fi => {
+                if (state.explored[idx(fi.x, fi.y)]) A.drawItem(ctx, fi.item.id, fi.item.id === 'money' ? 'money' : I.ITEMS[fi.item.id].kind, fi.x * T - camX, fi.y * T - camY);
+            });
             drawFacing(p, camX, camY);
             // キャラ (下にいるものほど手前)。敵は見えているときだけ
             const units = [...state.enemies.filter(e => state.visible[idx(e.x, e.y)]), p].sort((a, b) => a.fy - b.fy);
@@ -940,7 +1301,7 @@
             ctx.lineWidth = 1;
         }
 
-        // 上の帯 (仕様書 14章: 階・Lv・役職・HP・状態。満腹・借金は段階 4・6 から)
+        // 上の帯 (仕様書 14章: 階・Lv・役職・HP・満腹・お金。2 行めに状態。借金は段階 6 から)
         function drawHud() {
             const p = state.player;
             ctx.fillStyle = 'rgba(0,0,0,.6)';
@@ -962,23 +1323,31 @@
             ctx.fillRect(146, 4, Math.round(50 * k), 6);
             ctx.fillStyle = '#ffffff';
             ctx.fillText(`${p.hp}/${p.stats.hp}`, 200, 7);
-            // 状態異常・きあいため・まもりのかまえ
+            const belly = Math.ceil(p.belly);
+            ctx.fillStyle = belly > 20 ? '#ffffff' : belly > 0 ? '#f0d040' : '#ff5a4a';
+            ctx.fillText(`満腹 ${belly}`, 250, 7);
+            ctx.fillStyle = '#ffe680';
+            ctx.textAlign = 'right';
+            ctx.fillText(`${p.money.toLocaleString()}えん`, W - 4, 7);
+            ctx.textAlign = 'left';
+            // 2 行め: 状態異常・きあいため・まもりのかまえ・装備
             const tags = [];
             if (p.status) tags.push([U.STATUS[p.status.id].name, U.STATUS[p.status.id].color]);
             if (p.buffs.kiai) tags.push(['きあい', '#ffb060']);
             if (p.buffs.guard) tags.push(['まもり', '#8fd6f7']);
-            let x = 246;
+            const g = equipped(p);
+            if (g) tags.push([`そうび：${I.ITEMS[g.id].name}`, '#c8d8e8']);
+            if (!tags.length) return;
+            let x = 4;
             ctx.font = `9px ${FONT}`;
+            const w = tags.reduce((n, [t]) => n + ctx.measureText(t).width + 6, 2);
+            ctx.fillStyle = 'rgba(0,0,0,.45)';
+            ctx.fillRect(0, 13, w, 11);
             tags.forEach(([t, c]) => {
                 ctx.fillStyle = c;
-                ctx.fillText(t, x, 7);
+                ctx.fillText(t, x, 19);
                 x += ctx.measureText(t).width + 6;
             });
-            ctx.font = `10px ${FONT}`;
-            ctx.fillStyle = '#c8d8e8';
-            ctx.textAlign = 'right';
-            ctx.fillText(`ターン ${state.turn}`, W - 4, 7);
-            ctx.textAlign = 'left';
         }
 
         // ミニマップ (右上。一度見た場所を残す。見えている敵は赤)
@@ -1001,6 +1370,14 @@
                 ctx.fillStyle = '#3a8aff';
                 ctx.fillRect(mx + map.stairs.x * s - 1, my + map.stairs.y * s - 1, s + 2, s + 2);
             }
+            // 道具は水色、見つけたワナは むらさき
+            state.items.forEach(fi => {
+                if (!state.explored[idx(fi.x, fi.y)]) return;
+                ctx.fillStyle = fi.item.id === 'money' ? '#ffd84a' : '#7affff';
+                ctx.fillRect(mx + fi.x * s, my + fi.y * s, s, s);
+            });
+            ctx.fillStyle = '#c88aff';
+            state.traps.forEach(t => { if (t.seen) ctx.fillRect(mx + t.x * s, my + t.y * s, s, s); });
             ctx.fillStyle = '#ff4a4a';
             state.enemies.forEach(e => {
                 if (state.visible[idx(e.x, e.y)]) ctx.fillRect(mx + e.x * s - 1, my + e.y * s - 1, s + 2, s + 2);
@@ -1113,7 +1490,7 @@
 
         selectHero();
         return {
-            state, draw, moveInput, wait, confirm, attack: attackFront, useSkill, busy, makeEnemy,
+            state, draw, moveInput, wait, confirm, attack: attackFront, useSkill, itemMenu, busy, makeEnemy,
             skills: () => (state.player ? state.player.skills.map(skillLabel) : []),
             toggleMinimap() { state.mini = !state.mini; }
         };

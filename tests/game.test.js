@@ -1,4 +1,4 @@
-// ゲームの進行のテスト (主人公・役職をえらぶ・歩く・ダッシュ・階段・最後の階・戦い・わざ・状態異常)
+// ゲームの進行のテスト (主人公・役職をえらぶ・歩く・ダッシュ・階段・最後の階・戦い・わざ・状態異常・道具・満腹度・ワナ・お金)
 // canvas は何もしない偽物、時間 (performance.now) はテストで進める
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,16 +8,16 @@ import vm from 'node:vm';
 let fakeNow = 1000;
 globalThis.performance = { now: () => fakeNow };
 globalThis.KD = {};
-for (const f of ['rng.js', 'dungeon.js', 'units.js', 'art.js', 'game.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
-const { Dungeon: D, Units: U } = globalThis.KD;
+for (const f of ['rng.js', 'dungeon.js', 'units.js', 'items.js', 'art.js', 'game.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
+const { Dungeon: D, Units: U, Items: I } = globalThis.KD;
 
-// opts: createGame に渡す ({ enemies: false } で敵なし)。hero: 0 こおりくん / 1 おにおに。role: 役職の番号
+// opts: createGame に渡す ({ enemies: false } で敵なし。道具・ワナは things: true のときだけ)。hero: 0 こおりくん / 1 おにおに。role: 役職の番号
 function setup(opts = { enemies: false }, hero = 0, role = 0) {
     const noop = () => {};
     const ctx = new Proxy({ measureText: t => ({ width: t.length * 9 }) }, { get: (t, k) => (k in t ? t[k] : noop), set: (t, k, v) => { t[k] = v; return true; } });
     const asks = [];
     const ui = { ask: (message, options, done) => asks.push({ message, options, done }), asking: () => asks.length > 0 };
-    const game = globalThis.KD.createGame({ getContext: () => ctx }, ui, { seed: 12345, ...opts });
+    const game = globalThis.KD.createGame({ getContext: () => ctx }, ui, { seed: 12345, things: false, ...opts });
     const run = ms => { for (let i = 0; i < ms; i += 16) { fakeNow += 16; game.draw(fakeNow); } };
     const answer = i => asks.shift().done(i);
     // はじめに主人公と役職をえらぶ
@@ -333,4 +333,180 @@ test('ドット絵はどれも 16 × 16 で、色がそろっている', () => {
             }
         }
     }
+});
+
+// 道具の画面で name をえらび、action をする
+function useFromBag(game, asks, answer, name, action) {
+    game.itemMenu();
+    const i = asks[0].options.findIndex(o => o.startsWith(name));
+    assert.ok(i >= 0, `${name} を持っている`);
+    answer(i);
+    const j = asks[0].options.indexOf(action);
+    assert.ok(j >= 0, `${action} ができる`);
+    answer(j);
+}
+
+// 主人公のとなりのマス (右か左) に道具を置く。その向きを返す
+function itemBeside(s, item) {
+    const p = s.player;
+    const dx = [1, -1].find(d => D.canMove(s.map, p.x, p.y, d, 0));
+    s.items.push({ x: p.x + dx, y: p.y, item });
+    return dx;
+}
+
+test('階には道具・お金・ワナがある。階段とはじめの場所にはない', () => {
+    const { s } = setup({ enemies: false, things: true });
+    assert.ok(s.items.filter(i => i.item.id !== 'money').length >= 4);
+    assert.ok(s.items.some(i => i.item.id === 'money'));
+    assert.ok(s.traps.length >= 2);
+    for (const t of [...s.items, ...s.traps]) {
+        assert.ok(D.walkable(s.map, t.x, t.y));
+        assert.ok(!(t.x === s.map.stairs.x && t.y === s.map.stairs.y));
+        assert.ok(!(t.x === s.map.start.x && t.y === s.map.start.y));
+    }
+    assert.ok(s.traps.every(t => !t.seen), 'ワナは踏むまで見えない');
+});
+
+test('歩くと道具とお金を拾う。小石はまとめて持つ。24 個より多くは持てない', () => {
+    const { game, s, run } = setup();
+    const p = s.player;
+    let dx = itemBeside(s, { id: 'money', n: 30 });
+    game.moveInput(dx, 0); run(300);
+    assert.equal(p.money, 30);
+    dx = itemBeside(s, { id: 'pebble', n: 3 });
+    game.moveInput(dx, 0); run(300);
+    dx = itemBeside(s, { id: 'pebble', n: 2 });
+    game.moveInput(dx, 0); run(300);
+    assert.equal(p.bag.find(i => i.id === 'pebble').n, 5);
+    while (p.bag.length < I.BAG_MAX) p.bag.push({ id: 'onigiri', n: 1 });
+    dx = itemBeside(s, { id: 'ice_shard', n: 1 });
+    game.moveInput(dx, 0); run(300);
+    assert.equal(p.bag.length, I.BAG_MAX);
+    assert.ok(s.items.some(i => i.item.id === 'ice_shard'), '拾えずに残った');
+});
+
+test('歩くとおなかが減り、0 になると HP が減る。おにぎりを食べると満腹度が戻る', () => {
+    const { game, s, run, asks, answer } = setup();
+    const p = s.player;
+    for (let i = 0; i < 10; i++) { game.wait(); run(200); }
+    assert.ok(Math.abs(p.belly - (I.BELLY_MAX - 10 * I.HUNGER)) < 1e-9);
+    p.belly = 0.05;
+    const hp = p.hp;
+    game.wait(); run(200);
+    game.wait(); run(200);
+    assert.equal(p.belly, 0);
+    assert.ok(p.hp < hp);
+    useFromBag(game, asks, answer, 'おにぎり', '食べる');
+    run(600);
+    assert.ok(Math.abs(p.belly - (50 - I.HUNGER)) < 1e-9, "食べるのにも 1 ターンかかる");
+    assert.ok(!p.bag.some(i => i.id === 'onigiri'));
+});
+
+test('氷のかけら で HP が戻る。ちからのハチマキ をつけると こうげきが上がる', () => {
+    const { game, s, run, asks, answer } = setup();
+    const p = s.player;
+    p.hp = 5;
+    useFromBag(game, asks, answer, '氷のかけら', '使う');
+    run(600);
+    assert.equal(p.hp, Math.min(p.stats.hp, 45));
+    const atk = p.stats.atk;
+    p.bag.push({ id: 'power_band', n: 1 });
+    useFromBag(game, asks, answer, 'ちからのハチマキ', 'つける');
+    run(600);
+    assert.equal(p.stats.atk, atk + 4);
+    useFromBag(game, asks, answer, 'ちからのハチマキ', 'はずす');
+    run(600);
+    assert.equal(p.stats.atk, atk);
+});
+
+test('小石を投げると はなれた敵に当たる。だれもいなければ床に落ちる', () => {
+    const { game, s, run, asks, answer } = setup({});
+    toWideSpot(s);
+    const e = besideEnemy(game, s, 'haribaby', 3);
+    e.stats.hp = e.hp = 99;
+    e.ai = 'wait';
+    e.awake = false;
+    const p = s.player;
+    p.bag.push({ id: 'pebble', n: 2 });
+    useFromBag(game, asks, answer, '小石', '投げる');
+    run(800);
+    assert.equal(e.hp, 99 - 6);
+    assert.equal(p.bag.find(i => i.id === 'pebble').n, 1);
+    p.dir = [-p.dir[0], 0];
+    s.enemies.length = 0;
+    useFromBag(game, asks, answer, '小石', '投げる');
+    run(800);
+    assert.ok(s.items.some(i => i.item.id === 'pebble'), '床に落ちた');
+    assert.ok(!p.bag.some(i => i.id === 'pebble'));
+});
+
+test('ワナ: トゲはダメージ、借金取りはお金が減る、落とし穴は次の階へ', () => {
+    const { game, s, run } = setup();
+    const p = s.player;
+    p.money = 500;
+    const step = id => {
+        const dx = [1, -1].find(d => D.canMove(s.map, p.x, p.y, d, 0));
+        s.traps.push({ x: p.x + dx, y: p.y, id, seen: false });
+        game.moveInput(dx, 0);
+        run(900);
+    };
+    const hp = p.hp;
+    step('spike');
+    assert.ok(p.hp < hp);
+    assert.ok(s.traps.every(t => t.seen), '踏んだワナは見える');
+    step('debt');
+    assert.equal(p.money, 450);
+    step('pit');
+    run(1300);
+    assert.equal(s.floor, 2);
+});
+
+test('ペコリスは道具をぬすんで逃げる。たおすと落とす', () => {
+    const { game, s, run } = setup({});
+    const e = besideEnemy(game, s, 'pekorisu');
+    const p = s.player;
+    p.stats.hp = p.hp = 999;
+    for (let i = 0; i < 20 && !e.loot; i++) { game.wait(); run(700); }
+    assert.ok(e.loot, 'ぬすんだ');
+    const n = s.items.length;
+    // となりに戻してから攻撃
+    const dx = [1, -1].find(d => D.canMove(s.map, p.x, p.y, d, 0));
+    e.x = e.fx = p.x + dx;
+    e.y = e.fy = p.y;
+    e.anim = null;
+    e.hp = 1;
+    p.dir = [dx, 0];
+    for (let i = 0; i < 5 && s.enemies.length; i++) { game.attack(); run(800); }
+    assert.equal(s.enemies.length, 0);
+    assert.equal(s.items.length, n + 1, '落とした');
+});
+
+test('ふっかつのたね を持っていると 1 回だけ復活する。倒れると お金と道具の半分をなくす', () => {
+    const { game, s, run, asks, answer } = setup({});
+    besideEnemy(game, s);
+    const p = s.player;
+    p.bag = [{ id: 'revive_seed', n: 1 }, { id: 'onigiri', n: 1 }, { id: 'pebble', n: 3 }, { id: 'ice_shard', n: 1 }, { id: 'warp_orb', n: 1 }];
+    p.money = 300;
+    p.hp = 1;
+    for (let i = 0; i < 40 && p.bag.some(it => it.id === 'revive_seed'); i++) { game.wait(); run(900); }
+    assert.ok(!p.bag.some(it => it.id === 'revive_seed'), 'たねを使った');
+    assert.ok(!s.over, '復活した');
+    p.hp = 1;
+    for (let i = 0; i < 40 && !asks.length; i++) { game.wait(); run(1500); }
+    assert.match(asks[0].message, /なくした/);
+    answer(0);
+    assert.equal(p.money, 0);
+    assert.equal(p.bag.length, 2, '4 個のうち半分');
+});
+
+test('サポーターは見えているワナに気づき、お金を多く拾う', () => {
+    const { game, s, run } = setup({ enemies: false }, 0, U.ROLE_IDS.indexOf('supporter'));
+    const p = s.player;
+    const dx = [1, -1].find(d => D.canMove(s.map, p.x, p.y, d, 0));
+    s.items.push({ x: p.x + dx, y: p.y, item: { id: 'money', n: 20 } });
+    const room = s.map.rooms[s.map.roomAt[p.y * s.map.w + p.x]];
+    s.traps.push({ x: room.x, y: room.y, id: 'spike', seen: false });
+    game.moveInput(dx, 0); run(300);
+    assert.equal(p.money, 30);
+    assert.equal(s.traps[0].seen, true, '同じ部屋のワナに気づいた');
 });

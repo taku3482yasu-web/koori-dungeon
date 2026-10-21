@@ -258,5 +258,76 @@
         ctx.fillRect(px + 6, py + 13, 4, 2);
     }
 
-    KD.Art = { T, THEMES, SPRITES, drawSprite, drawFloor, drawPath, drawWall, drawStairs };
+    // ----- 道具・お金・ワナ (16 × 16 のマスのまんなかに小さく) -----
+    const px1 = (ctx, c, x, y, w = 1, h = 1) => {
+        ctx.fillStyle = c;
+        ctx.fillRect(x, y, w, h);
+    };
+    const ORB_COLORS = { warp_orb: '#b07aff', escape_orb: '#7ad0ff', sweep_orb: '#ff7a5a' };
+
+    function drawItem(ctx, id, kind, x, y) {
+        ctx.fillStyle = 'rgba(0,0,0,.25)';
+        ctx.fillRect(x + 4, y + 12, 8, 2);
+        if (id === 'money') {
+            // 金貨を 3 枚
+            [[4, 7], [8, 8], [6, 4]].forEach(([cx, cy]) => {
+                px1(ctx, '#b08020', x + cx, y + cy, 5, 4);
+                px1(ctx, '#ffd84a', x + cx, y + cy, 4, 3);
+                px1(ctx, '#fff4b0', x + cx + 1, y + cy, 1, 1);
+            });
+        } else if (kind === 'food') {
+            // おにぎり (三角と のり)。腐ったものは緑っぽい
+            const rice = id === 'bad_onigiri' ? '#b8c890' : '#ffffff';
+            const s = id === 'big_onigiri' ? 1 : 0;
+            for (let r = 0; r < 7 + s; r++) px1(ctx, rice, x + 7 - Math.floor(r / 2) - s, y + 3 + r - s, 2 + Math.floor(r / 2) * 2 + s * 2, 1);
+            px1(ctx, '#1a2a1a', x + 6 - s, y + 8, 4 + s * 2, 3 + s);
+            if (id === 'bad_onigiri') px1(ctx, '#6a8a3a', x + 5, y + 5, 2, 1);
+        } else if (kind === 'heal') {
+            // 氷のかけら
+            px1(ctx, '#4aa8e0', x + 6, y + 3, 4, 9);
+            px1(ctx, '#bff0ff', x + 5, y + 5, 6, 5);
+            px1(ctx, '#ffffff', x + 7, y + 4, 1, 3);
+        } else if (id === 'omamori') {
+            px1(ctx, '#ff6a8a', x + 5, y + 4, 6, 8);
+            px1(ctx, '#ffe680', x + 6, y + 6, 4, 2);
+            px1(ctx, '#ffffff', x + 7, y + 2, 2, 2);
+        } else if (kind === 'seed' || id === 'revive_seed') {
+            const c = id === 'revive_seed' ? '#ffb040' : '#8a6aff';
+            px1(ctx, c, x + 6, y + 5, 4, 6);
+            px1(ctx, c, x + 5, y + 6, 6, 4);
+            px1(ctx, '#ffffff', x + 6, y + 6, 1, 1);
+        } else if (kind === 'throw') {
+            const c = id === 'ice_pellet' ? ['#7fd3f7', '#bff0ff'] : ['#7a7a7a', '#b0b0b0'];
+            [[4, 8], [8, 7], [6, 5]].forEach(([cx, cy]) => {
+                px1(ctx, c[0], x + cx, y + cy, 4, 3);
+                px1(ctx, c[1], x + cx, y + cy, 2, 1);
+            });
+        } else if (kind === 'orb') {
+            const c = ORB_COLORS[id] || '#ffffff';
+            px1(ctx, c, x + 5, y + 4, 6, 8);
+            px1(ctx, c, x + 4, y + 5, 8, 6);
+            px1(ctx, '#ffffff', x + 6, y + 5, 2, 2);
+        } else if (kind === 'gear') {
+            const c = id === 'power_band' ? '#e04040' : id === 'guard_scarf' ? '#4a8aff' : '#f0b020';
+            px1(ctx, c, x + 3, y + 6, 10, 4);
+            px1(ctx, '#ffffff', x + 3, y + 7, 10, 1);
+            px1(ctx, c, x + 11, y + 9, 2, 4);
+        }
+    }
+
+    // ワナ (見つけたものだけ描く)
+    function drawTrap(ctx, id, x, y) {
+        px1(ctx, 'rgba(0,0,0,.35)', x + 2, y + 2, 12, 12);
+        const marks = {
+            spike: () => { for (let i = 0; i < 3; i++) { px1(ctx, '#d0d0d0', x + 4 + i * 3, y + 6, 1, 6); px1(ctx, '#ffffff', x + 4 + i * 3, y + 5); } },
+            warp: () => { px1(ctx, '#b07aff', x + 4, y + 4, 8, 8); px1(ctx, '#2a1a4a', x + 6, y + 6, 4, 4); px1(ctx, '#ffffff', x + 7, y + 7, 2, 2); },
+            colitis: () => { px1(ctx, '#8a5a2a', x + 5, y + 9, 6, 3); px1(ctx, '#8a5a2a', x + 6, y + 7, 4, 2); px1(ctx, '#8a5a2a', x + 7, y + 5, 2, 2); },
+            sleep: () => { px1(ctx, '#8ab8ff', x + 4, y + 5, 5, 1); px1(ctx, '#8ab8ff', x + 7, y + 6, 1, 2); px1(ctx, '#8ab8ff', x + 5, y + 8, 1, 1); px1(ctx, '#8ab8ff', x + 4, y + 9, 5, 1); px1(ctx, '#8ab8ff', x + 10, y + 7, 3, 1); px1(ctx, '#8ab8ff', x + 10, y + 9, 3, 1); },
+            pit: () => { px1(ctx, '#000000', x + 3, y + 4, 10, 9); px1(ctx, '#3a2a1a', x + 3, y + 4, 10, 1); },
+            debt: () => { px1(ctx, '#ffd84a', x + 4, y + 4, 8, 8); px1(ctx, '#7a5a10', x + 7, y + 5, 2, 6); px1(ctx, '#7a5a10', x + 5, y + 7, 6, 1); }
+        };
+        (marks[id] || marks.spike)();
+    }
+
+    KD.Art = { T, THEMES, SPRITES, drawSprite, drawFloor, drawPath, drawWall, drawStairs, drawItem, drawTrap };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);

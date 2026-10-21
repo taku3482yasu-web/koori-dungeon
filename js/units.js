@@ -25,13 +25,15 @@
     // ----- 状態異常 (仕様書 7章) -----
     //   sleep ねむり: 動けない / para まひ: 半分の確率で動けない / confuse こんらん: 半分の確率で ちがう向きへ
     //   poison どく: 毎ターン HP が減り、回復しない / bind しばり: その場から動けない (攻撃はできる)
+    //   colitis 大腸炎: 3 ターンに 1 回 おなかが痛くて動けない (仕様書 17章・前作のネタ)
     //   ひるみ (flinch) は状態異常とは別で、つぎの 1 回だけ動けない
     const STATUS = {
         sleep: { name: 'ねむり', turns: [3, 5], color: '#8ab8ff', mark: 'Zz' },
         para: { name: 'まひ', turns: [5, 8], color: '#ffe040', mark: 'ﾏﾋ' },
         confuse: { name: 'こんらん', turns: [4, 6], color: '#ff9ad8', mark: '@' },
         poison: { name: 'どく', turns: [8, 10], color: '#c88aff', mark: 'ﾄﾞｸ' },
-        bind: { name: 'しばり', turns: [3, 4], color: '#7ae07a', mark: '#' }
+        bind: { name: 'しばり', turns: [3, 4], color: '#7ae07a', mark: '#' },
+        colitis: { name: '大腸炎', turns: [10, 14], color: '#c8a060', mark: '@@' }
     };
 
     // ----- わざ (仕様書 7章) -----
@@ -109,13 +111,13 @@
     //   ai: approach 近づく / wait まつ / flee にげる / shoot 撃つ
     //   speed: 2 なら 1 ターンに 2 回動く (はやい)
     //   move: わざ、rate: ふつうの攻撃のかわりに わざを使う確率。immune: かからない状態異常
-    //   ペコリスは道具がまだないので、HP が半分を切ると逃げる (道具を取るのは段階 4)
+    //   steal: となりに来ると道具をぬすんで逃げる。たおすと落とす。ほかに、HP が半分を切っても逃げる
     const ENEMIES = {
         haribaby:   { no: '001', name: 'ハリベビー', element: 'ふつう', ai: 'approach', speed: 1, hp: 10, atk: 7, def: 4, exp: 6, line: 'ハリ…！' },
         mumenbachi: { no: '002', name: 'ムメンキョバチ', element: 'かぜ', ai: 'approach', speed: 2, hp: 7, atk: 5, def: 3, exp: 8, line: 'メンキョナイー！', move: 'tsukkomi', rate: 0.3 },
         donguriko:  { no: '003', name: 'ドングリコ', element: 'しぜん', ai: 'approach', speed: 1, hp: 12, atk: 6, def: 7, exp: 7, line: 'コロコロ～', move: 'korogari', rate: 0.3 },
         nemuridake: { no: '004', name: 'ネムリダケ', element: 'しぜん', ai: 'wait', speed: 1, hp: 15, atk: 7, def: 5, exp: 9, line: 'ふぁ～…', move: 'nemurigona', rate: 0.3 },
-        pekorisu:   { no: '005', name: 'ペコリス', element: 'ふつう', ai: 'flee', speed: 1, hp: 16, atk: 8, def: 6, exp: 12, line: 'いただきっ！' },
+        pekorisu:   { no: '005', name: 'ペコリス', element: 'ふつう', ai: 'flee', speed: 1, hp: 16, atk: 8, def: 6, exp: 12, line: 'いただきっ！', steal: true },
         tsutankobu: { no: '006', name: 'ツタンコブ', element: 'しぜん', ai: 'wait', speed: 1, hp: 22, atk: 10, def: 8, exp: 14, line: 'からまっちゃえ', move: 'karamitsuku', rate: 0.35 },
         yofukashi:  { no: '007', name: 'ヨフカシフクロウ', element: 'かぜ', ai: 'shoot', speed: 1, hp: 15, atk: 8, def: 5, exp: 14, line: 'まだ寝ないホー', move: 'habataki', immune: ['sleep'] }
     };
