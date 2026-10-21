@@ -142,6 +142,8 @@ test('演出: ボスが起きると カットイン。大きなダメージで �
     game.wait();
     run(100);
     assert.ok(s.cutin && s.cutin.kind === b.kind);
+    run(1500);   // カットインのあと 台詞
+    assert.ok(asks.length, '台詞');
     while (asks.length) asks.shift().done(0);
     p.hp = p.stats.hp;
     b.stats.atk = 999;

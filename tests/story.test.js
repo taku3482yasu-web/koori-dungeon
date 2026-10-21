@@ -100,9 +100,9 @@ test('いちばん下の階には ボスがいて、たおすまで階段を使�
     game.confirm();
     assert.equal(asks.length, 0, '「降りますか？」と聞かない');
     assert.ok(s.messages.some(m => /たおさないと/.test(m.text)));
-    // 見えると 目をさまして 台詞
+    // 見えると 目をさまして カットインのあと 台詞
     game.wait();
-    run(500);
+    run(1800);
     assert.equal(boss.awake, true);
     assert.match(asks[0].message, /ハリー/);
     while (asks.length) choose('つぎへ');
