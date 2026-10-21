@@ -3,8 +3,9 @@
 // ---------------------------------------------------------------------
 // 仕様書 15章:
 //   移動: 矢印キー・テンキー (斜めはテンキーか、矢印を2つ同時に。Shift を押しているあいだは斜めだけ)
-//   ダッシュ: B を押しながら移動 / 足踏み: Space / 決定: Z・Enter / 戻る: X・Esc / ミニマップ: M
-//   スマホ: 十字ボタン (斜めあり。長押しでダッシュ)・決定・足踏み・ミニマップ
+//   ダッシュ: B を押しながら移動 / 向きだけ変える: R を押しながら方向 / 足踏み: Space
+//   攻撃・決定: Z・Enter (階段の上なら「降りますか？」) / 戻る: X・Esc / ミニマップ: M
+//   スマホ: 十字ボタン (斜めあり。長押しでダッシュ)・攻撃・足踏み・ミニマップ
 // =====================================================================
 (function (KD) {
     'use strict';
@@ -16,7 +17,7 @@
     function createAsk(box) {
         const text = box.querySelector('.ask-text');
         const choices = box.querySelector('.ask-choices');
-        let current = null;   // { options, index, done }
+        let current = null;   // { options, index, done, onMove }
         function render() {
             choices.innerHTML = '';
             current.options.forEach((label, i) => {
@@ -31,6 +32,11 @@
                 choices.appendChild(b);
             });
         }
+        function moveTo(i) {
+            current.index = i;
+            render();
+            if (current.onMove) current.onMove(i);
+        }
         function choose(i) {
             const c = current;
             current = null;
@@ -38,19 +44,20 @@
             c.done(i);
         }
         return {
-            ask(message, options, done) {
-                current = { options, index: 0, done };
+            // place: 'bottom' で画面の下に出す (主人公をえらぶとき、絵を見せるため)。onMove: えらんでいるものが変わった
+            ask(message, options, done, { place = 'center', onMove = null } = {}) {
+                current = { options, index: 0, done, onMove };
                 text.textContent = message;
+                box.className = `ask ${place}`;
                 box.hidden = false;
-                render();
+                moveTo(0);
             },
             asking: () => Boolean(current),
             key(k) {
                 if (!current) return false;
                 if (k === 'up' || k === 'down') {
                     const n = current.options.length;
-                    current.index = (current.index + (k === 'up' ? n - 1 : 1)) % n;
-                    render();
+                    moveTo((current.index + (k === 'up' ? n - 1 : 1)) % n);
                 } else if (k === 'ok') choose(current.index);
                 else if (k === 'back') choose(current.options.length - 1);
                 return true;
@@ -68,7 +75,7 @@
         const ask = createAsk(document.getElementById('ask'));
         const game = KD.createGame(document.getElementById('screen'), ask);
         const held = new Map();     // 押している方向キー → 押した時刻
-        let shift = false, dashKey = false;
+        let shift = false, dashKey = false, turnKey = false;
         let touch = null;           // 画面の十字ボタン: { dir, at }
         let needRelease = false;    // ダッシュが止まったら、いったん離すまで動かない
 
@@ -100,6 +107,7 @@
             }
             if (k === 'ShiftLeft' || k === 'ShiftRight') shift = true;
             else if (k === 'KeyB') dashKey = true;
+            else if (k === 'KeyR') turnKey = true;
             else if (k === 'Space') {
                 e.preventDefault();
                 game.wait();
@@ -111,11 +119,12 @@
             held.delete(k);
             if (k === 'ShiftLeft' || k === 'ShiftRight') shift = false;
             if (k === 'KeyB') dashKey = false;
+            if (k === 'KeyR') turnKey = false;
             if (!held.size && !touch) needRelease = false;
         });
         window.addEventListener('blur', () => {
             held.clear();
-            shift = dashKey = false;
+            shift = dashKey = turnKey = false;
             touch = null;
         });
 
@@ -161,7 +170,7 @@
                     if (shift && !(dir[0] && dir[1])) dir = null;   // Shift を押しているあいだは斜めだけ
                     const since = now - Math.min(...held.values());
                     if (dir && (dir[0] || dir[1]) && since >= FIRST_DELAY_MS) {
-                        game.moveInput(dir[0], dir[1], { dashing: dashKey });
+                        game.moveInput(dir[0], dir[1], { dashing: dashKey, turnOnly: turnKey });
                         if (dashKey) needRelease = true;
                     }
                 }

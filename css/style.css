@@ -62,6 +62,8 @@ h1 small { display: block; font-size: 13px; color: var(--text); font-weight: nor
     box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
 }
 .ask[hidden] { display: none; }
+.ask.bottom { top: auto; bottom: 10px; transform: translateX(-50%); padding: 10px 14px; }
+.ask.bottom .ask-text { margin-bottom: 8px; font-size: 13px; }
 .ask-text { margin: 0 0 12px; white-space: pre-line; font-size: 15px; }
 .ask-choices { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
 .ask-choices button {

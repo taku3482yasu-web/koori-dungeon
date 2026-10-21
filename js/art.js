@@ -31,8 +31,134 @@
                 [...KOORI_BODY, '...odo....odo...', '...ooo....ooo...', '................'],
                 [...KOORI_BODY, '....odo..odo....', '....ooo..ooo....', '................']
             ]
+        },
+        // おにおに (16x16): スロットの絵 (赤鬼・角・牙・虎柄の腰巻・金棒) を小さくしたもの
+        onioni: {
+            palette: { h: '#f0e0a0', k: '#1a1a1a', r: '#d83a2a', d: '#b02a1a', y: '#ffe040', w: '#ffffff', m: '#5a0a0a', t: '#f0b020', g: '#4a3a2a', s: '#d0d0d0' },
+            frames: legs([
+                '.h.......h...gg.',
+                '.hkkkkkkkh...gs.',
+                '.kkkkkkkkkk..gg.',
+                '.krrrrrrrrk..sg.',
+                '.rkkrrrrkkr..gg.',
+                '.rykrrrrykr..gs.',
+                '.rrrrddrrrr..gg.',
+                '.rwmmmmmmwr.rsg.',
+                '..rrrrrrrr.rrgg.',
+                '.rrdrrrrdrrr.gg.',
+                'rr.rrrrrr.rr.gg.',
+                'dd.tktttkt.dd...',
+                '...tttttttt.....'
+            ], ['...rr....rr.....', '..ddd...ddd.....'], ['....rr..rr......', '...ddd.ddd......'])
+        },
+
+        // ----- ハリーの森の敵 (敵キャラ表 001〜007)。右向きに描く -----
+        haribaby: {
+            palette: { s: '#c8a070', S: '#a07848', b: '#8a5a3a', f: '#f0d0a0', k: '#10162a', n: '#ff8aa0' },
+            frames: legs([
+                '................',
+                '................',
+                '.....s.s.s......',
+                '...s.sSsSs.s....',
+                '..sSsSsSsSss....',
+                '.sSsSsSsSsssff..',
+                '.sSsSsSsSsffkf..',
+                '.sSsSsSsSfffffn.',
+                '.sSsSsSsSsfffff.',
+                '..sSsSsSsSssff..',
+                '..bbbbbbbbbbb...'
+            ], ['...b.b....b.b...', '................'], ['....b.b..b.b....', '................'])
+        },
+        mumenbachi: {
+            palette: { h: '#e04040', v: '#ffffff', y: '#ffd040', k: '#1a1a1a', w: '#d8f0ff' },
+            frames: [
+                ['................', '......hhhh......', '.....hhhhhh.....', '.....hhhhhhhv...', '.....ykyyky.....',
+                    'www..yyyyyy..www', '.wwwkkkkkkkkwww.', '....yyyyyyyy....', '....kkkkkkkk....', '.....yyyyyy.....',
+                    '......kkkk......', '.......kk.......', '................', '................', '................', '................'],
+                ['................', '......hhhh......', '.....hhhhhh.....', '.www.hhhhhhhvww.', 'wwww.ykyyky.wwww',
+                    '.....yyyyyy.....', '....kkkkkkkk....', '....yyyyyyyy....', '....kkkkkkkk....', '.....yyyyyy.....',
+                    '......kkkk......', '.......kk.......', '................', '................', '................', '................']
+            ]
+        },
+        donguriko: {
+            palette: { c: '#7a4a20', C: '#5a3410', n: '#c88a40', l: '#e0a860', k: '#10162a', f: '#5a3410' },
+            frames: legs([
+                '.......cc.......',
+                '....cCcCcCcC....',
+                '...CcCcCcCcCc...',
+                '...cccccccccc...',
+                '....nnnnnnnn....',
+                '...nlnnnnnnnn...',
+                '...nlknnnnknn...',
+                '...nlknnnnknn...',
+                '...nnnnnnnnnn...',
+                '....nnnkknnn....',
+                '.....nnnnnn.....',
+                '......nnnn......'
+            ], ['.....f....f.....'], ['......f..f......'])
+        },
+        nemuridake: {
+            palette: { r: '#c84a6a', w: '#ffffff', s: '#f0e0c0', k: '#5a3a2a', p: '#a05060', z: '#ffffff' },
+            frames: [
+                ['................', '.....rrrrrr.....', '...rrrwwrrrrr...', '..rrrrwwrrrwwrr.', '.rrwwrrrrrrwwrrr',
+                    '.rrwwrrrrrrrrrrr', '..rrrrrrrrrrrrr.', '....ssssssss....', '....skkssskks...', '....ssssssss....',
+                    '....sssppsss....', '....ssssssss....', '.....ssssss.....', '................', '................', '................'],
+                ['.............zz.', '.....rrrrrr...z.', '...rrrwwrrrrr...', '..rrrrwwrrrwwrr.', '.rrwwrrrrrrwwrrr',
+                    '.rrwwrrrrrrrrrrr', '..rrrrrrrrrrrrr.', '....ssssssss....', '....skkssskks...', '....ssssssss....',
+                    '....sssppsss....', '....ssssssss....', '.....ssssss.....', '................', '................', '................']
+            ]
+        },
+        pekorisu: {
+            palette: { b: '#c87a3a', t: '#e09a50', c: '#f0c890', k: '#10162a', w: '#f8e8d0' },
+            frames: legs([
+                '..ttt...........',
+                '.ttttt....b.b...',
+                'tttttt...bbbbb..',
+                'ttt.tt..bbbbkbb.',
+                'tt..tt..bccbbbbb',
+                'tt...tt.ccccccb.',
+                '.tt..tt.bccccbb.',
+                '..ttttt.bbwwbb..',
+                '...tttbbbwwwbb..',
+                '.....bbbbwwwbb..',
+                '......bbbbbbb...'
+            ], ['......b...b.....'], ['.......b.b......'])
+        },
+        tsutankobu: {
+            palette: { g: '#3a8a3a', d: '#2a6a2a', n: '#6aa84a', w: '#ffffff', k: '#10162a' },
+            frames: [
+                ['......gg........', '.....gnng.......', '....gnnnng......', '....gnwknwkg....', '....gnnnnnng....',
+                    '...ggnnddnngg...', '..gg.gnnnng.gg..', '.gg..gnnnng..gg.', 'g....ggnngg....g', '......gnng......',
+                    '.....dgggd......', '....dd.g.dd.....', '...d...g...d....', '................', '................', '................'],
+                ['......gg........', '.....gnng.......', '....gnnnng......', '....gnwknwkg....', '....gnnnnnng....',
+                    '...ggnnddnngg...', '.gg..gnnnng..gg.', 'g....gnnnng....g', '.....ggnngg.....', '......gnng......',
+                    '.....dgggd......', '....dd.g.dd.....', '...d...g...d....', '................', '................', '................']
+            ]
+        },
+        yofukashi: {
+            palette: { b: '#7a6a5a', l: '#b8a890', w: '#ffffff', k: '#10162a', u: '#5a3a6a', y: '#f0b030' },
+            frames: legs([
+                '...b........b...',
+                '...bb......bb...',
+                '...bbbbbbbbbb...',
+                '..bwwwbbbbwwwb..',
+                '..bwkwbbbbwkwb..',
+                '..buuubyybuuub..',
+                '..bbbbbyybbbbb..',
+                '.bbbllllllllbbb.',
+                'bbbllllllllllbbb',
+                '.bbllllllllllbb.',
+                '..bbllllllllbb..',
+                '...bbbbbbbbbb...'
+            ], ['....yy....yy....'], ['.....yy..yy.....'])
         }
     };
+
+    // 体 (上の行) に、足の行を 2 とおりつけて 2 コマにする。足りない行は透明で 16 行にそろえる
+    function legs(body, a, b) {
+        const pad = rows => [...rows, ...Array(16 - rows.length).fill('................')];
+        return [pad([...body, ...a]), pad([...body, ...b])];
+    }
 
     // 絵を (x, y) を左上にして描く。flip: 左右反転
     function drawSprite(ctx, id, frame, x, y, { flip = false, scale = 1 } = {}) {
