@@ -40,23 +40,34 @@
     //   range: front 正面 1 マス / line 前方の直線 / around 周り 8 マス / self 自分
     //   power: ふつうの攻撃を 1 としたときの強さ。special: とくこう・とくぼう で計算する
     //   status / chance: 当たったときに その確率で状態異常 (flinch は ひるみ)
+    //   role: その役職のときだけ使える (役職のわざ・奥義。仕様書 6.4)。turns: まもりが続くターン。reveal: stairs 階段 / map 階の地図と道具
     const SKILLS = {
         // こおりくん (前作の武器から)
         koori_sword: { name: 'コオリソード', element: 'こおり', range: 'front', power: 1.4, acc: 0.95, pp: 20 },
         koori_breath: { name: 'こおりのいき', element: 'こおり', range: 'line', power: 1.2, acc: 0.9, pp: 15, special: true },
         koori_hammer: { name: 'コオリハンマー', element: 'こおり', range: 'front', power: 2.0, acc: 0.85, pp: 12, status: 'flinch', chance: 0.3 },
-        shitenno: { name: '四天王絶対殺す剣', element: 'こおり', range: 'around', power: 2.0, acc: 0.95, pp: 5 },
+        shitenno: { name: '四天王絶対殺す剣', element: 'こおり', range: 'around', power: 2.0, acc: 0.95, pp: 5, role: 'attacker', note: '周りの敵みんなに 強い こおりの攻撃（奥義）' },
         // おにおに
         oni_club: { name: '鬼鬼の金棒', element: 'ほのお', range: 'front', power: 1.5, acc: 0.95, pp: 20 },
         oni_fire: { name: '鬼火', element: 'ほのお', range: 'line', power: 1.3, acc: 0.9, pp: 15, special: true },
         oni_spin: { name: '金棒ぶんまわし', element: 'ふつう', range: 'around', power: 1.2, acc: 0.9, pp: 10 },
         oni_smash: { name: '鬼のかちわり', element: 'ほのお', range: 'front', power: 2.2, acc: 0.8, pp: 8, status: 'flinch', chance: 0.3 },
-        // 役職のわざ (その役職のときだけ持てる。仕様書 6.3)
-        kiai: { name: 'きあいため', range: 'self', pp: 10, buff: 'kiai', note: 'つぎの攻撃のダメージが 2 倍' },
-        heal: { name: 'いやしの風', range: 'self', pp: 8, heal: 0.4, note: '自分と となりの仲間の HP を 4 割回復して、状態異常も治す' },
-        guard: { name: 'まもりのかまえ', range: 'self', pp: 8, buff: 'guard', note: '5 ターン、受けるダメージが半分' },
-        lullaby: { name: 'ねむりのうた', element: 'ふしぎ', range: 'around', power: 0, acc: 0.8, pp: 6, status: 'sleep', chance: 1, note: '周りの敵をねむらせる' },
-        scout: { name: 'みとおし', range: 'self', pp: 3, reveal: true, note: '階段の場所がわかる' },
+        // 役職のわざ (その役職のときだけ使える。仕様書 6.3)
+        kiai: { name: 'きあいため', range: 'self', pp: 10, buff: 'kiai', role: 'attacker', note: 'つぎの攻撃のダメージが 2 倍' },
+        heal: { name: 'いやしの風', range: 'self', pp: 8, heal: 0.4, role: 'healer', note: '自分と となりの仲間の HP を 4 割回復して、状態異常も治す' },
+        guard: { name: 'まもりのかまえ', range: 'self', pp: 8, buff: 'guard', role: 'defender', note: '5 ターン、受けるダメージが半分' },
+        lullaby: { name: 'ねむりのうた', element: 'ふしぎ', range: 'around', power: 0, acc: 0.8, pp: 6, status: 'sleep', chance: 1, role: 'jammer', note: '周りの敵をねむらせる' },
+        scout: { name: 'みとおし', range: 'self', pp: 3, reveal: 'stairs', role: 'supporter', note: '階段の場所がわかる' },
+        // 奥義 (バトルツリーの枝のいちばん先。こおりくんとおにおにで ちがう。仕様書 6.4)
+        koori_oasis: { name: 'ひんやりオアシス', range: 'self', pp: 3, heal: 1, role: 'healer', note: '自分と となりの仲間の HP を全部回復（奥義）' },
+        koori_wall: { name: '氷の城壁', range: 'self', pp: 3, buff: 'guard', turns: 12, role: 'defender', note: '12 ターン、受けるダメージが半分（奥義）' },
+        diamond_dust: { name: 'ダイヤモンドダスト', element: 'こおり', range: 'around', power: 1.5, acc: 0.95, pp: 4, status: 'sleep', chance: 0.5, role: 'jammer', note: '周りの敵に こおりの攻撃。ねむらせることもある（奥義）' },
+        koori_map: { name: 'こおりの地図', range: 'self', pp: 2, reveal: 'map', role: 'supporter', note: '階の地図と、道具の場所がわかる（奥義）' },
+        oni_kishin: { name: '鬼神の金棒', element: 'ほのお', range: 'front', power: 3.2, acc: 0.9, pp: 4, status: 'flinch', chance: 0.5, role: 'attacker', note: '正面の敵に とても強い ほのおの攻撃（奥義）' },
+        oni_kanbyo: { name: '鬼の看病', range: 'self', pp: 3, heal: 1, role: 'healer', note: '自分と となりの仲間の HP を全部回復（奥義）' },
+        oni_niou: { name: '鬼の仁王立ち', range: 'self', pp: 3, buff: 'guard', turns: 12, role: 'defender', note: '12 ターン、受けるダメージが半分（奥義）' },
+        oni_gyoso: { name: '鬼の形相', element: 'ふしぎ', range: 'around', power: 0, acc: 0.9, pp: 5, status: 'confuse', chance: 1, role: 'jammer', note: '周りの敵を こんらんさせる（奥義）' },
+        oni_takara: { name: '鬼の宝さがし', range: 'self', pp: 2, reveal: 'map', role: 'supporter', note: '階の地図と、道具の場所がわかる（奥義）' },
         // 敵のわざ (仲間になったら PP つきで使う)
         tsukkomi: { name: 'つっこみ', element: 'かぜ', range: 'front', power: 1.3, acc: 0.9, pp: 15 },
         korogari: { name: 'ころがりタックル', element: 'しぜん', range: 'front', power: 1.3, acc: 0.9, pp: 15 },
@@ -96,7 +107,8 @@
             note: 'どの能力もそこそこ。ふつうの攻撃もわざも使える',
             base: { hp: 30, atk: 10, def: 9, spa: 10, spd: 9 },
             grow: { hp: 4, atk: 2, def: 1.8, spa: 2, spd: 1.8 },
-            learn: [[1, 'koori_sword'], [1, 'koori_breath'], [4, 'koori_hammer'], [6, 'shitenno']]
+            // 四天王絶対殺す剣は アタッカーの奥義 (バトルツリー) にした
+            learn: [[1, 'koori_sword'], [1, 'koori_breath'], [4, 'koori_hammer']]
         },
         onioni: {
             id: 'onioni', name: 'おにおに', element: 'ほのお', type: '攻撃と守りに特化したアタッカー',
@@ -168,9 +180,9 @@
         return [ROLES[e.role].skill, ...(e.move ? [e.move] : [])].map(newSkill);
     }
 
-    // はじめに持っているわざ: 役職のわざ + Lv1 で覚えるわざ
-    function startSkills(id, role) {
-        const list = [ROLES[role].skill, ...HEROES[id].learn.filter(([lv]) => lv <= 1).map(([, s]) => s)];
+    // はじめに持っているわざ: Lv1 で覚えるわざ。withRole なら役職のわざも (仲間のこおりくん・おにおに)
+    function startSkills(id, role, withRole = false) {
+        const list = [...(withRole ? [ROLES[role].skill] : []), ...HEROES[id].learn.filter(([lv]) => lv <= 1).map(([, s]) => s)];
         return list.map(newSkill);
     }
     const newSkill = id => ({ id, pp: SKILLS[id].pp, max: SKILLS[id].pp });

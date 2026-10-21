@@ -33,7 +33,10 @@
             });
             // 縦にならべたとき (道具がたくさん) は、えらんでいるものが見えるように
             const on = choices.querySelector('.on');
-            if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+            if (!on) return;
+            const top = on.offsetTop - choices.offsetTop, bottom = top + on.offsetHeight;
+            if (top < choices.scrollTop) choices.scrollTop = top;
+            else if (bottom > choices.scrollTop + choices.clientHeight) choices.scrollTop = bottom - choices.clientHeight;
         }
         function moveTo(i) {
             current.index = i;
@@ -54,6 +57,7 @@
                 text.textContent = message;
                 box.className = `ask ${place}${list ? ' list' : ''}`;
                 box.hidden = false;
+                choices.scrollTop = 0;
                 moveTo(0);
             },
             asking: () => Boolean(current),
@@ -178,7 +182,7 @@
                 b.querySelector('.nm').textContent = s.name;
                 b.querySelector('.inf').textContent = s.info;
                 b.querySelector('.pp').textContent = `PP ${s.pp}`;
-                if (s.pp.startsWith('0/')) b.classList.add('empty');
+                if (s.pp.startsWith('0/') || s.off) b.classList.add('empty');
                 b.addEventListener('pointerdown', e => {
                     e.preventDefault();
                     if (!ask.asking()) game.useSkill(i);

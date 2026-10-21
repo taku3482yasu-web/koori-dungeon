@@ -1,9 +1,9 @@
 // =====================================================================
-// ゲームの進行 (段階 5: 主人公と役職をえらび、仲間といっしょに わざ・道具を使って戦いながら降りる)
+// ゲームの進行 (段階 6: タイトル → 町 → ダンジョン → 町。ダンジョンでは仲間といっしょに わざ・道具を使って戦う)
 // ---------------------------------------------------------------------
 // 仕様書 4章 (マップ・見える範囲・ミニマップ・階段・ワナ)・5章 (ターン・移動・斜め・ダッシュ)・
 // 6章 (能力・Lv・属性・役職・満腹度)・7章 (わざ・状態異常)・8章 (仲間)・9章 (道具・お金)・15章 (操作)。
-// キャラの数字と計算は units.js、道具とワナのデータは items.js。
+// キャラの数字と計算は units.js、道具とワナのデータは items.js、町は town.js (データ) と townui.js (画面)。
 // 状態は state にまとめ、draw() で毎フレーム canvas に描く。入力は main.js から届く。
 //
 // ターンの流れ: 主人公が 1 回動く → 仲間が 1 回ずつ動く → 敵が 1 回 (はやい敵は 2 回) 動く。
@@ -38,7 +38,8 @@
     const DUNGEONS = [{ id: 'forest', name: 'ハリーの森', floors: 5, theme: 'forest', table: U.FOREST_TABLE, items: I.FOREST_ITEMS, traps: I.FOREST_TRAPS }];
 
     // opts (テスト用): enemies: false で敵を出さない・things: false で道具とワナを置かない・partner: false で最初の仲間なし・
-    //   recruit: false で敵が仲間にならない (数なら その確率)・seed で同じ階にする
+    //   recruit: false で敵が仲間にならない (数なら その確率)・seed で同じ階にする・
+    //   start: 'dungeon' でタイトルと町を飛ばして すぐダンジョンへ・role: はじめの役職 (開放もする)・save: false でセーブしない
     function createGame(canvas, ui, opts = {}) {
         const ctx = canvas.getContext('2d');
         canvas.width = W;
@@ -46,9 +47,10 @@
         ctx.imageSmoothingEnabled = false;
 
         const state = {
-            phase: 'select',  // select 主人公・役職をえらぶ / play
-            selectStep: 'hero',
-            pick: 0,          // えらんでいるもの (主人公 / 役職の番号)
+            phase: 'title',   // title タイトル / select 主人公をえらぶ / town 町 / play ダンジョン
+            pick: 0,          // えらんでいる主人公の番号
+            town: null,       // 町のデータ (townui.js。借金・BP・倉庫・クエストなど)
+            run: null,        // ダンジョンの中: { dungeon, floor, seed } (中断セーブ)
             dungeon: DUNGEONS[0],
             floor: 1,
             map: null,
@@ -57,7 +59,7 @@
             player: null,
             allies: [],       // いっしょにいる仲間
             fallen: [],       // この冒険でたおれた仲間 (やり直すと戻る)
-            plaza: [],        // 町の広場で待っている仲間 (いっぱいで連れていけなかった。段階 6 で選べるようにする)
+            roster: [],       // 町の広場で待っている仲間 (連れていく仲間は 広場でえらぶ)
             tactic: 'fight',  // 仲間の作戦 (TACTICS)
             enemies: [],
             items: [],        // 床に落ちている道具・お金: { x, y, item: { id, n } } (お金は id 'money')
@@ -86,34 +88,27 @@
             if (state.messages.length > 4) state.messages.shift();
         }
 
-        // ----- 主人公と役職をえらぶ (仕様書 6.2・6.3) -----
+        // ----- 主人公をえらぶ (仕様書 6.2) -----
+        // 役職はアタッカーから始まり、バトルツリーで開放して町で切りかえる (仕様書 6.3・6.4)
         const HERO_IDS = ['koori', 'onioni'];
-        function selectHero() {
+        function selectHero(done) {
             state.phase = 'select';
-            state.selectStep = 'hero';
-            ui.ask('主人公をえらんでください。\n（えらばなかったほうは、あとで最初の仲間になります）', HERO_IDS.map(id => U.HEROES[id].name), i => {
-                selectRole(HERO_IDS[i]);
-            }, { place: 'bottom', onMove: i => { state.pick = i; } });
-        }
-
-        // 役職は本当は町のバトルツリーで開放して切りかえる (段階 6)。それまでは、はじめにえらんで試せる
-        function selectRole(heroId) {
-            state.selectStep = 'role';
-            state.heroPick = heroId;
-            ui.ask('役職をえらんでください。\n（町ができる段階 6 までの おためし。あとからはバトルツリーで開放します）', U.ROLE_IDS.map(id => U.ROLES[id].name), i => {
-                state.player = makeHero(heroId, U.ROLE_IDS[i]);
+            ui.ask('主人公をえらんでください。\n（えらばなかったほうは、最初の仲間になります）', HERO_IDS.map(id => U.HEROES[id].name), i => {
+                const role = typeof opts.role === 'number' ? U.ROLE_IDS[opts.role] : opts.role || 'attacker';
+                state.player = makeHero(HERO_IDS[i], role);
+                if (!state.player.tree.includes(`${role}1`)) state.player.tree.push(`${role}1`);
                 // えらばなかったほうが最初の仲間 (仕様書 6.2)
-                if (opts.partner !== false) state.allies = [makeAlly(HERO_IDS.find(id => id !== heroId))];
-                state.phase = 'play';
-                changeFloor(1, `${state.dungeon.name}  B1F`);
+                state.allies = opts.partner !== false ? [makeAlly(HERO_IDS.find(id => id !== HERO_IDS[i]))] : [];
+                state.roster = [];
+                done();
             }, { place: 'bottom', onMove: i => { state.pick = i; } });
         }
 
-        function makeHero(id, role) {
+        function makeHero(id, role = 'attacker') {
             const stats = U.heroStats(id, 1, role);
             return {
                 kind: id, name: U.HEROES[id].name, hero: true, side: 'party', element: U.HEROES[id].element, role,
-                lv: 1, exp: 0, stats, hp: stats.hp, regen: 0, skills: U.startSkills(id, role),
+                lv: 1, exp: 0, stats, hp: stats.hp, regen: 0, skills: U.startSkills(id, role), tree: [...KD.Town.TREE_START],
                 belly: I.BELLY_MAX, money: 0,
                 // はじめの持ち物 (案。段階 6 からは町で準備する)
                 bag: [{ id: 'onigiri', n: 1 }, { id: 'ice_shard', n: 1 }],
@@ -126,7 +121,7 @@
             const isHero = Boolean(U.HEROES[kind]);
             const role = isHero ? 'attacker' : U.ENEMIES[kind].role;
             const stats = U.allyStats(kind, lv, role);
-            const skills = isHero ? U.startSkills(kind, role) : U.enemyAllySkills(kind);
+            const skills = isHero ? U.startSkills(kind, role, true) : U.enemyAllySkills(kind);
             if (isHero) U.learnedBetween(kind, 1, lv).forEach(id => { if (skills.length < U.MAX_SKILLS) skills.push(U.newSkill(id)); });
             return {
                 kind, name: isHero ? U.HEROES[kind].name : U.ENEMIES[kind].name, ally: true, side: 'party',
@@ -138,7 +133,7 @@
         const party = () => [state.player, ...state.allies];
         const equipped = p => p.bag && p.bag.find(it => it.eq);
 
-        // 能力を計算しなおす (Lv・役職・装備)。仲間はバトルツリーでは強くならない (仕様書 6.2)
+        // 能力を計算しなおす (Lv・役職・バトルツリー・装備)。仲間はバトルツリーでは強くならない (仕様書 6.2)
         function recalc(p) {
             if (!p.hero) {
                 p.stats = U.allyStats(p.kind, p.lv, p.role);
@@ -146,6 +141,8 @@
                 return;
             }
             const s = U.heroStats(p.kind, p.lv, p.role);
+            const tree = KD.Town.treeStats(p.kind, p.tree || []);
+            for (const k of Object.keys(tree)) s[k] += tree[k];
             const g = equipped(p);
             const bonus = g && I.ITEMS[g.id].bonus;
             if (bonus) for (const k of Object.keys(bonus)) s[k] += bonus[k];
@@ -187,6 +184,12 @@
                 for (let i = 0; i < 3 + Math.ceil(n / 2); i++) spawnEnemy(startRoom);
             }
             say(`${state.dungeon.name} B${n}F に着いた。`);
+            // 中断セーブ (各階に着いたとき。仕様書 16章)
+            state.run = { dungeon: state.dungeon.id, floor: n, seed: state.seed };
+            if (state.town) {
+                town.save();
+                town.onFloor(n);
+            }
         }
 
         // u を (x, y) のいちばん近くの あいているマスに置く (仲間がいっしょに階に着く・仲間になる)
@@ -260,16 +263,33 @@
             });
         }
 
+        // いちばん下の階の階段: 突破して町へ (仕様書 3章)
         function clear() {
             state.done = true;
-            ui.ask(`${state.dungeon.name}を突破した！\n（段階 5 はここまで。町は段階 6、ボスのハリーは段階 7 で）`, ['もう一度'], () => {
-                state.done = false;
-                restart();
-            });
+            if (state.town) town.onClear(party().map(u => u.kind));
+            backToTown('clear');
         }
 
-        // B1F からやり直す。Lv・わざ・持ち物はそのまま (仕様書 1章・10章)。HP・PP・満腹度は元に戻り、たおれた仲間も戻る
-        function restart() {
+        // ダンジョンへ出発する (町から)。HP・PP・満腹度は元に戻り、たおれた仲間も戻る
+        function startDungeon(id) {
+            state.dungeon = DUNGEONS.find(d => d.id === id) || DUNGEONS[0];
+            refresh();
+            state.seed = (Date.now() ^ (Math.random() * 1e9) ^ state.seed) >>> 0;
+            if (opts.seed) state.seed = (opts.seed + (state.town ? state.town.day - 1 : 0)) >>> 0;
+            state.phase = 'play';
+            changeFloor(1, `${state.dungeon.name}  B1F`);
+        }
+
+        // 中断セーブから、その階のはじめに戻る
+        function resume(run) {
+            state.dungeon = DUNGEONS.find(d => d.id === run.dungeon) || DUNGEONS[0];
+            state.seed = run.seed;
+            state.phase = 'play';
+            changeFloor(run.floor, `${state.dungeon.name}  B${run.floor}F`);
+            return true;
+        }
+
+        function refresh() {
             const p = state.player;
             p.belly = I.BELLY_MAX;
             state.allies.push(...state.fallen);
@@ -282,8 +302,30 @@
                 u.buffs = { kiai: false, guard: 0 };
                 u.skills.forEach(k => { k.pp = k.max; });
             });
-            state.seed = (state.seed * 16807 + 1) >>> 0;
-            changeFloor(1, `${state.dungeon.name}  B1F`);
+        }
+
+        // 町へ戻る。reason: clear 突破 / escape 脱出 / down たおれた / quest クエスト達成
+        function backToTown(reason, info = {}) {
+            state.queue.length = 0;
+            dash = null;
+            state.fade = {
+                at: performance.now(), label: '町へ', then: () => {
+                    state.allies.push(...state.fallen);
+                    state.fallen = [];
+                    party().forEach(u => {
+                        u.status = null;
+                        u.hp = u.stats.hp;
+                    });
+                    state.map = null;
+                    state.enemies = [];
+                    state.items = [];
+                    state.traps = [];
+                    state.done = false;
+                    state.over = false;
+                    state.run = null;
+                    town.enter(reason, { dungeon: state.dungeon.name, ...info });
+                }
+            };
         }
 
         // ----- 敵 -----
@@ -580,7 +622,7 @@
                         state.allies.push(a);
                         say(`${a.name}が 仲間になった！（役職：${U.ROLES[a.role].name}）`);
                     } else {
-                        state.plaza.push(a);
+                        state.roster.push(a);
                         say(`${a.name}が 仲間になった！ いっぱいなので、町の広場で待っている。`);
                     }
                 });
@@ -772,7 +814,7 @@
                 u.buffs.kiai = true;
                 say(`${u.name}は きあいを ためた！ つぎの攻撃は 2 倍だ。`);
             } else if (mv.buff === 'guard') {
-                u.buffs.guard = GUARD_TURNS;
+                u.buffs.guard = mv.turns || GUARD_TURNS;
                 say(`${u.name}は まもりを かためた！`);
             } else if (mv.heal) {
                 // 自分と、となりの仲間 (ヒーラーのわざ)
@@ -784,6 +826,10 @@
                     say(t.status ? `${t.name}の HP が ${n} 回復して、${U.STATUS[t.status.id].name}も 治った！` : `${t.name}の HP が ${n} 回復した！`);
                     t.status = null;
                 });
+            } else if (mv.reveal === 'map') {
+                // 階の地図と道具 (奥義)
+                state.map.tiles.forEach((tile, i) => { if (tile !== D.WALL) state.explored[i] = 1; });
+                say('階の地図と、道具の場所が わかった！');
             } else if (mv.reveal) {
                 const { stairs } = state.map;
                 state.explored[idx(stairs.x, stairs.y)] = 1;
@@ -797,7 +843,9 @@
                 t.flinch = true;
                 return say(`${t.name}は ひるんだ！`);
             }
-            if (t.status || t.immune && t.immune.includes(id)) return loud ? say(`${t.name}には 効かなかった。`) : undefined;
+            const gear = t.bag && equipped(t);
+            const immune = [...(t.immune || []), ...((gear && I.ITEMS[gear.id].immune) || [])];
+            if (t.status || immune.includes(id)) return loud ? say(`${t.name}には 効かなかった。`) : undefined;
             const [a, b] = U.STATUS[id].turns;
             t.status = { id, turns: rng.int(a, b) };
             if (id === 'sleep') t.awake = true;
@@ -823,6 +871,12 @@
                 say(`${e.name}は ${I.label(e.loot)}を 落とした。`);
             }
             if (!from || from.side !== 'party') return say(`${e.name}を たおした！`);
+            // 素材を落とすことがある (鍛冶屋で使う)
+            if (I.DROPS[e.kind] && rng.chance(I.MATERIAL_RATE)) {
+                const d = I.ITEMS[I.DROPS[e.kind]];
+                if (dropItem(e.x, e.y, { id: I.DROPS[e.kind], n: rng.int(d.count[0], d.count[1]) })) say(`${e.name}は ${d.name}を 落とした。`);
+            }
+            if (state.town) town.onKill(e.kind);
             // けいけんちは、いっしょにいるみんなに入る
             say(`${e.name}を たおした！ けいけんち +${e.exp}`);
             party().forEach(u => gainExp(u, e.exp));
@@ -855,20 +909,31 @@
 
         // わざを覚える。4 つ持っていたら、どれかを忘れるか聞く (仕様書 7章)
         function learn(p, id) {
-            const name = U.SKILLS[id].name;
             if (p.skills.some(s => s.id === id)) return;
-            if (p.skills.length < U.MAX_SKILLS) {
-                p.skills.push(U.newSkill(id));
-                return say(`${p.name}は ${name}を 覚えた！`);
-            }
+            if (p.skills.length < U.MAX_SKILLS) return learnNow(p, id);
             state.queue.push(() => {
-                ui.ask(`${p.name}は ${name}を 覚えたい！\nかわりに どれかを 忘れますか？`, [...p.skills.map(s => U.SKILLS[s.id].name), `${name}を 覚えない`], i => {
-                    if (i >= p.skills.length) return say(`${name}を 覚えなかった。`);
-                    say(`${U.SKILLS[p.skills[i].id].name}を 忘れて、${name}を 覚えた！`);
-                    p.skills[i] = U.newSkill(id);
-                }, { list: true });
+                learnNow(p, id);
                 return 0;
             });
+        }
+
+        // すぐ覚える (町のバトルツリーからも使う)。done: 終わったら
+        function learnNow(p, id, done = () => {}) {
+            const name = U.SKILLS[id].name;
+            if (p.skills.some(s => s.id === id)) return done();
+            if (p.skills.length < U.MAX_SKILLS) {
+                p.skills.push(U.newSkill(id));
+                say(`${p.name}は ${name}を 覚えた！`);
+                return done();
+            }
+            ui.ask(`${p.name}は ${name}を 覚えたい！\nかわりに どれかを 忘れますか？`, [...p.skills.map(s => U.SKILLS[s.id].name), `${name}を 覚えない`], i => {
+                if (i >= p.skills.length) say(`${name}を 覚えなかった。`);
+                else {
+                    say(`${U.SKILLS[p.skills[i].id].name}を 忘れて、${name}を 覚えた！`);
+                    p.skills[i] = U.newSkill(id);
+                }
+                done();
+            }, { list: true });
         }
 
         // 主人公がたおれた (段階 6 で町に戻るようにする。今は B1F からやり直し)
@@ -888,16 +953,13 @@
             dash = null;
             say(`${p.name}は たおれてしまった…`);
             state.queue.push(() => 900, () => {
-                // お金はすべて、道具は半分なくす (仕様書 10章)
+                // お金はすべて、道具は半分なくす (仕様書 10章)。倉庫の物は残る
                 const lost = Math.floor(p.bag.length / 2);
                 for (let i = 0; i < lost; i++) p.bag.splice(rng.int(0, p.bag.length - 1), 1);
                 const money = p.money;
                 p.money = 0;
                 recalc(p);
-                ui.ask(`${p.name}は たおれてしまった…\nお金（${money}えん）と、道具を ${lost} 個 なくした。\n（町に戻るのは段階 6 から。今は Lv${p.lv} のまま B1F からやり直し）`, ['もう一度'], () => {
-                    state.over = false;
-                    restart();
-                });
+                backToTown('down', { money, lost });
                 return 0;
             });
         }
@@ -1008,7 +1070,8 @@
             const { item } = fi;
             if (item.id === 'money') {
                 // サポーターは お金が多く拾える (仕様書 6.3)
-                const n = Math.round(item.n * (p.role === 'supporter' ? 1.5 : 1));
+                const coin = equipped(p) && I.ITEMS[equipped(p).id].money;
+                const n = Math.round(item.n * (p.role === 'supporter' ? 1.5 : 1) * (coin || 1));
                 p.money += n;
                 state.items.splice(state.items.indexOf(fi), 1);
                 return say(`${n}えん 拾った！`);
@@ -1169,6 +1232,10 @@
                 popup(p, `+${n}`, '#7ae07a');
                 say(`HP が ${n} 回復した！`);
             }
+            if (d.cure && p.status) {
+                say(`${U.STATUS[p.status.id].name}が 治った！`);
+                p.status = null;
+            }
             if (d.status) inflict(p, d.status, true);
             if (d.orb === 'warp') {
                 warpUnit(p);
@@ -1187,14 +1254,10 @@
             return ATTACK_MS;
         }
 
-        // あなぬけ玉: ダンジョンから出る (段階 6 からは町に戻る)
+        // あなぬけ玉: ダンジョンから出て、持ち物はそのまま町に戻る
         function escape() {
             state.done = true;
-            state.queue.length = 0;
-            ui.ask(`${state.dungeon.name}から 脱出した！\n（町に戻るのは段階 6 から。今は 持ち物はそのまま B1F から）`, ['もう一度'], () => {
-                state.done = false;
-                restart();
-            });
+            backToTown('escape');
         }
 
         // 投げる: まっすぐ飛んで、最初に当たったキャラに効く。だれにも当たらなければ落ちる
@@ -1290,6 +1353,8 @@
             const s = p.skills[i];
             if (!s) return;
             if (s.pp <= 0) return say(`${U.SKILLS[s.id].name}は PP が もうない！`);
+            const role = U.SKILLS[s.id].role;
+            if (role && role !== p.role) return say(`${U.SKILLS[s.id].name}は ${U.ROLES[role].name}のときだけ 使える。`);
             const dir = confusedDir(p, p.dir);
             playerTurn(() => {
                 s.pp--;
@@ -1300,7 +1365,8 @@
         // わざのえらび方 (画面のボタン・キーボード 1〜4) に出す説明
         function skillLabel(s) {
             const mv = U.SKILLS[s.id];
-            return { name: mv.name, info: `${mv.element || '―'}・${RANGE_NAMES[mv.range]}`, pp: `${s.pp}/${s.max}`, note: mv.note || '' };
+            const off = mv.role && mv.role !== state.player.role;
+            return { name: mv.name, info: off ? `${U.ROLES[mv.role].name}のときだけ` : `${mv.element || '―'}・${RANGE_NAMES[mv.range]}`, pp: `${s.pp}/${s.max}`, note: mv.note || '', off };
         }
 
         // 決定: 階段の上で前に敵がいなければ「降りますか？」、それ以外は攻撃
@@ -1354,9 +1420,13 @@
 
         function draw(now) {
             update(now);
+            if (state.phase === 'title' || state.phase === 'town') {
+                town.draw(ctx, now, W, H);
+                if (state.fade) drawFade(now);
+                return;
+            }
             if (!state.map) {
-                if (state.selectStep === 'role') drawRoles(now);
-                else drawSelect(now);
+                drawSelect(now);
                 if (state.fade) drawFade(now);
                 return;
             }
@@ -1703,38 +1773,6 @@
             ctx.textAlign = 'left';
         }
 
-        // 役職をえらぶ画面 (5 つの役職と、能力の変わり方・役職のわざ)
-        function drawRoles(now) {
-            ctx.fillStyle = '#0a1420';
-            ctx.fillRect(0, 0, W, H);
-            ctx.textBaseline = 'middle';
-            ctx.font = `bold 12px ${FONT}`;
-            ctx.fillStyle = '#8fd6f7';
-            ctx.textAlign = 'center';
-            ctx.fillText('役職をえらんでね', W / 2, 12);
-            ctx.textAlign = 'left';
-            A.drawSprite(ctx, state.heroPick, Math.floor(now / 300) % 2, 8, 4, { scale: 1 });
-            U.ROLE_IDS.forEach((id, i) => {
-                const r = U.ROLES[id];
-                const on = state.pick === i;
-                const y = 24 + i * 25;
-                ctx.fillStyle = on ? '#1c3450' : '#142436';
-                ctx.fillRect(10, y, W - 20, 23);
-                ctx.strokeStyle = on ? '#ffe680' : '#3a6a8a';
-                ctx.strokeRect(10.5, y + 0.5, W - 21, 22);
-                ctx.font = `bold 10px ${FONT}`;
-                ctx.fillStyle = on ? '#ffe680' : '#ffffff';
-                ctx.fillText(r.name, 16, y + 7);
-                ctx.font = `9px ${FONT}`;
-                ctx.fillStyle = '#c8d8e8';
-                ctx.fillText(`${r.good}／わざ：${U.SKILLS[r.skill].name}（${U.SKILLS[r.skill].note}）`, 16, y + 17);
-                ctx.fillStyle = '#9ad0f0';
-                ctx.textAlign = 'right';
-                ctx.fillText(U.roleText(id), W - 16, y + 7);
-                ctx.textAlign = 'left';
-            });
-        }
-
         // 階が変わるときの暗転と、ダンジョンの名前と階
         function drawFade(now) {
             const k = (now - state.fade.at) / FADE_MS;
@@ -1752,10 +1790,21 @@
             }
         }
 
-        selectHero();
+        // 町 (townui.js) に渡す中身
+        const town = KD.createTown({
+            state, opts, say, later: fn => state.queue.push(() => { fn(); return 0; }),
+            selectHero, makeHero, makeAlly, recalc, learnNow, startDungeon, resume, backToTown, partyMax: () => PARTY_MAX
+        }, ui);
+
+        if (opts.start === 'dungeon') {
+            selectHero(() => {
+                town.newTown(state.seed);
+                startDungeon('forest');
+            });
+        } else town.title();
         return {
-            state, draw, moveInput, wait, confirm, attack: attackFront, useSkill, itemMenu, tacticMenu, busy, makeEnemy, makeAlly,
-            skills: () => (state.player ? state.player.skills.map(skillLabel) : []),
+            state, town, draw, moveInput, wait, confirm, attack: attackFront, useSkill, itemMenu, tacticMenu, busy, makeEnemy, makeAlly,
+            skills: () => (state.player && state.phase === 'play' ? state.player.skills.map(skillLabel) : []),
             toggleMinimap() { state.mini = !state.mini; }
         };
     }

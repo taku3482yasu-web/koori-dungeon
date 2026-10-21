@@ -1,4 +1,5 @@
-// ゲームの進行のテスト (主人公・役職をえらぶ・歩く・ダッシュ・階段・最後の階・戦い・わざ・状態異常・道具・満腹度・ワナ・お金・仲間)
+// ゲームの進行のテスト (主人公をえらぶ・歩く・ダッシュ・階段・最後の階・戦い・わざ・状態異常・道具・満腹度・ワナ・お金・仲間)
+// 町のテストは town.test.js
 // canvas は何もしない偽物、時間 (performance.now) はテストで進める
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,23 +9,22 @@ import vm from 'node:vm';
 let fakeNow = 1000;
 globalThis.performance = { now: () => fakeNow };
 globalThis.KD = {};
-for (const f of ['rng.js', 'dungeon.js', 'units.js', 'items.js', 'art.js', 'game.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
+for (const f of ['rng.js', 'dungeon.js', 'units.js', 'items.js', 'town.js', 'art.js', 'townui.js', 'game.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
 const { Dungeon: D, Units: U, Items: I } = globalThis.KD;
 
 // opts: createGame に渡す ({ enemies: false } で敵なし。道具・ワナは things: true のときだけ)。hero: 0 こおりくん / 1 おにおに。role: 役職の番号
+// タイトルと町を飛ばして、すぐダンジョンから始める
 function setup(opts = { enemies: false }, hero = 0, role = 0) {
     const noop = () => {};
-    const ctx = new Proxy({ measureText: t => ({ width: t.length * 9 }) }, { get: (t, k) => (k in t ? t[k] : noop), set: (t, k, v) => { t[k] = v; return true; } });
+    const ctx = new Proxy({ measureText: t => ({ width: t.length * 9 }), createLinearGradient: () => ({ addColorStop() {} }) }, { get: (t, k) => (k in t ? t[k] : noop), set: (t, k, v) => { t[k] = v; return true; } });
     const asks = [];
     const ui = { ask: (message, options, done) => asks.push({ message, options, done }), asking: () => asks.length > 0 };
-    const game = globalThis.KD.createGame({ getContext: () => ctx }, ui, { seed: 12345, things: false, partner: false, recruit: false, ...opts });
+    const game = globalThis.KD.createGame({ getContext: () => ctx }, ui, { seed: 12345, things: false, partner: false, recruit: false, start: 'dungeon', save: false, role, ...opts });
     const run = ms => { for (let i = 0; i < ms; i += 16) { fakeNow += 16; game.draw(fakeNow); } };
     const answer = i => asks.shift().done(i);
-    // はじめに主人公と役職をえらぶ
+    // はじめに主人公をえらぶ
     assert.match(asks[0].message, /主人公/);
     answer(hero);
-    assert.match(asks[0].message, /役職/);
-    answer(role);
     run(1300);
     return { game, s: game.state, run, asks, answer };
 }
@@ -56,7 +56,7 @@ test('ダッシュは部屋の出入り・分かれ道で止まる', () => {
     assert.ok(s.player.x <= room.x + room.w, '部屋の端か出口で止まった');
 });
 
-test('階段に乗ると「降りますか？」と聞き、はいで次の階へ。最後の階は突破', () => {
+test('階段に乗ると「降りますか？」と聞き、はいで次の階へ。最後の階は突破して町へ', () => {
     const { game, s, run, asks, answer } = setup();
     for (let floor = 1; floor <= s.dungeon.floors; floor++) {
         assert.equal(s.floor, floor);
@@ -78,11 +78,9 @@ test('階段に乗ると「降りますか？」と聞き、はいで次の階�
         run(1300);
         if (floor < s.dungeon.floors) assert.equal(s.floor, floor + 1, '次の階');
     }
-    assert.equal(s.done, true);
-    assert.match(asks[0].message, /突破/);
-    answer(0);   // もう一度
     run(1300);
-    assert.equal(s.floor, 1);
+    assert.equal(s.phase, 'town');
+    assert.match(asks[0].message, /突破/);
     assert.equal(s.done, false);
 });
 
@@ -155,7 +153,7 @@ test('はなれた敵は近づいてくる', () => {
     assert.ok(Math.max(Math.abs(e.x - p.x), Math.abs(e.y - p.y)) < d0, '1 マス近づいた');
 });
 
-test('HP が 0 になるとたおれて、Lv はそのまま B1F からやり直し', () => {
+test('HP が 0 になるとたおれて町に戻る。Lv はそのまま。借金に利子が足される', () => {
     const { game, s, run, asks, answer } = setup({});
     besideEnemy(game, s);
     const p = s.player;
@@ -166,14 +164,12 @@ test('HP が 0 になるとたおれて、Lv はそのまま B1F からやり直
         game.wait();
         run(1500);
     }
-    assert.equal(s.over, true);
-    assert.match(asks[0].message, /たおれて/);
-    answer(0);
-    run(1300);
+    assert.equal(s.phase, 'town');
+    assert.match(asks[0].message, /町に運ばれた/);
     assert.equal(s.over, false);
-    assert.equal(s.floor, 1);
     assert.equal(p.lv, 3);
     assert.equal(p.hp, p.stats.hp);
+    assert.ok(s.town.debt > globalThis.KD.Town.DEBT_START, '利子');
 });
 
 test('わざを使うと PP が減り、こおりはしぜんによく効く', () => {
@@ -257,22 +253,23 @@ test('ねむりごな でねむる。ヨフカシフクロウは ねむらない
 test('Lv が上がるとわざを覚える。5 つめは どれかを忘れるか聞く', () => {
     const { game, s, run, asks, answer } = setup({});
     const p = s.player;
-    assert.equal(p.skills.length, 3, '役職のわざ + Lv1 のわざ 2 つ');
+    assert.deepEqual(p.skills.map(k => k.id), ['koori_sword', 'koori_breath'], 'Lv1 のわざ 2 つ');
+    // 4 つ持っている状態で Lv4 になると、コオリハンマーを覚えたいと聞く
+    p.skills.push(U.newSkill('kiai'), U.newSkill('guard'));
     const e = besideEnemy(game, s);
     e.exp = 10000;
     e.hp = 1;
     p.buffs.kiai = true;
     for (let i = 0; i < 5 && s.enemies.length; i++) { game.attack(); run(900); }
-    assert.ok(p.lv >= 6);
-    assert.equal(p.skills.length, 4);
-    assert.ok(p.skills.some(k => k.id === 'koori_hammer'));
-    assert.equal(asks.length, 1, '四天王絶対殺す剣を覚えたい');
-    assert.match(asks[0].message, /四天王絶対殺す剣/);
+    assert.ok(p.lv >= 4);
+    assert.equal(asks.length, 1, 'コオリハンマーを覚えたい');
+    assert.match(asks[0].message, /コオリハンマー/);
     answer(0);   // 1 番めを忘れる
-    assert.equal(p.skills[0].id, 'shitenno');
+    assert.equal(p.skills[0].id, 'koori_hammer');
+    assert.equal(p.skills.length, 4);
 });
 
-test('役職で能力が変わる。役職のわざを持って始まる', () => {
+test('役職で能力が変わる。役職のわざは その役職のときだけ使える', () => {
     const base = U.heroStats('koori', 5, 'supporter');
     const atk = U.heroStats('koori', 5, 'attacker');
     const def = U.heroStats('koori', 5, 'defender');
@@ -281,8 +278,16 @@ test('役職で能力が変わる。役職のわざを持って始まる', () =>
     U.ROLE_IDS.forEach((id, i) => {
         const { s } = setup({ enemies: false }, 1, i);
         assert.equal(s.player.role, id);
-        assert.equal(s.player.skills[0].id, U.ROLES[id].skill);
+        assert.ok(s.player.tree.includes(`${id}1`), '役職が開放されている');
     });
+    const { game, s, run } = setup({ enemies: false });
+    s.player.skills.push(U.newSkill('guard'));
+    const i = s.player.skills.length - 1;
+    assert.equal(game.skills()[i].off, true);
+    game.useSkill(i);
+    run(500);
+    assert.equal(s.player.skills[i].pp, s.player.skills[i].max, 'アタッカーでは まもりのかまえ は使えない');
+    assert.equal(s.turn, 0);
 });
 
 test('ジャマー (はやい) は 2 回に 1 回だけ敵が動く。ディフェンダー (おそい) は敵が 2 回動く', () => {
@@ -651,7 +656,7 @@ test('たおした敵が仲間になりたそうにする。はいで仲間に�
         run(400);
     }
     assert.equal(s.allies.length, 2, '主人公をふくめて 3 人まで');
-    assert.equal(s.plaza.length, 1);
+    assert.equal(s.roster.length, 1);
     assert.equal(s.allies[0].kind, 'donguriko');
     assert.equal(s.allies[0].role, 'defender');
     assert.ok(s.allies[0].skills.some(k => k.id === 'korogari'));

@@ -307,6 +307,11 @@
             px1(ctx, c, x + 5, y + 4, 6, 8);
             px1(ctx, c, x + 4, y + 5, 8, 6);
             px1(ctx, '#ffffff', x + 6, y + 5, 2, 2);
+        } else if (kind === 'material') {
+            // 素材 (小さな包み)
+            px1(ctx, '#8a6a3a', x + 4, y + 7, 8, 5);
+            px1(ctx, '#c8a060', x + 5, y + 6, 6, 2);
+            px1(ctx, '#f0e0a0', x + 7, y + 5, 2, 2);
         } else if (kind === 'gear') {
             const c = id === 'power_band' ? '#e04040' : id === 'guard_scarf' ? '#4a8aff' : '#f0b020';
             px1(ctx, c, x + 3, y + 6, 10, 4);

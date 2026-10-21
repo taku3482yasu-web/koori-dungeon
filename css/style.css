@@ -62,9 +62,12 @@ h1 small { display: block; font-size: 13px; color: var(--text); font-weight: nor
     box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
 }
 .ask[hidden] { display: none; }
+/* 画面の中に収める (道具やレシピが多いときは、選ぶところだけ スクロール) */
+.ask { max-height: calc(100% - 12px); display: flex; flex-direction: column; }
+.ask.bottom { max-height: calc(100% - 20px); }
 .ask.bottom { top: auto; bottom: 10px; transform: translateX(-50%); padding: 10px 14px; }
 .ask.bottom .ask-text { margin-bottom: 8px; font-size: 13px; }
-.ask.list .ask-choices { flex-direction: column; align-items: stretch; flex-wrap: nowrap; max-height: 46vh; overflow-y: auto; }
+.ask.list .ask-choices { flex-direction: column; justify-content: flex-start; align-items: stretch; flex-wrap: nowrap; min-height: 0; overflow-y: auto; }
 .ask.list .ask-choices { gap: 4px; }
 .ask.list .ask-choices button { text-align: left; padding: 5px 12px; font-size: 14px; }
 
