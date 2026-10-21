@@ -4,12 +4,13 @@
 // 1 階は 56 × 32 マス。マップを 4 × 2 の区画に分け、4〜8 個の区画に部屋を置く。
 // 部屋のない区画には通路の曲がり角 (点) を置き、となりの区画どうしを通路でつなぐ。
 // つなぎ方は全区画を通る木 (どこからでもどこへでも行ける) + おまけの道を少し。
+// ダンジョンによって、部屋の中に水たまり・溶岩を置く (仕様書 4.2)。部屋のふちは あけるので、つながりは変わらない。
 // 画面には触らない (game.js が描く)。
 // =====================================================================
 (function (KD) {
     'use strict';
 
-    const WALL = 0, FLOOR = 1, CORRIDOR = 2;
+    const WALL = 0, FLOOR = 1, CORRIDOR = 2, WATER = 3, LAVA = 4;
     const COLS = 4, ROWS = 2;
 
     // 区画 a・b のあいだを通路でつなぐ (b は a の右か下)
@@ -35,9 +36,9 @@
         }
     }
 
-    // 階を作る。opts: { w, h, minRooms, maxRooms }
+    // 階を作る。opts: { w, h, minRooms, maxRooms, pool: { tile: WATER か LAVA, chance: 部屋ごとの確率 } }
     // 戻り値: { w, h, tiles, rooms, roomAt, start, stairs }
-    //   tiles: 0 壁 / 1 部屋の床 / 2 通路。roomAt: そのマスの部屋の番号 (部屋でなければ -1)
+    //   tiles: 0 壁 / 1 部屋の床 / 2 通路 / 3 水 (泳げるキャラだけ) / 4 溶岩 (歩けるがダメージ)。roomAt: そのマスの部屋の番号 (部屋でなければ -1)
     function generate(rng, opts = {}) {
         const w = opts.w || 56, h = opts.h || 32;
         const map = { w, h, tiles: new Uint8Array(w * h), rooms: [], roomAt: new Int16Array(w * h).fill(-1) };
@@ -93,16 +94,33 @@
         const spot = room => ({ x: room.x + rng.int(0, room.w - 1), y: room.y + rng.int(0, room.h - 1) });
         map.start = spot(map.rooms[r1]);
         map.stairs = spot(map.rooms[r2]);
+        // 水たまり・溶岩 (部屋のふち 1 マスは あける。はじめの場所・階段にかかるなら置かない)
+        if (opts.pool) {
+            map.rooms.forEach(room => {
+                if (room.w < 5 || room.h < 4 || !rng.chance(opts.pool.chance)) return;
+                const pw = rng.int(1, room.w - 4), ph = rng.int(1, room.h - 3);
+                const px = room.x + 1 + rng.int(0, room.w - 3 - pw), py = room.y + 1 + rng.int(0, room.h - 2 - ph);
+                const inside = q => q.x >= px && q.x < px + pw && q.y >= py && q.y < py + ph;
+                if (inside(map.start) || inside(map.stairs)) return;
+                for (let y = py; y < py + ph; y++) {
+                    for (let x = px; x < px + pw; x++) map.tiles[y * w + x] = opts.pool.tile;
+                }
+            });
+        }
         return map;
     }
 
     const at = (map, x, y) => (x < 0 || y < 0 || x >= map.w || y >= map.h ? WALL : map.tiles[y * map.w + x]);
-    const walkable = (map, x, y) => at(map, x, y) !== WALL;
+    // 歩けるか。水は swim (泳げる) のときだけ
+    const walkable = (map, x, y, swim = false) => {
+        const t = at(map, x, y);
+        return t !== WALL && (t !== WATER || swim);
+    };
 
     // (x, y) から (dx, dy) へ動けるか。斜めは、角を壁がふさいでいたら動けない (仕様書 5章)
-    function canMove(map, x, y, dx, dy) {
-        if (!walkable(map, x + dx, y + dy)) return false;
-        if (dx && dy && (!walkable(map, x + dx, y) || !walkable(map, x, y + dy))) return false;
+    function canMove(map, x, y, dx, dy, swim = false) {
+        if (!walkable(map, x + dx, y + dy, swim)) return false;
+        if (dx && dy && (at(map, x + dx, y) === WALL || at(map, x, y + dy) === WALL)) return false;
         return true;
     }
 
@@ -143,5 +161,5 @@
         return { count: n, seen };
     }
 
-    KD.Dungeon = { WALL, FLOOR, CORRIDOR, generate, at, walkable, canMove, visibleFrom, reachable };
+    KD.Dungeon = { WALL, FLOOR, CORRIDOR, WATER, LAVA, generate, at, walkable, canMove, visibleFrom, reachable };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);

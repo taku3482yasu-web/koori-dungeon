@@ -1,9 +1,10 @@
 // =====================================================================
-// タイトル・町の画面と操作 (仕様書 2章 ストーリー・3章 流れ・6.4 バトルツリー・13章 町・13.1 クエスト・16章 セーブ)
+// タイトル・町の画面と操作 (仕様書 2章 ストーリー・3章 流れ・6.4 バトルツリー・13章 町・13.1 クエスト・13.3 交易所・16章 セーブ)
 // ---------------------------------------------------------------------
 // game.js の createGame の中から KD.createTown(g, ui) で作る。g はゲームの中身 (state・主人公を作る・ダンジョンへ行く など)。
 // 町の操作は ui.ask (えらぶ画面) のくり返し。施設をえらぶ → その施設の画面 → 終わったら町のメニューに戻る。
 // 町のデータは state.town にまとめ、セーブ (localStorage) するときもこれを書き出す。
+// 施設は 借金を返した合計で開く (town.js の UNLOCK)。ダンジョンは ボスをたおすと 次が現れる (dungeons.js)。
 // =====================================================================
 (function (KD) {
     'use strict';
@@ -30,8 +31,11 @@
 
     function createTown(g, ui) {
         const { state } = g;
-        let view = 'town';   // town 町 / tree バトルツリー / title タイトル
+        let view = 'town';   // town 町 / tree バトルツリー / title タイトル / loading つないでいる
         let pick = 0;
+        const DG = KD.Dungeons;
+        // 交易所のオンライン (config.js に Supabase の URL と鍵があれば)
+        const net = g.opts.market === false ? { online: false } : KD.createMarket((KD.CONFIG || {}).supabase || {}, g.opts.marketDeps || {});
 
         const t = () => state.town;
         const p = () => state.player;
@@ -43,7 +47,8 @@
         function newTown(seed) {
             state.town = {
                 seed, day: 1, debt: TW.DEBT_START, paid: 0, bp: 0, bank: 0, storage: [], quests: [], owned: [],
-                board: [], shop: [], rare: [], market: [], listings: [], news: [], ended: false
+                board: [], shop: [], rare: [], market: [], listings: [], news: [], ended: false,
+                cleared: 0, seen: {}, storyEnd: false
             };
             refreshDay();
         }
@@ -52,7 +57,7 @@
         function refreshDay() {
             const town = t();
             const kinds = [...state.allies, ...state.roster].map(a => a.kind);
-            town.board = TW.questBoard(dayRng(1), town.day, { owned: town.owned, allyKinds: [...new Set(kinds)] });
+            town.board = TW.questBoard(dayRng(1), town.day, { owned: town.owned, allyKinds: [...new Set(kinds)], dungeons: openDungeons() });
             town.shop = TW.shopStock(dayRng(2));
             town.rare = TW.rareStock(dayRng(3));
             town.market = TW.rivalListings(dayRng(4));
@@ -114,7 +119,12 @@
                 t().debt += interest;
                 lines.push(`${p().name}は 町に運ばれた…`, `お金（${money(info.money || 0)}）と、道具を ${info.lost || 0} 個 なくした。`);
                 if (interest) lines.push(`おにおに「金返せ！」 借金に利子 ${money(interest)}が 足された。`);
-            } else if (reason === 'clear') lines.push(`${info.dungeon}を 突破して、町に戻った！`);
+            } else if (reason === 'clear') {
+                lines.push(`${info.dungeon}を 突破して、町に戻った！`);
+                // はじめてボスをたおした: ストーリーが進む
+                const d = DG.byId(info.id);
+                if (info.boss && d && DG.LIST.indexOf(d) === (t().cleared || 0)) return storyClear(d, lines);
+            }
             else if (reason === 'escape') lines.push(`${info.dungeon}から 脱出して、町に戻った。`);
             else if (reason === 'quest') lines.push('クエストを達成して、町に戻った。ギルドで報告しよう。');
             state.run = null;
@@ -122,6 +132,26 @@
             if (lines.length) return ask(lines.join('\n'), ['町へ'], () => menu(), { list: false });
             menu();
         }
+
+        // ボスをたおしたあとの話。仲間が増え、次のダンジョンが現れる (dungeons.js の story)
+        function storyClear(d, lines = []) {
+            const town = t();
+            town.cleared = DG.LIST.indexOf(d) + 1;
+            const st = d.story || {};
+            if (st.ally && ![...state.allies, ...state.roster].some(a => a.kind === st.ally)) {
+                const a = g.makeAlly(st.ally, Math.max(1, p().lv - 1));
+                if (state.allies.length < g.partyMax() - 1) state.allies.push(a);
+                else state.roster.push(a);
+            }
+            if (st.last) town.storyEnd = true;
+            refreshDay();
+            save();
+            g.talk([...lines, ...(st.clear || [])], () => menu());
+        }
+
+        const openDungeons = () => DG.LIST.slice(0, Math.min(DG.LIST.length, (t().cleared || 0) + 1));
+        const paidNeed = id => Math.max(0, (TW.UNLOCK[id] || 0) - t().paid);
+        const isOpen = id => g.opts.unlockAll || paidNeed(id) <= 0;
 
         function menu() {
             state.phase = 'town';
@@ -131,19 +161,30 @@
             const done = town.quests.filter(questDone).length;
             const head = [`${town.day}日目　借金 ${money(town.debt)}　お金 ${money(p().money)}　BP ${town.bp}`,
                 ...news, ...(done ? [`達成したクエストが ${done} 件ある。ギルドで報告しよう。`] : [])];
-            ui.ask(head.join('\n'), PLACES.map(pl => pl.name), i => PLACE_FN[PLACES[i].id](), {
-                place: 'bottom', onMove: i => { pick = i; }
-            });
+            ui.ask(head.join('\n'), PLACES.map(pl => (isOpen(pl.id) ? pl.name : `${pl.name}（あと ${money(paidNeed(pl.id))}）`)), i => {
+                const pl = PLACES[i];
+                if (!isOpen(pl.id)) {
+                    return say(`おにおに「${pl.name}は、借金を あと ${money(paidNeed(pl.id))} 返したら 使わせてやる」`);
+                }
+                PLACE_FN[pl.id]();
+            }, { place: 'bottom', onMove: i => { pick = i; } });
         }
 
         // ----- ダンジョンへ -----
         function goDungeon() {
             const party = [p(), ...state.allies].map(u => `${u.name} Lv${u.lv}`).join('・');
             const qs = t().quests.length ? `受けているクエスト ${t().quests.length} 件` : 'クエストを受けていない';
-            ask(`どこへ行く？\nいっしょに行く：${party}\n${qs}`, ['ハリーの森（5 階）', 'やめる'], i => {
-                if (i !== 0) return menu();
-                g.startDungeon('forest');
-            });
+            const list = openDungeons();
+            ask(`どこへ行く？（★ はボスをたおしたダンジョン）\nいっしょに行く：${party}\n${qs}`,
+                [...list.map((d, i) => `${i < (t().cleared || 0) ? '★' : '　'}${d.name}（${d.floors} 階）`), 'やめる'], i => {
+                    if (i >= list.length) return menu();
+                    const d = list[i];
+                    // はじめて行くときは ふるカワから ひとこと
+                    const intro = !t().seen[d.id] && d.story && d.story.intro;
+                    t().seen[d.id] = true;
+                    if (intro) return g.talk(intro, () => g.startDungeon(d.id));
+                    g.startDungeon(d.id);
+                });
         }
 
         // ----- 探検隊ギルド (ふるカワ。仕様書 13.1) -----
@@ -229,7 +270,10 @@
                     town.bp += bp;
                     save();
                     if (town.debt <= 0 && !town.ended) return ending();
-                    ask(`${money(n)} 返した！ BP +${bp}（いま ${town.bp} BP）\n残りの借金 ${money(town.debt)}`, ['もどる'], debt);
+                    // 返した合計で 施設が開く
+                    const opened = PLACES.filter(pl => TW.UNLOCK[pl.id] && town.paid - n < TW.UNLOCK[pl.id] && town.paid >= TW.UNLOCK[pl.id]);
+                    const more = opened.map(pl => `おにおに「少しは返したな。……${pl.name}を 使っていいぞ」`);
+                    ask([`${money(n)} 返した！ BP +${bp}（いま ${town.bp} BP）`, `残りの借金 ${money(town.debt)}`, ...more].join('\n'), ['もどる'], debt);
                 });
         }
 
@@ -396,8 +440,39 @@
         }
 
         // ----- 交易所 (2026-10-22 追加: 珍しい道具・ほかのプレイヤーの出品) -----
-        // ほかの探検隊の出品は、いまはコンピューター (ライバル探検隊)。本当のプレイヤーとつなぐのは、サーバーを決めてから
+        // Supabase につながっていれば (config.js)、本当のプレイヤーの出品を買える・自分の出品が ほかのプレイヤーに売れる。
+        // つながっていなければ、コンピューターの探検隊 (ライバル探検隊) だけ。自分の出品は 日がたつとコンピューターが買う
+        const myName = () => `${p().name}（ばりきつよめ）`;
+        const tradable = id => Boolean(I.ITEMS[id]) && I.ITEMS[id].only !== 'quest';
+
+        // つないでいるあいだは「つないでいます…」を見せる。つながらなければ fail
+        function connect(promise, ok, fail) {
+            view = 'loading';
+            promise.then(r => {
+                view = 'town';
+                ok(r);
+            }, () => {
+                view = 'town';
+                fail();
+            });
+        }
+        const offline = back => ask('交易所「いまは ほかのプレイヤーと つながらないみたい……」', ['もどる'], back, { list: false });
+
+        // 入ったとき: ほかのプレイヤーに売れた分の お金を受け取る
         function trade() {
+            if (!net.online) return tradeMenu();
+            connect(net.claim(), rows => {
+                const sold = (rows || []).filter(r => tradable(r.item_id));
+                if (!sold.length) return tradeMenu();
+                const total = sold.reduce((n, r) => n + r.price, 0);
+                p().money += total;
+                save();
+                ask(['出品していた道具が 売れていた！', ...sold.map(r => `${I.label({ id: r.item_id, n: r.n })} → ${r.buyer_name || 'だれか'}（+${money(r.price)}）`)].join('\n'),
+                    ['もどる'], tradeMenu, { list: false });
+            }, tradeMenu);
+        }
+
+        function tradeMenu() {
             ask(`交易所「珍しい品が そろってますよ」　お金 ${money(p().money)}`, ['珍しい道具', 'ほかの探検隊の出品', '出品する', '自分の出品', 'やめる'], i => {
                 if (i === 0) return rare();
                 if (i === 1) return market();
@@ -409,9 +484,9 @@
 
         function rare() {
             const list = t().rare;
-            if (!list.length) return ask('今日の珍しい道具は 売り切れ。', ['もどる'], trade, { list: false });
+            if (!list.length) return ask('今日の珍しい道具は 売り切れ。', ['もどる'], tradeMenu, { list: false });
             ask('珍しい道具（日がわり）', [...list.map(r => `${I.ITEMS[r.id].name}　${money(r.price)}`), 'もどる'], i => {
-                if (i >= list.length) return trade();
+                if (i >= list.length) return tradeMenu();
                 const r = list[i];
                 if (p().money < r.price) return ask(`お金が たりない。\n${I.ITEMS[r.id].note}`, ['もどる'], rare, { list: false });
                 p().money -= r.price;
@@ -422,49 +497,92 @@
             });
         }
 
+        // ほかのプレイヤー (オンライン) と、コンピューターの探検隊の出品
         function market() {
-            const list = t().market;
-            if (!list.length) return ask('いまは 出品が ない。', ['もどる'], trade, { list: false });
-            ask('ほかの探検隊の出品（いまはコンピューターの探検隊）', [...list.map(l => `${l.seller}：${I.label(l)}　${money(l.price)}`), 'もどる'], i => {
-                if (i >= list.length) return trade();
-                const l = list[i];
-                if (p().money < l.price) return ask('お金が たりない。', ['もどる'], market, { list: false });
-                p().money -= l.price;
-                list.splice(i, 1);
-                giveItem({ id: l.id, n: l.n }, true);
-                save();
-                ask(`${l.seller}から ${I.label(l)}を 買った！`, ['もどる'], market, { list: false });
-            });
+            const rivals = t().market;
+            const show = players => {
+                const rows = [
+                    ...players.filter(l => tradable(l.item_id)).map(l => ({ id: l.item_id, n: l.n, price: l.price, seller: l.seller_name, remote: l.id })),
+                    ...rivals.map(l => ({ ...l, seller: `${l.seller}（コンピューター）`, src: l }))
+                ];
+                if (!rows.length) return ask('いまは 出品が ない。', ['もどる'], tradeMenu, { list: false });
+                ask(`ほかの探検隊の出品${net.online ? '' : '（いまはコンピューターの探検隊だけ）'}`, [...rows.map(l => `${l.seller}：${I.label(l)}　${money(l.price)}`), 'もどる'], i => {
+                    if (i >= rows.length) return tradeMenu();
+                    const l = rows[i];
+                    if (p().money < l.price) return ask('お金が たりない。', ['もどる'], market, { list: false });
+                    if (l.src) {
+                        p().money -= l.price;
+                        rivals.splice(rivals.indexOf(l.src), 1);
+                        giveItem({ id: l.id, n: l.n }, true);
+                        save();
+                        return ask(`${l.seller}から ${I.label(l)}を 買った！`, ['もどる'], market, { list: false });
+                    }
+                    connect(net.buy(l.remote, myName()), res => {
+                        const r = res && res[0];
+                        if (!r) return ask('ひと足おそく、売り切れていた！', ['もどる'], market, { list: false });
+                        p().money -= r.price;
+                        giveItem({ id: r.item_id, n: r.n }, true);
+                        save();
+                        ask(`${l.seller}から ${I.label(l)}を 買った！`, ['もどる'], market, { list: false });
+                    }, () => offline(market));
+                });
+            };
+            if (!net.online) return show([]);
+            connect(net.list(), rows => show(rows || []), () => show([]));
         }
 
         function list() {
-            const items = p().bag.filter(it => !it.eq);
-            if (!items.length) return ask('出品できる道具を 持っていない。', ['もどる'], trade, { list: false });
-            ask('どれを出品する？（家で 1 日すすめると、売れていることがある）', [...items.map(I.label), 'もどる'], i => {
-                if (i >= items.length) return trade();
+            const items = p().bag.filter(it => !it.eq && tradable(it.id));
+            if (!items.length) return ask('出品できる道具を 持っていない。（つけている装備と ★限定品は 出品できない）', ['もどる'], tradeMenu, { list: false });
+            const when = net.online ? 'ほかのプレイヤーが買うと、つぎに交易所に来たとき お金を受け取れる' : '家で 1 日すすめると、売れていることがある';
+            ask(`どれを出品する？（${when}）`, [...items.map(I.label), 'もどる'], i => {
+                if (i >= items.length) return tradeMenu();
                 const it = items[i];
                 const base = (I.ITEMS[it.id].price || 10) * (it.n || 1);
                 const prices = [Math.round(base * 0.8), base, Math.round(base * 1.5)];
                 ask(`${I.label(it)}を いくらで出品する？`, [`安め ${money(prices[0])}`, `ふつう ${money(prices[1])}`, `高め ${money(prices[2])}`, 'やめる'], j => {
                     if (j === 3) return list();
-                    p().bag.splice(p().bag.indexOf(it), 1);
-                    t().listings.push({ id: it.id, n: it.n || 1, price: prices[j] });
-                    save();
-                    ask(`${I.label(it)}を ${money(prices[j])}で 出品した。`, ['もどる'], trade, { list: false });
+                    const done = () => ask(`${I.label(it)}を ${money(prices[j])}で 出品した。`, ['もどる'], tradeMenu, { list: false });
+                    if (!net.online) {
+                        p().bag.splice(p().bag.indexOf(it), 1);
+                        t().listings.push({ id: it.id, n: it.n || 1, price: prices[j] });
+                        save();
+                        return done();
+                    }
+                    connect(net.post(myName(), { id: it.id, n: it.n || 1, price: prices[j] }), () => {
+                        if (p().bag.includes(it)) p().bag.splice(p().bag.indexOf(it), 1);
+                        save();
+                        done();
+                    }, () => offline(list));
                 }, { list: false });
             });
         }
 
         function mine() {
-            const ls = t().listings;
-            if (!ls.length) return ask('出品している道具は ない。', ['もどる'], trade, { list: false });
-            ask('自分の出品（えらぶと 取り下げる）', [...ls.map(l => `${I.label(l)}　${money(l.price)}`), 'もどる'], i => {
-                if (i >= ls.length) return trade();
-                const l = ls.splice(i, 1)[0];
-                giveItem({ id: l.id, n: l.n }, true);
-                save();
-                mine();
-            });
+            const local = t().listings;
+            const show = remote => {
+                const rows = [...remote.map(l => ({ id: l.item_id, n: l.n, price: l.price, remote: l.id })), ...local.map(l => ({ ...l, src: l }))];
+                if (!rows.length) return ask('出品している道具は ない。', ['もどる'], tradeMenu, { list: false });
+                ask('自分の出品（えらぶと 取り下げる）', [...rows.map(l => `${I.label(l)}　${money(l.price)}`), 'もどる'], i => {
+                    if (i >= rows.length) return tradeMenu();
+                    const l = rows[i];
+                    if (l.src) {
+                        local.splice(local.indexOf(l.src), 1);
+                        giveItem({ id: l.id, n: l.n }, true);
+                        save();
+                        return mine();
+                    }
+                    connect(net.cancel(l.remote), res => {
+                        const r = res && res[0];
+                        if (!r) return ask('もう 売れていた！ 交易所に入りなおすと、お金を受け取れる。', ['もどる'], tradeMenu, { list: false });
+                        giveItem({ id: r.item_id, n: r.n }, true);
+                        save();
+                        mine();
+                    }, () => offline(mine));
+                });
+            };
+            if (!net.online) return show([]);
+            connect(net.mine(), rows => show((rows || []).filter(l => tradable(l.item_id))), () => show([]));
         }
 
         // ----- 倉庫 -----
@@ -564,23 +682,24 @@
                 if (i === 0) g.backToTown('quest');
             }, { list: false }));
         }
-        function onKill(kind) {
+        const sameDungeon = (q, id) => (q.dungeon || 'forest') === id;
+        function onKill(kind, id) {
             t().quests.forEach(q => {
-                if (q.type !== 'kill' || q.kind !== kind || q.progress >= q.count) return;
+                if (q.type !== 'kill' || q.kind !== kind || q.progress >= q.count || !sameDungeon(q, id)) return;
                 q.progress++;
                 if (q.progress >= q.count) questReached(q);
             });
         }
-        function onFloor(n) {
+        function onFloor(n, id) {
             t().quests.forEach(q => {
-                if (q.type !== 'reach' || q.progress >= 1 || n < q.floor) return;
+                if (q.type !== 'reach' || q.progress >= 1 || n < q.floor || !sameDungeon(q, id)) return;
                 q.progress = 1;
                 questReached(q);
             });
         }
-        function onClear(kinds) {
+        function onClear(kinds, id) {
             t().quests.forEach(q => {
-                if (q.type === 'ally' && kinds.includes(q.kind)) q.progress = 1;
+                if (q.type === 'ally' && kinds.includes(q.kind) && sameDungeon(q, id)) q.progress = 1;
             });
         }
 
@@ -628,7 +747,7 @@
             state.allies = data.allies.map(ally);
             state.roster = data.roster.map(ally);
             state.tactic = data.tactic || 'fight';
-            state.town = data.town;
+            state.town = { cleared: 0, seen: {}, storyEnd: false, ...data.town };
             // ダンジョンの中でやめていたら、その階の はじめから (中断セーブ。仕様書 16章)
             if (data.run) return g.resume(data.run);
             menu();
@@ -640,6 +759,22 @@
             if (view === 'title') return drawTitle(ctx, now, W, H);
             if (view === 'tree') return drawTree(ctx, now, W, H);
             drawTown(ctx, now, W, H);
+            if (view === 'loading') {
+                ctx.fillStyle = 'rgba(0,0,0,.6)';
+                ctx.fillRect(0, H / 2 - 16, W, 32);
+                ctx.font = `12px ${FONT}`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(`つないでいます${'.'.repeat(Math.floor(now / 300) % 4)}`, W / 2, H / 2);
+                ctx.textAlign = 'left';
+            }
+        }
+
+        // キャラの絵 (小さい絵か、やすさんたちの大きい絵)。(x, y) は 16 × 16 の左上
+        function drawChar(ctx, kind, frame, x, y) {
+            if (A.SPRITES[kind]) return A.drawSprite(ctx, kind, frame, x, y);
+            KD.BigArt.drawBig(ctx, kind, frame, x + 8, y + 16, { height: 22 });
         }
 
         function drawTitle(ctx, now, W, H) {
@@ -674,6 +809,8 @@
             PLACES.forEach((pl, i) => {
                 const x = 12 + (i % 5) * 74, y = 30 + Math.floor(i / 5) * 62;
                 const on = pick === i && state.phase === 'town';
+                const locked = !isOpen(pl.id);
+                ctx.globalAlpha = locked ? 0.35 : 1;
                 ctx.fillStyle = '#f0e0c0';
                 ctx.fillRect(x + 8, y + 18, 48, 26);
                 ctx.fillStyle = pl.color;
@@ -699,11 +836,12 @@
                 ctx.strokeText(pl.name, x + 32, y + 52);
                 ctx.fillText(pl.name, x + 32, y + 52);
                 ctx.lineWidth = 1;
+                ctx.globalAlpha = 1;
             });
             ctx.textAlign = 'left';
             // 主人公と仲間
             const bob = Math.floor(now / 400) % 2;
-            [p(), ...state.allies].forEach((u, i) => A.drawSprite(ctx, u.kind, bob, 150 + i * 22, 162, { flip: false }));
+            [p(), ...state.allies].forEach((u, i) => drawChar(ctx, u.kind, bob, 150 + i * 22, 162));
             // 上の帯: 日・借金・お金・BP
             ctx.fillStyle = 'rgba(0,0,0,.6)';
             ctx.fillRect(0, 0, W, 14);

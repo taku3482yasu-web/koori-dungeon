@@ -177,7 +177,8 @@
     // 仲間になった敵のわざ: 役職のわざ + その敵のわざ
     function enemyAllySkills(kind) {
         const e = ENEMIES[kind];
-        return [ROLES[e.role].skill, ...(e.move ? [e.move] : [])].map(newSkill);
+        const move = e.move || (e.moves && e.moves[0] && e.moves[0][0]);
+        return [ROLES[e.role].skill, ...(move ? [move] : [])].map(newSkill);
     }
 
     // はじめに持っているわざ: Lv1 で覚えるわざ。withRole なら役職のわざも (仲間のこおりくん・おにおに)

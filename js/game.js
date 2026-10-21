@@ -1,9 +1,10 @@
 // =====================================================================
-// ゲームの進行 (段階 6: タイトル → 町 → ダンジョン → 町。ダンジョンでは仲間といっしょに わざ・道具を使って戦う)
+// ゲームの進行 (段階 7: タイトル → 町 → ダンジョン 7 つ (いちばん下にボス) → 町。仲間といっしょに わざ・道具を使って戦う)
 // ---------------------------------------------------------------------
 // 仕様書 4章 (マップ・見える範囲・ミニマップ・階段・ワナ)・5章 (ターン・移動・斜め・ダッシュ)・
 // 6章 (能力・Lv・属性・役職・満腹度)・7章 (わざ・状態異常)・8章 (仲間)・9章 (道具・お金)・15章 (操作)。
-// キャラの数字と計算は units.js、道具とワナのデータは items.js、町は town.js (データ) と townui.js (画面)。
+// キャラの数字と計算は units.js・enemies.js、ダンジョンは dungeons.js、道具とワナは items.js、町は town.js (データ) と townui.js (画面)。
+// 絵は art.js (小さい絵・マス)・bigart.js (ボス・仲間)・enemyart.js (ダンジョン 2〜7 の敵)。
 // 状態は state にまとめ、draw() で毎フレーム canvas に描く。入力は main.js から届く。
 //
 // ターンの流れ: 主人公が 1 回動く → 仲間が 1 回ずつ動く → 敵が 1 回 (はやい敵は 2 回) 動く。
@@ -26,7 +27,6 @@
     const SHOOT_RANGE = 6;                        // 「撃つ」敵の届くマス数
     const LINE_RANGE = 10;                        // 直線のわざの届くマス数
     const GUARD_TURNS = 5;                        // まもりのかまえ が続くターン
-    const PARTY_MAX = 3;                          // いっしょに行ける人数 (主人公をふくむ。ストーリーで 5 人まで。仕様書 8章)
     const RECRUIT_RATE = 0.1;                     // たおした敵が「仲間になりたそうに」する確率
     const TACTICS = { fight: 'みんなで戦う', follow: 'ついてきて', flee: 'にげて' };
     const DIRS8 = [[0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]];
@@ -34,12 +34,14 @@
     const RANGE_NAMES = { front: '正面', line: '直線', around: '周り', self: '自分' };
     const ELEMENT_COLORS = { 'こおり': '#bff0ff', 'ほのお': '#ff9a4a', 'みず': '#6ab8ff', 'しぜん': '#9ae07a', 'かぜ': '#e8f4ff', 'ふしぎ': '#d8a8ff', 'ふつう': '#ffffff' };
 
-    // ダンジョン (今はハリーの森だけ。仕様書 12章)
-    const DUNGEONS = [{ id: 'forest', name: 'ハリーの森', floors: 5, theme: 'forest', table: U.FOREST_TABLE, items: I.FOREST_ITEMS, traps: I.FOREST_TRAPS }];
+    // ダンジョン 7 つ (仕様書 12章。dungeons.js)。床の道具・ワナの種類は どこも同じ
+    const DG = KD.Dungeons;
+    const DUNGEONS = DG.LIST.map(d => ({ items: I.FOREST_ITEMS, trapKinds: I.FOREST_TRAPS, ...d }));
+    const has = (u, trait) => Boolean(u.traits && u.traits.includes(trait));
 
     // opts (テスト用): enemies: false で敵を出さない・things: false で道具とワナを置かない・partner: false で最初の仲間なし・
     //   recruit: false で敵が仲間にならない (数なら その確率)・seed で同じ階にする・
-    //   start: 'dungeon' でタイトルと町を飛ばして すぐダンジョンへ・role: はじめの役職 (開放もする)・save: false でセーブしない
+    //   start: 'dungeon' でタイトルと町を飛ばして すぐダンジョンへ (dungeon: どのダンジョンか)・role: はじめの役職 (開放もする)・save: false でセーブしない
     function createGame(canvas, ui, opts = {}) {
         const ctx = canvas.getContext('2d');
         canvas.width = W;
@@ -107,7 +109,7 @@
         function makeHero(id, role = 'attacker') {
             const stats = U.heroStats(id, 1, role);
             return {
-                kind: id, name: U.HEROES[id].name, hero: true, side: 'party', element: U.HEROES[id].element, role,
+                kind: id, name: U.HEROES[id].name, hero: true, side: 'party', element: U.HEROES[id].element, role, immune: U.HEROES[id].immune || [],
                 lv: 1, exp: 0, stats, hp: stats.hp, regen: 0, skills: U.startSkills(id, role), tree: [...KD.Town.TREE_START],
                 belly: I.BELLY_MAX, money: 0,
                 // はじめの持ち物 (案。段階 6 からは町で準備する)
@@ -116,21 +118,25 @@
             };
         }
 
-        // 仲間を作る。こおりくん・おにおにはアタッカー、仲間になった敵は敵ごとの役職 (仕様書 6.3)
+        // 仲間を作る。こおりくん・おにおにはアタッカー、やすさんたちと 仲間になった敵は それぞれの役職 (仕様書 6.3)
         function makeAlly(kind, lv = 1, x = 0, y = 0) {
             const isHero = Boolean(U.HEROES[kind]);
-            const role = isHero ? 'attacker' : U.ENEMIES[kind].role;
+            const role = isHero ? U.HEROES[kind].role || 'attacker' : U.ENEMIES[kind].role;
             const stats = U.allyStats(kind, lv, role);
             const skills = isHero ? U.startSkills(kind, role, true) : U.enemyAllySkills(kind);
             if (isHero) U.learnedBetween(kind, 1, lv).forEach(id => { if (skills.length < U.MAX_SKILLS) skills.push(U.newSkill(id)); });
             return {
                 kind, name: isHero ? U.HEROES[kind].name : U.ENEMIES[kind].name, ally: true, side: 'party',
-                element: isHero ? U.HEROES[kind].element : U.ENEMIES[kind].element, immune: isHero ? [] : U.ENEMIES[kind].immune || [],
+                element: isHero ? U.HEROES[kind].element : U.ENEMIES[kind].element, immune: (isHero ? U.HEROES[kind].immune : U.ENEMIES[kind].immune) || [],
+                // 仲間になっても 溶岩に強いのは そのまま (ほかの とくちょう は敵のときだけ)
+                traits: !isHero && U.ENEMIES[kind].traits.includes('lava') ? ['lava'] : [],
                 role, lv, exp: 0, stats, hp: stats.hp, regen: 0, skills, ...body(x, y)
             };
         }
 
         const party = () => [state.player, ...state.allies];
+        // 一緒に行ける人数 (ストーリーで ふえる。仕様書 8章)
+        const partyMax = () => DG.partyMax(state.town ? state.town.cleared || 0 : 0);
         const equipped = p => p.bag && p.bag.find(it => it.eq);
 
         // 能力を計算しなおす (Lv・役職・バトルツリー・装備)。仲間はバトルツリーでは強くならない (仕様書 6.2)
@@ -159,7 +165,7 @@
         // ----- 階 -----
         function enterFloor(n) {
             state.floor = n;
-            state.map = D.generate(KD.createRng(state.seed + n * 7919));
+            state.map = D.generate(KD.createRng(state.seed + n * 7919), { pool: state.dungeon.pool });
             rng = KD.createRng(state.seed + n * 104729);
             state.explored = new Uint8Array(state.map.w * state.map.h);
             const p = state.player;
@@ -176,19 +182,25 @@
             state.arrived = false;
             state.fastSkip = false;
             state.turn = 0;
+            state.boss = null;
+            state.bossDown = false;
+            const last = n >= state.dungeon.floors;
+            // 月の迷宮: しばらくすると 階の形が変わる (いちばん下の階は変わらない)
+            state.shiftAt = state.dungeon.shift && !last ? state.dungeon.shift : 0;
             placeThings(n);
             state.allies.forEach(a => placeNear(a, p.x, p.y));
             look();
             if (opts.enemies !== false) {
                 const startRoom = roomOf(p.x, p.y);
-                for (let i = 0; i < 3 + Math.ceil(n / 2); i++) spawnEnemy(startRoom);
+                for (let i = 0; i < 3 + Math.min(4, Math.ceil(n / 2)); i++) spawnEnemy(startRoom);
+                if (last && state.dungeon.boss) spawnBoss();
             }
             say(`${state.dungeon.name} B${n}F に着いた。`);
             // 中断セーブ (各階に着いたとき。仕様書 16章)
             state.run = { dungeon: state.dungeon.id, floor: n, seed: state.seed };
             if (state.town) {
                 town.save();
-                town.onFloor(n);
+                town.onFloor(n, state.dungeon.id);
             }
         }
 
@@ -213,9 +225,9 @@
             const d = state.dungeon;
             const last = n >= d.floors;
             for (let i = rng.int(4, 7); i > 0; i--) placeAt(spot => state.items.push({ ...spot, item: I.rollItem(rng, d.items) }));
-            for (let i = rng.int(2, 4); i > 0; i--) placeAt(spot => state.items.push({ ...spot, item: { id: 'money', n: I.rollMoney(rng, n) } }));
-            for (let i = rng.int(2, 4); i > 0; i--) {
-                let id = I.weighted(rng, d.traps);
+            for (let i = rng.int(2, 4); i > 0; i--) placeAt(spot => state.items.push({ ...spot, item: { id: 'money', n: Math.round(I.rollMoney(rng, n) * (d.money || 1)) } }));
+            for (let i = rng.int(d.traps[0], d.traps[1]); i > 0; i--) {
+                let id = I.weighted(rng, d.trapKinds);
                 if (id === 'pit' && last) id = 'spike';   // いちばん下の階に落とし穴はない
                 placeAt(spot => state.traps.push({ ...spot, id, seen: false }));
             }
@@ -228,6 +240,7 @@
                 const room = rng.pick(map.rooms);
                 const x = room.x + rng.int(0, room.w - 1), y = room.y + rng.int(0, room.h - 1);
                 if ((x === map.stairs.x && y === map.stairs.y) || (x === map.start.x && y === map.start.y) || itemAt(x, y) || trapAt(x, y)) continue;
+                if (D.at(map, x, y) !== D.FLOOR) continue;
                 return void put({ x, y });
             }
         }
@@ -253,9 +266,10 @@
             state.fade = { at: performance.now(), label, then: () => enterFloor(n) };
         }
 
-        // 階段に乗った: 「降りますか？」
+        // 階段に乗った: 「降りますか？」。ボスをたおすまでは使えない
         function askStairs() {
             const last = state.floor >= state.dungeon.floors;
+            if (state.boss && state.boss.hp > 0) return say(`${state.boss.name}を たおさないと、先へ 進めない！`);
             ui.ask(last ? `階段がある。降りると${state.dungeon.name}を抜けられそうだ。降りますか？` : '階段がある。降りますか？', ['はい', 'いいえ'], choice => {
                 if (choice !== 0) return say('降りるのをやめた。');
                 if (last) return clear();
@@ -266,8 +280,8 @@
         // いちばん下の階の階段: 突破して町へ (仕様書 3章)
         function clear() {
             state.done = true;
-            if (state.town) town.onClear(party().map(u => u.kind));
-            backToTown('clear');
+            if (state.town) town.onClear(party().map(u => u.kind), state.dungeon.id);
+            backToTown('clear', { boss: state.bossDown, id: state.dungeon.id });
         }
 
         // ダンジョンへ出発する (町から)。HP・PP・満腹度は元に戻り、たおれた仲間も戻る
@@ -338,39 +352,77 @@
         const cheb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
         const seen = u => u.side === 'party' || Boolean(state.visible[idx(u.x, u.y)]);
 
+        // 敵を作る。ダンジョンによって すばやい (fast)・力持ち (strong)
         function makeEnemy(kind, lv, x, y) {
             const data = U.ENEMIES[kind];
             const st = U.enemyStats(kind, lv);
+            const d = state.dungeon || {};
+            const strong = d.strong || 1;
+            const fast = d.fast && !data.boss && rng.chance(d.fast);
+            const hidden = data.traits.includes('disguise') || data.traits.includes('mimic');
+            const atk = Math.round(st.atk * strong);
             return {
-                kind, name: data.name, side: 'enemy', element: data.element, ai: data.ai, speed: data.speed, move: data.move || null, rate: data.rate || 0,
-                immune: data.immune || [], lv, exp: st.exp, stats: { hp: st.hp, atk: st.atk, def: st.def, spa: st.spa, spd: st.spd }, hp: st.hp,
-                steal: Boolean(data.steal), loot: null,
-                awake: data.ai !== 'wait', goal: null, seen: null, ...body(x, y)
+                kind, name: data.name, side: 'enemy', element: data.element, ai: data.ai, speed: fast ? 2 : data.speed,
+                moves: data.moves, traits: data.traits, boss: Boolean(data.boss), big: Boolean(data.big),
+                immune: data.immune || [], lv, exp: st.exp, baseAtk: atk,
+                stats: { hp: st.hp, atk, def: st.def, spa: Math.round(st.spa * strong), spd: st.spd }, hp: st.hp,
+                steal: Boolean(data.steal), loot: null, money: 0, revived: false, berserk: false, rage: 0, tick: 0, hits: 0,
+                awake: data.ai !== 'wait' && !hidden && !data.boss, goal: null, seen: null, ...body(x, y)
             };
         }
 
-        // 見えていない部屋のどこかに敵を 1 体出す (avoidRoom の部屋には出さない)
+        // 見えていない部屋のどこかに敵を 1 体出す (avoidRoom の部屋には出さない)。どこにでも出る敵・強敵も まれに出る
         function spawnEnemy(avoidRoom) {
             const map = state.map;
-            const table = state.dungeon.table[state.floor - 1];
+            const d = state.dungeon;
             for (let tries = 0; tries < 60; tries++) {
                 const room = rng.pick(map.rooms);
                 const x = room.x + rng.int(0, room.w - 1), y = room.y + rng.int(0, room.h - 1);
-                if (roomOf(x, y) === avoidRoom || state.visible[idx(x, y)] || occupied(x, y)) continue;
+                if (roomOf(x, y) === avoidRoom || state.visible[idx(x, y)] || occupied(x, y) || D.at(map, x, y) !== D.FLOOR) continue;
                 if (x === map.stairs.x && y === map.stairs.y) continue;
-                // 敵の Lv: B1F は 1、B5F で 3〜4 (ハリーの森はチュートリアルなので弱め)
-                const lv = Math.max(1, Math.ceil(state.floor * 0.7) - 1 + rng.int(0, 1));
-                state.enemies.push(makeEnemy(rng.pick(table), lv, x, y));
-                return true;
+                let kind = rng.pick(DG.tableFor(d, state.floor));
+                for (const [k, chance] of DG.ANYWHERE) if (rng.chance(chance)) kind = k;
+                if (d.rare && rng.chance(0.04)) kind = rng.pick(d.rare);
+                const lv = Math.max(1, DG.levelFor(d, state.floor) + rng.int(0, 1));
+                const e = makeEnemy(kind, lv, x, y);
+                state.enemies.push(e);
+                // アソヘイ: 何体かまとまって出る
+                if (has(e, 'group')) for (let i = rng.int(1, 2); i > 0; i--) addNear(kind, lv, x, y);
+                return e;
             }
-            return false;
+            return null;
+        }
+
+        // (x, y) の近くに敵を出す (分裂・仲間を呼ぶ・まとまって出る)
+        function addNear(kind, lv, x, y) {
+            if (state.enemies.length >= MAX_ENEMIES + 4) return null;
+            const e = makeEnemy(kind, lv, x, y);
+            if (!placeNear(e, x, y)) return null;
+            e.awake = true;
+            state.enemies.push(e);
+            return e;
+        }
+
+        // ボス (いちばん下の階の、階段の近く。仕様書 12章)
+        function spawnBoss() {
+            const d = state.dungeon, { stairs } = state.map;
+            const e = makeEnemy(d.boss, DG.levelFor(d, d.floors) + 2, stairs.x, stairs.y);
+            if (!placeNear(e, stairs.x, stairs.y)) return;
+            state.enemies.push(e);
+            state.boss = e;
+        }
+
+        // 台詞を 1 つずつ見せる (ボスに会ったとき)
+        function talk(lines, done = () => {}) {
+            if (!lines || !lines.length) return done();
+            ui.ask(lines[0], ['つぎへ'], () => talk(lines.slice(1), done));
         }
 
         // (x, y) から各マスまでの歩数 (8 方向。斜めは角を壁がふさいでいたら通れない)
         const distances = (x, y) => distancesFrom([[x, y]]);
 
-        // いくつかの場所 points のうち、いちばん近いところからの歩数
-        function distancesFrom(points) {
+        // いくつかの場所 points のうち、いちばん近いところからの歩数。swim なら水の上も通る
+        function distancesFrom(points, swim = false) {
             const map = state.map;
             const dist = new Int16Array(map.w * map.h).fill(-1);
             const list = points.slice();
@@ -379,7 +431,7 @@
                 const [cx, cy] = list[i];
                 for (const [dx, dy] of DIRS8) {
                     const nx = cx + dx, ny = cy + dy;
-                    if (D.canMove(map, cx, cy, dx, dy) && dist[idx(nx, ny)] < 0) {
+                    if (D.canMove(map, cx, cy, dx, dy, swim) && dist[idx(nx, ny)] < 0) {
                         dist[idx(nx, ny)] = dist[idx(cx, cy)] + 1;
                         list.push([nx, ny]);
                     }
@@ -394,7 +446,7 @@
             let best = null, bestD = here;
             for (const [dx, dy] of DIRS8) {
                 const nx = e.x + dx, ny = e.y + dy;
-                if (!D.canMove(state.map, e.x, e.y, dx, dy) || occupied(nx, ny)) continue;
+                if (!D.canMove(state.map, e.x, e.y, dx, dy, has(e, 'swim')) || occupied(nx, ny)) continue;
                 const d = dist[idx(nx, ny)];
                 if (d < 0) continue;
                 if (away ? d > bestD : d < bestD) {
@@ -448,15 +500,19 @@
             const p = state.player;
             if (e.flinch) return void (e.flinch = false);
             const st = e.status && e.status.id;
-            if (st === 'sleep' || (st === 'para' && rng.chance(0.5)) || cramped(e)) return;
+            if (st === 'sleep' || st === 'freeze' || (st === 'para' && rng.chance(0.5)) || cramped(e)) return;
+            if (has(e, 'slow') && ++e.tick % 2) return;   // プロテインゴーレム: 2 ターンに 1 回
+            if (has(e, 'malfunction') && rng.chance(0.2)) return void (seen(e) && say(`${e.name}は 故障して 止まった。`));
             if (!e.awake) {
-                if (!party().some(u => cheb(e, u) <= 2)) return;   // 「まつ」敵は、近くに来るまで動かない
-                e.awake = true;
+                // 「まつ」敵・化けている敵は 近くに来るまで、ボスは 見えるまで 動かない
+                if (e.boss ? !state.visible[idx(e.x, e.y)] : !party().some(u => cheb(e, u) <= 2)) return;
+                wake(e);
+                if (e.boss) return;
             }
             // こんらん: 半分の確率で、でたらめな方向へ歩く
             if (st === 'confuse' && rng.chance(0.5)) {
                 const [dx, dy] = rng.pick(DIRS8);
-                if (D.canMove(state.map, e.x, e.y, dx, dy) && !occupied(e.x + dx, e.y + dy)) moveUnit(e, dx, dy, ms);
+                if (D.canMove(state.map, e.x, e.y, dx, dy, has(e, 'swim')) && !occupied(e.x + dx, e.y + dy)) moveUnit(e, dx, dy, ms);
                 return;
             }
             const sees = state.visible[idx(e.x, e.y)] === 1;   // こちらから見えている敵は、こちらも見えている
@@ -464,28 +520,39 @@
                 e.seen = [p.x, p.y];
                 e.goal = null;
             }
-            // にげる敵: HP が半分を切ったか、道具をぬすんだら逃げる
-            const fleeing = e.ai === 'flee' && sees && (e.hp < e.stats.hp / 2 || Boolean(e.loot));
-            const move = e.move && U.SKILLS[e.move];
+            // ツキウサギ: 仲間の敵を回復
+            if (has(e, 'healer') && rng.chance(0.4)) {
+                const other = state.enemies.find(o => o !== e && o.hp > 0 && o.hp < o.stats.hp * 0.6 && cheb(o, e) <= 2);
+                if (other) return void state.queue.push(() => enemyHeal(e, other));
+            }
+            // ツボマジン・ハリー・大魔王ASO: 仲間を呼ぶ
+            if (has(e, 'summon') && sees && rng.chance(e.boss ? 0.15 : 0.12) && state.enemies.length < MAX_ENEMIES + 4) {
+                return void state.queue.push(() => summon(e));
+            }
+            // にげる敵: HP が半分を切ったか、道具やお金を取ったら逃げる。キンメンコイヌは すぐ逃げる
+            const fleeing = sees && ((e.ai === 'flee' && (e.hp < e.stats.hp / 2 || Boolean(e.loot) || has(e, 'rich'))) || e.money > 0);
             const t = !fleeing && pickTarget(e);
             if (t) {
                 face(e, t.x - e.x, t.y - e.y);
-                // ペコリス: 主人公の道具をぬすむ
+                const m = pickMove(e, ['front', 'around', 'self']);
+                // ペコリス: 主人公の道具をぬすむ / シャッキンボウレイ: お金を取る
                 if (e.steal && t === p && !e.loot && p.bag.some(it => !it.eq) && rng.chance(0.5)) state.queue.push(() => steal(e));
-                // わざ (正面) を使うこともある
-                else if (move && move.range === 'front' && rng.chance(e.rate)) state.queue.push(() => enemySkill(e, t));
+                else if (has(e, 'stealMoney') && t === p && p.money > 0 && !e.money && rng.chance(0.4)) state.queue.push(() => stealMoney(e));
+                else if (m) state.queue.push(() => enemySkill(e, t, m));
                 else state.queue.push(() => attack(e, t));
                 return;
             }
-            if (e.ai === 'shoot' && move && sees) {
-                const target = party().find(u => u.hp > 0 && lineTo(e, u));
+            // 直線のわざ (撃つ敵は届けば必ず。ほかの敵は ときどき)
+            if (sees && !fleeing) {
+                const lm = e.moves.find(([id, rate]) => U.SKILLS[id].range === 'line' && (e.ai === 'shoot' || rng.chance(rate)));
+                const target = lm && party().find(u => u.hp > 0 && lineTo(e, u));
                 if (target) {
                     face(e, target.x - e.x, target.y - e.y);
-                    state.queue.push(() => enemySkill(e, target));
-                    return;
+                    return void state.queue.push(() => enemySkill(e, target, lm[0]));
                 }
             }
             if (st === 'bind') return;   // しばり: その場から動けない
+            if (has(e, 'ghost')) return void ghostStep(e, fleeing, sees, ms);
             if (fleeing) return void stepAlong(e, dist, ms, true);
             if (sees) return void stepAlong(e, dist, ms);
             if (!e.goal || (e.x === e.goal.x && e.y === e.goal.y)) {
@@ -493,6 +560,99 @@
                 setGoal(e);
             }
             if (!stepAlong(e, e.goal.dist, ms)) e.goal = null;
+        }
+
+        // 起きる (化けていた敵は 正体を見せる。ボスは 台詞)
+        function wake(e) {
+            e.awake = true;
+            if (has(e, 'disguise') || has(e, 'mimic')) say(`${e.name}が 化けていた！「${U.ENEMIES[e.kind].line}」`);
+            if (e.boss && !e.met) {
+                e.met = true;
+                const lines = state.dungeon.story && state.dungeon.story.boss;
+                state.queue.push(() => {
+                    talk(lines || [`${e.name}「${U.ENEMIES[e.kind].line}」`]);
+                    return 0;
+                });
+            }
+        }
+
+        // わざを えらぶ (ranges の範囲のわざを、それぞれの確率で)
+        function pickMove(e, ranges) {
+            for (const [id, rate] of e.moves) if (ranges.includes(U.SKILLS[id].range) && rng.chance(rate)) return id;
+            return null;
+        }
+
+        // 壁の中を通る敵 (ワスレクラゲ・ルナシャドウ など): まっすぐ近づく (逃げるときは はなれる)
+        function ghostStep(e, away, sees, ms) {
+            const map = state.map, p = state.player;
+            let tx, ty;
+            if (sees || e.seen) [tx, ty] = sees ? [p.x, p.y] : e.seen;
+            else {
+                if (!e.goal || (e.x === e.goal.x && e.y === e.goal.y)) setGoal(e);
+                ({ x: tx, y: ty } = e.goal);
+            }
+            if (e.seen && e.x === tx && e.y === ty) e.seen = null;
+            const far = (x, y) => Math.max(Math.abs(x - tx), Math.abs(y - ty));
+            let best = null, bestD = far(e.x, e.y);
+            for (const [dx, dy] of DIRS8) {
+                const nx = e.x + dx, ny = e.y + dy;
+                if (nx < 1 || ny < 1 || nx >= map.w - 1 || ny >= map.h - 1 || occupied(nx, ny)) continue;
+                const d = far(nx, ny);
+                if (away ? d > bestD : d < bestD) {
+                    best = [dx, dy];
+                    bestD = d;
+                }
+            }
+            if (best) moveUnit(e, best[0], best[1], ms);
+        }
+
+        // ツキウサギ: もちをついて回復
+        function enemyHeal(e, o) {
+            if (e.hp <= 0 || o.hp <= 0) return 0;
+            const n = Math.round(o.stats.hp * 0.3);
+            o.hp = Math.min(o.stats.hp, o.hp + n);
+            e.lunge = { at: performance.now(), dir: e.dir };
+            if (seen(e)) say(`${e.name}「${U.ENEMIES[e.kind].line}」 ${o.name}の HP が 回復した！`);
+            popup(o, `+${n}`, '#7ae07a');
+            return ATTACK_MS;
+        }
+
+        // 仲間を呼ぶ
+        function summon(e) {
+            if (e.hp <= 0) return 0;
+            const kind = U.ENEMIES[e.kind].summon || rng.pick(DG.tableFor(state.dungeon, state.floor));
+            const c = addNear(kind, Math.max(1, e.lv - 2), e.x, e.y);
+            if (!c) return 0;
+            say(`${e.name}「${e.boss ? '出でよ！' : U.ENEMIES[e.kind].line}」 ${c.name}が 現れた！`);
+            state.rings.push({ x: c.x, y: c.y, at: performance.now(), color: '#d8a8ff' });
+            return ATTACK_MS;
+        }
+
+        // シャッキンボウレイ: お金を取って逃げる (たおすと返ってくる)
+        function stealMoney(e) {
+            const p = state.player;
+            if (e.hp <= 0 || !canHit(e, p) || p.money <= 0) return 0;
+            const n = Math.max(1, Math.floor(p.money * 0.15));
+            p.money -= n;
+            e.money = n;
+            e.lunge = { at: performance.now(), dir: e.dir };
+            say(`${e.name}「${U.ENEMIES[e.kind].line}」 ${n}えん 取られた！`);
+            return ATTACK_MS;
+        }
+
+        // バクダンジロウ: 爆発して、周りに ダメージ
+        function explode(e) {
+            if (e.hp <= 0) return 0;
+            say(`${e.name}「${U.ENEMIES[e.kind].line}」 ドカーン！`);
+            state.rings.push({ x: e.x, y: e.y, at: performance.now(), color: '#ffb030' });
+            const n = Math.round(e.stats.atk * 1.5);
+            [...party(), ...state.enemies].filter(u => u !== e && u.hp > 0 && cheb(u, e) === 1).forEach(u => {
+                say(`${u.name}に ${n} のダメージ！`);
+                hurt(u, n, e);
+            });
+            e.hp = 0;
+            defeat(e, state.player);
+            return ATTACK_MS;
         }
 
         // 道具をぬすむ (つけている装備はぬすめない)
@@ -509,11 +669,11 @@
         }
 
         // 敵のわざ (順番が来たときに、まだ届くか確かめる)
-        function enemySkill(e, t) {
+        function enemySkill(e, t, id) {
             if (e.hp <= 0 || t.hp <= 0 || state.over) return 0;
-            const move = U.SKILLS[e.move];
-            if (move.range === 'front' ? !canHit(e, t) : !lineTo(e, t)) return 0;
-            return useMove(e, e.move, [Math.sign(t.x - e.x), Math.sign(t.y - e.y)]);
+            const move = U.SKILLS[id];
+            if (move.range === 'line' ? !lineTo(e, t) : move.range !== 'self' && !canHit(e, t)) return 0;
+            return useMove(e, id, [Math.sign(t.x - e.x), Math.sign(t.y - e.y)]);
         }
 
         // ----- 仲間 (仕様書 8章) -----
@@ -521,14 +681,14 @@
         function allyAct(a, distP, ms) {
             if (a.flinch) return void (a.flinch = false);
             const st = a.status && a.status.id;
-            if (st === 'sleep' || paralyzed(a) || cramped(a)) return;
+            if (st === 'sleep' || st === 'freeze' || paralyzed(a) || cramped(a)) return;
             if (st === 'confuse' && rng.chance(0.5)) {
                 const [dx, dy] = rng.pick(DIRS8);
                 if (st !== 'bind' && D.canMove(state.map, a.x, a.y, dx, dy) && !occupied(a.x + dx, a.y + dy)) moveUnit(a, dx, dy, ms);
                 return;
             }
             const p = state.player;
-            const foes = state.enemies.filter(e => e.hp > 0 && state.visible[idx(e.x, e.y)]);
+            const foes = state.enemies.filter(e => e.hp > 0 && e.awake && state.visible[idx(e.x, e.y)]);
             const adj = foes.filter(e => canHit(a, e));
             const canWalk = st !== 'bind';
             const foeDist = () => distancesFrom(foes.map(e => [e.x, e.y]));
@@ -612,13 +772,13 @@
         // たおした敵が仲間になりたそうにする (仕様書 8章)。いっぱいなら町の広場で待つ
         function maybeRecruit(e) {
             const rate = typeof opts.recruit === 'number' ? opts.recruit : RECRUIT_RATE;
-            if (opts.recruit === false || !rng.chance(rate)) return;
+            if (opts.recruit === false || e.boss || e.big || !rng.chance(rate)) return;
             state.queue.push(() => {
                 if (state.over) return 0;
                 ui.ask(`${e.name}が 仲間になりたそうに こちらを見ている！\n仲間にしますか？`, ['はい', 'いいえ'], i => {
                     if (i !== 0) return say(`${e.name}は さみしそうに 去っていった…`);
                     const a = makeAlly(e.kind, e.lv);
-                    if (party().length < PARTY_MAX && placeNear(a, state.player.x, state.player.y)) {
+                    if (party().length < partyMax() && placeNear(a, state.player.x, state.player.y)) {
                         state.allies.push(a);
                         say(`${a.name}が 仲間になった！（役職：${U.ROLES[a.role].name}）`);
                     } else {
@@ -676,24 +836,41 @@
             const p = state.player;
             const distP = distances(p.x, p.y);
             state.allies.slice().sort((a, b) => cheb(a, p) - cheb(b, p)).forEach(a => { if (a.hp > 0) allyAct(a, distP, ms); });
-            // 敵は、いちばん近い主人公・仲間をめざす
-            const dist = distancesFrom(party().map(u => [u.x, u.y]));
+            // 敵は、いちばん近い主人公・仲間をめざす (泳げる敵は 水の上も通る)
+            const points = party().map(u => [u.x, u.y]);
+            const dist = distancesFrom(points);
+            const distSwim = state.enemies.some(e => has(e, 'swim')) ? distancesFrom(points, true) : dist;
             for (let round = 0; round < 2 * times; round++) {
-                for (const e of state.enemies.slice()) if (e.hp > 0 && e.speed * times > round) act(e, dist, ms);
+                for (const e of state.enemies.slice()) if (e.hp > 0 && e.speed * times > round) act(e, has(e, 'swim') ? distSwim : dist, ms);
             }
             // 時間がたつと敵が増える (仕様書 4.3)
             if (opts.enemies !== false && state.turn % SPAWN_EVERY === 0 && state.enemies.length < MAX_ENEMIES) spawnEnemy(-1);
+            // 月の迷宮: 階の形が変わる
+            if (state.shiftAt && state.turn >= state.shiftAt && !state.over) {
+                state.shiftAt = 0;
+                say('迷宮の形が 変わった！');
+                state.queue.length = 0;
+                state.seed = (Math.imul(state.seed, 31) + 7) >>> 0;
+                changeFloor(state.floor, `${state.dungeon.name}  B${state.floor}F`);
+            }
         }
 
         // 1 ターンたった: 状態異常・まもりのかまえ が切れる。どくは HP が減る
         function tickStatus() {
             for (const u of [...party(), ...state.enemies]) {
                 if (u.hp <= 0) continue;
+                // 溶岩の上 (ほのおの敵・マグマのよろいは へいき。こおりくんは 2 倍)
+                if (D.at(state.map, u.x, u.y) === D.LAVA && !has(u, 'lava') && !(equipped(u) && I.ITEMS[equipped(u).id].lava)) {
+                    const n = Math.max(1, Math.floor(u.stats.hp / 20)) * (u.kind === 'koori' ? 2 : 1);
+                    if (seen(u)) say(`${u.name}は 溶岩で アチチ！ ${n} のダメージ！`);
+                    hurt(u, n, null);
+                    if (u.hp <= 0) continue;
+                }
                 if (u.buffs.guard && --u.buffs.guard === 0 && u.side === 'party') say(`${u.name}の まもりのかまえが 切れた。`);
                 if (!u.status) continue;
-                if (u.status.id === 'poison') {
-                    const n = Math.max(1, Math.floor(u.stats.hp / 16));
-                    if (seen(u)) say(`${u.name}は どくで ${n} のダメージ！`);
+                if (u.status.id === 'poison' || u.status.id === 'burn') {
+                    const n = Math.max(1, Math.floor(u.stats.hp / (u.status.id === 'poison' ? 16 : 20)));
+                    if (seen(u)) say(`${u.name}は ${u.status.id === 'poison' ? 'どく' : 'やけど'}で ${n} のダメージ！`);
                     hurt(u, n, null);
                     if (u.hp <= 0) continue;
                 }
@@ -719,9 +896,18 @@
             if (dx) u.flip = dx < 0;
         }
 
-        // a が t に与えるダメージ (属性の相性・同じ属性・きあいため・まもりのかまえ)
+        // a が t に与えるダメージ (属性の相性・同じ属性・きあいため・まもりのかまえ・やけど・よわき・凶暴)
         function deal(a, t, { power = 1, element = null, special = false } = {}) {
-            const atk = special ? a.stats.spa : a.stats.atk, def = special ? t.stats.spd : t.stats.def;
+            let atk = special ? a.stats.spa : a.stats.atk;
+            const def = special ? t.stats.spd : t.stats.def;
+            if (hasStatus(a, 'weak')) atk *= 0.7;
+            if (hasStatus(a, 'burn') && !special) atk *= 0.8;
+            if (has(a, 'frenzy') && state.turn > 100) atk *= 1.5;   // マンゲツウルフ
+            // ダンベルコング: 2 回に 1 回 強い攻撃
+            if (has(a, 'charge') && ++a.hits % 2 === 0) {
+                power *= 2;
+                say(`${a.name}の 全力の一撃！`);
+            }
             let { dmg, eff } = U.hitDamage(rng, atk, def, { power, element, self: a.element, target: t.element });
             if (a.buffs.kiai) {
                 dmg *= 2;
@@ -731,13 +917,15 @@
             return { dmg, eff };
         }
         const effText = eff => (eff > 1 ? ' こうかは ばつぐんだ！' : eff < 1 ? ' こうかは いまひとつ…' : '');
+        // 当たる確率 (目つぶしは半分、ミカヅキバットには 当たりにくい)
+        const hitRate = (a, t, base) => base * (hasStatus(a, 'blind') ? 0.5 : 1) * (has(t, 'evasive') ? 0.7 : 1);
 
         // ふつうの攻撃 (となりのマス)。見せる時間を返す
         function attack(a, t) {
             if (a.hp <= 0 || t.hp <= 0 || !canHit(a, t)) return 0;
             face(a, t.x - a.x, t.y - a.y);
             a.lunge = { at: performance.now(), dir: a.dir };
-            if (!rng.chance(U.HIT)) {
+            if (!rng.chance(hitRate(a, t, U.HIT))) {
                 say(`${a.name}の こうげき！ ${t.name}は よけた。`);
                 popup(t, 'MISS', '#c8d8e8');
             } else {
@@ -793,13 +981,21 @@
             if (!targets.length) say('しかし だれにも 当たらなかった。');
             for (const t of targets) {
                 if (t.hp <= 0) continue;
-                if (!rng.chance(mv.acc)) {
+                if (!rng.chance(hitRate(u, t, mv.acc))) {
                     say(`${t.name}は よけた。`);
                     popup(t, 'MISS', '#c8d8e8');
                     continue;
                 }
                 if (mv.power > 0) {
                     const { dmg, eff } = deal(u, t, mv);
+                    // ミラーマッスル: わざを はね返すことがある
+                    if (has(t, 'reflect') && rng.chance(0.3)) {
+                        const back = Math.max(1, Math.round(dmg / 2));   // はね返すのは 半分
+                        say(`${t.name}は わざを はね返した！ ${u.name}に ${back} のダメージ！`);
+                        hurt(u, back, t);
+                        if (u.hp <= 0) break;
+                        continue;
+                    }
                     say(`${t.name}に ${dmg} のダメージ！${effText(eff)}`);
                     hurt(t, dmg, u);
                 }
@@ -856,19 +1052,68 @@
             t.hp = Math.max(0, t.hp - n);
             t.hurtAt = performance.now();
             popup(t, String(n), t.side === 'party' ? '#ff8a8a' : '#ffffff');
-            if (t.side === 'enemy') t.awake = true;
-            if (t.hp > 0) return;
+            if (hasStatus(t, 'freeze') && rng.chance(0.5)) {
+                t.status = null;
+                if (seen(t)) say(`${t.name}の こおりが とけた！`);
+            }
+            if (t.side === 'enemy' && !t.awake) wake(t);
+            if (t.hp > 0) return void (t.side === 'enemy' && reactHurt(t));
+            // ナンドモスライム: 1 回だけ復活
+            if (has(t, 'revive') && !t.revived) {
+                t.revived = true;
+                t.hp = Math.round(t.stats.hp / 2);
+                return say(`${t.name}「${U.ENEMIES[t.kind].line}」 ……復活した！`);
+            }
             if (t.hero) down();
             else if (t.side === 'party') allyDown(t);
             else defeat(t, from);
         }
 
+        // 攻撃されたときの とくちょう
+        function reactHurt(e) {
+            if (has(e, 'shell') && !e.buffs.guard && rng.chance(0.4)) {
+                e.buffs.guard = 3;
+                say(`${e.name}は 甲羅に こもった！`);
+            }
+            if (has(e, 'rage') && e.rage < 3) {
+                e.rage++;
+                e.stats.atk = Math.round(e.baseAtk * (1 + 0.15 * e.rage));
+                say(`${e.name}は 燃え上がった！ こうげきが 上がった！`);
+            }
+            if (has(e, 'berserk') && !e.berserk && e.hp < e.stats.hp / 2) {
+                e.berserk = true;
+                e.stats.atk = Math.round(e.stats.atk * 1.5);
+                say(e.kind === 'maou' ? `${e.name}は 本気を 出した！` : `${e.name}は 鬼の顔に なった！ こうげきが 上がった！`);
+            }
+            if (has(e, 'split') && rng.chance(0.35) && addNear(e.kind, e.lv, e.x, e.y)) say(`${e.name}が 分裂した！`);
+            if (has(e, 'explode') && e.hp < e.stats.hp * 0.3) state.queue.push(() => explode(e));
+            if (has(e, 'warp') && rng.chance(0.3)) {
+                warpUnit(e);
+                say(`${e.name}は 月の光に 消えた！`);
+            }
+        }
+
         function defeat(e, from) {
+            if (!state.enemies.includes(e)) return;
             state.enemies.splice(state.enemies.indexOf(e), 1);
             state.dying.push({ ...e, at: performance.now() });
             if (e.loot) {
                 dropItem(e.x, e.y, e.loot);
                 say(`${e.name}は ${I.label(e.loot)}を 落とした。`);
+            }
+            if (e.money) dropItem(e.x, e.y, { id: 'money', n: e.money });
+            // キンメンコイヌ・ゴールド金面犬: たくさんのお金 / タカラミミック: 良い道具
+            if (has(e, 'rich') && dropItem(e.x, e.y, { id: 'money', n: Math.round(60 * e.lv * (e.big ? 6 : 1)) })) say(`${e.name}は お金を たくさん 落とした！`);
+            if (has(e, 'mimic')) {
+                const good = rng.pick(['gold_band', 'revive_seed', 'omamori', 'moon_drop', 'lucky_coin']);
+                if (dropItem(e.x, e.y, { id: good, n: 1 })) say(`${e.name}は ${I.ITEMS[good].name}を 落とした！`);
+            }
+            if (e.boss) {
+                state.bossDown = true;
+                state.queue.push(() => 500, () => {
+                    say('階段が 使えるようになった！');
+                    return 0;
+                });
             }
             if (!from || from.side !== 'party') return say(`${e.name}を たおした！`);
             // 素材を落とすことがある (鍛冶屋で使う)
@@ -876,7 +1121,7 @@
                 const d = I.ITEMS[I.DROPS[e.kind]];
                 if (dropItem(e.x, e.y, { id: I.DROPS[e.kind], n: rng.int(d.count[0], d.count[1]) })) say(`${e.name}は ${d.name}を 落とした。`);
             }
-            if (state.town) town.onKill(e.kind);
+            if (state.town) town.onKill(e.kind, state.dungeon.id);
             // けいけんちは、いっしょにいるみんなに入る
             say(`${e.name}を たおした！ けいけんち +${e.exp}`);
             party().forEach(u => gainExp(u, e.exp));
@@ -1005,6 +1250,7 @@
 
         // u を (dx, dy) へ 1 マス動かし、動くところを見せる。動いているあいだに また動いたら (はやい敵・入れかわり)、つなげて見せる
         function moveUnit(u, dx, dy, ms) {
+            if (has(u, 'caltrops') && rng.chance(0.25) && !trapAt(u.x, u.y) && !itemAt(u.x, u.y)) state.traps.push({ x: u.x, y: u.y, id: 'spike', seen: true });
             face(u, dx, dy);
             if (u.anim) u.anim.pts.push([u.x + dx, u.y + dy]);
             else u.anim = { pts: [[u.x, u.y], [u.x + dx, u.y + dy]], at: performance.now(), ms, phase: state.phaseId };
@@ -1036,7 +1282,10 @@
             if (hasStatus(p, 'bind')) return void passTurn(`${p.name}は からまって 動けない！`);
             if (paralyzed(p)) return void passTurn(`${p.name}は からだが しびれて 動けない！`);
             if (cramped(p)) return void passTurn(`${p.name}は おなかが ぐるぐる… 動けない！`);
-            if (!D.canMove(state.map, p.x, p.y, dx, dy) || enemyAt(p.x + dx, p.y + dy)) {
+            const blocker = enemyAt(p.x + dx, p.y + dy);
+            if (!D.canMove(state.map, p.x, p.y, dx, dy) || blocker) {
+                // 化けている敵に ぶつかると 正体を見せる
+                if (blocker && !blocker.awake && (has(blocker, 'disguise') || has(blocker, 'mimic'))) wake(blocker);
                 if (confused) passTurn(`${p.name}は ふらふらしている…`);
                 return false;
             }
@@ -1400,11 +1649,11 @@
                 }
                 // ねむり・ひるみ のあいだは、ひとりでにターンがすすむ
                 const p = state.player;
-                if (!busy() && (p.flinch || hasStatus(p, 'sleep'))) {
+                if (!busy() && (p.flinch || hasStatus(p, 'sleep') || hasStatus(p, 'freeze'))) {
                     if (p.flinch) {
                         p.flinch = false;
                         passTurn(`${p.name}は ひるんで 動けない！`);
-                    } else passTurn(`${p.name}は ぐっすり ねむっている…`);
+                    } else passTurn(hasStatus(p, 'freeze') ? `${p.name}は こおって 動けない！` : `${p.name}は ぐっすり ねむっている…`);
                 }
             }
             if (state.fade && now - state.fade.at > FADE_MS / 2 && state.fade.then) {
@@ -1445,8 +1694,10 @@
                     if (!state.explored[i]) continue;
                     const px = tx * T - camX, py = ty * T - camY;
                     const t = map.tiles[i];
-                    if (t === D.WALL) A.drawWall(ctx, th, tx, ty, px, py, D.walkable(map, tx, ty + 1));
+                    if (t === D.WALL) A.drawWall(ctx, th, tx, ty, px, py, D.at(map, tx, ty + 1) !== D.WALL);
                     else if (t === D.FLOOR) A.drawFloor(ctx, th, tx, ty, px, py);
+                    else if (t === D.WATER) A.drawLiquid(ctx, th, 'water', tx, ty, px, py, now);
+                    else if (t === D.LAVA) A.drawLiquid(ctx, th, 'lava', tx, ty, px, py, now);
                     else A.drawPath(ctx, th, tx, ty, px, py);
                     if (tx === map.stairs.x && ty === map.stairs.y) A.drawStairs(ctx, th, px, py);
                     // 一度見たけれど今は見えていないマスは暗く
@@ -1473,6 +1724,7 @@
             drawPopups(camX, camY, now);
             drawHud();
             drawParty();
+            drawBossBar();
             if (state.mini) drawMinimap(th);
             drawMessages(now);
             if (state.fade) drawFade(now);
@@ -1503,8 +1755,16 @@
             const hurt = now - u.hurtAt;
             if (u.hurtAt && hurt < 360 && Math.floor(hurt / 60) % 2 === 0) return;
             // ねむっているあいだは足が止まる
-            const frame = hasStatus(u, 'sleep') ? 0 : U.HEROES[u.kind] ? u.step % 2 : (u.step + Math.floor(now / 450)) % 2;
-            A.drawSprite(ctx, u.kind, frame, sx, sy - 2, { flip: u.flip });
+            const frame = hasStatus(u, 'sleep') || hasStatus(u, 'freeze') ? 0 : U.HEROES[u.kind] ? u.step % 2 : (u.step + Math.floor(now / 450)) % 2;
+            // 化けている敵は 道具に見える
+            if (u.side === 'enemy' && !u.awake && (has(u, 'disguise') || has(u, 'mimic'))) {
+                return A.drawItem(ctx, has(u, 'mimic') ? 'chest' : 'onigiri', has(u, 'mimic') ? 'chest' : 'food', Math.round(u.fx * T - camX), Math.round(u.fy * T - camY));
+            }
+            drawBody(u, frame, sx, sy, u.flip);
+            if (hasStatus(u, 'freeze')) {
+                ctx.fillStyle = 'rgba(190,240,255,.45)';
+                ctx.fillRect(sx + 1, sy - 2, 14, 16);
+            }
             // 敵は HP が減っていたら小さなバー (仲間は水色)
             if (!u.hero && u.hp < u.stats.hp) {
                 ctx.fillStyle = 'rgba(0,0,0,.6)';
@@ -1529,6 +1789,18 @@
             }
         }
 
+        // キャラの絵: 小さい絵 (art.js) か、大きい絵 (bigart.js・enemyart.js)。ボスは大きく描く
+        function drawBody(u, frame, sx, sy, flip, alpha = 1) {
+            if (A.SPRITES[u.kind]) {
+                ctx.globalAlpha = alpha;
+                A.drawSprite(ctx, u.kind, frame, sx, sy - 2, { flip });
+                ctx.globalAlpha = 1;
+                return;
+            }
+            const height = u.boss ? 30 : u.big ? 26 : U.HEROES[u.kind] ? 22 : 16;
+            KD.BigArt.drawBig(ctx, u.kind, frame, sx + 8, sy + 14, { height, flip, alpha });
+        }
+
         // 主人公の向いている方向 (攻撃するマス) に小さな印
         function drawFacing(p, camX, camY) {
             const [dx, dy] = p.dir;
@@ -1546,9 +1818,7 @@
         function drawDying(d, camX, camY, now) {
             const k = (now - d.at) / 450;
             if (Math.floor(k * 8) % 2) return;
-            ctx.globalAlpha = 1 - k;
-            A.drawSprite(ctx, d.kind, 0, Math.round(d.fx * T - camX), Math.round(d.fy * T - camY) - 2 - Math.round(k * 4), { flip: d.flip });
-            ctx.globalAlpha = 1;
+            drawBody(d, 0, Math.round(d.fx * T - camX), Math.round(d.fy * T - camY) - Math.round(k * 4), d.flip, 1 - k);
         }
 
         function drawShots(camX, camY, now) {
@@ -1652,6 +1922,25 @@
             });
         }
 
+        // ボスの HP (画面の下のほう、まんなか)
+        function drawBossBar() {
+            const b = state.boss;
+            if (!b || b.hp <= 0 || !b.awake) return;
+            const w = 160, x = (W - w) / 2, y = H - 66;
+            ctx.fillStyle = 'rgba(0,0,0,.6)';
+            ctx.fillRect(x - 4, y - 10, w + 8, 18);
+            ctx.font = `bold 9px ${FONT}`;
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#ffb0a0';
+            ctx.fillText(b.name, W / 2, y - 4);
+            ctx.textAlign = 'left';
+            ctx.fillStyle = '#3a1010';
+            ctx.fillRect(x, y + 2, w, 4);
+            ctx.fillStyle = '#ff5a4a';
+            ctx.fillRect(x, y + 2, Math.round(w * b.hp / b.stats.hp), 4);
+        }
+
         // 仲間の HP と作戦 (左上、上の帯の下)
         function drawParty() {
             const list = state.allies;
@@ -1692,7 +1981,8 @@
                 for (let x = 0; x < map.w; x++) {
                     const i = y * map.w + x;
                     if (!state.explored[i] || map.tiles[i] === D.WALL) continue;
-                    ctx.fillStyle = map.tiles[i] === D.FLOOR ? th.mini.floor : th.mini.path;
+                    const tile = map.tiles[i];
+                    ctx.fillStyle = tile === D.FLOOR ? th.mini.floor : tile === D.WATER ? th.mini.water || '#5a9ad8' : tile === D.LAVA ? th.mini.lava || '#ff7a3a' : th.mini.path;
                     ctx.globalAlpha = 0.75;
                     ctx.fillRect(mx + x * s, my + y * s, s, s);
                 }
@@ -1712,7 +2002,7 @@
             state.traps.forEach(t => { if (t.seen) ctx.fillRect(mx + t.x * s, my + t.y * s, s, s); });
             ctx.fillStyle = '#ff4a4a';
             state.enemies.forEach(e => {
-                if (state.visible[idx(e.x, e.y)]) ctx.fillRect(mx + e.x * s - 1, my + e.y * s - 1, s + 2, s + 2);
+                if (state.visible[idx(e.x, e.y)] && (e.awake || !(has(e, 'disguise') || has(e, 'mimic')))) ctx.fillRect(mx + e.x * s - 1, my + e.y * s - 1, s + 2, s + 2);
             });
             ctx.fillStyle = '#7affff';
             state.allies.forEach(a => ctx.fillRect(mx + a.x * s - 1, my + a.y * s - 1, s + 2, s + 2));
@@ -1793,17 +2083,17 @@
         // 町 (townui.js) に渡す中身
         const town = KD.createTown({
             state, opts, say, later: fn => state.queue.push(() => { fn(); return 0; }),
-            selectHero, makeHero, makeAlly, recalc, learnNow, startDungeon, resume, backToTown, partyMax: () => PARTY_MAX
+            selectHero, makeHero, makeAlly, recalc, learnNow, startDungeon, resume, backToTown, partyMax, talk
         }, ui);
 
         if (opts.start === 'dungeon') {
             selectHero(() => {
                 town.newTown(state.seed);
-                startDungeon('forest');
+                startDungeon(opts.dungeon || 'forest');
             });
         } else town.title();
         return {
-            state, town, draw, moveInput, wait, confirm, attack: attackFront, useSkill, itemMenu, tacticMenu, busy, makeEnemy, makeAlly,
+            state, town, draw, moveInput, wait, confirm, attack: attackFront, useSkill, itemMenu, tacticMenu, busy, makeEnemy, makeAlly, spawnBoss,
             skills: () => (state.player && state.phase === 'play' ? state.player.skills.map(skillLabel) : []),
             toggleMinimap() { state.mini = !state.mini; }
         };

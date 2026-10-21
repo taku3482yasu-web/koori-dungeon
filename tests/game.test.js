@@ -9,7 +9,7 @@ import vm from 'node:vm';
 let fakeNow = 1000;
 globalThis.performance = { now: () => fakeNow };
 globalThis.KD = {};
-for (const f of ['rng.js', 'dungeon.js', 'units.js', 'items.js', 'town.js', 'art.js', 'townui.js', 'game.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
+for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'config.js', 'market.js', 'townui.js', 'game.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
 const { Dungeon: D, Units: U, Items: I } = globalThis.KD;
 
 // opts: createGame に渡す ({ enemies: false } で敵なし。道具・ワナは things: true のときだけ)。hero: 0 こおりくん / 1 おにおに。role: 役職の番号
@@ -19,7 +19,7 @@ function setup(opts = { enemies: false }, hero = 0, role = 0) {
     const ctx = new Proxy({ measureText: t => ({ width: t.length * 9 }), createLinearGradient: () => ({ addColorStop() {} }) }, { get: (t, k) => (k in t ? t[k] : noop), set: (t, k, v) => { t[k] = v; return true; } });
     const asks = [];
     const ui = { ask: (message, options, done) => asks.push({ message, options, done }), asking: () => asks.length > 0 };
-    const game = globalThis.KD.createGame({ getContext: () => ctx }, ui, { seed: 12345, things: false, partner: false, recruit: false, start: 'dungeon', save: false, role, ...opts });
+    const game = globalThis.KD.createGame({ getContext: () => ctx }, ui, { seed: 12345, things: false, partner: false, recruit: false, start: 'dungeon', save: false, market: false, role, ...opts });
     const run = ms => { for (let i = 0; i < ms; i += 16) { fakeNow += 16; game.draw(fakeNow); } };
     const answer = i => asks.shift().done(i);
     // はじめに主人公をえらぶ
@@ -326,10 +326,12 @@ test('ダメージは 1 以上。こうげきが高いほど大きい', () => {
     assert.ok(hi > lo);
 });
 
-test('ドット絵はどれも 16 × 16 で、色がそろっている', () => {
+test('ドット絵はどれも 16 × 16 で、色がそろっている。敵とボスと仲間は みんな絵がある', () => {
     const { SPRITES } = globalThis.KD.Art;
-    for (const id of ['koori', 'onioni', ...Object.keys(U.ENEMIES)]) {
-        assert.ok(SPRITES[id], `${id} の絵がある`);
+    const { BigArt } = globalThis.KD;
+    for (const id of ['koori', 'onioni', 'yasu', 'tamu', 'dake', ...Object.keys(U.ENEMIES)]) {
+        assert.ok(SPRITES[id] || BigArt.has(id), `${id} の絵がある`);
+        if (!SPRITES[id]) continue;
         for (const f of SPRITES[id].frames) {
             assert.equal(f.length, 16, id);
             for (const row of f) {
@@ -474,14 +476,17 @@ test('ペコリスは道具をぬすんで逃げる。たおすと落とす', ()
     for (let i = 0; i < 20 && !e.loot; i++) { game.wait(); run(700); }
     assert.ok(e.loot, 'ぬすんだ');
     const n = s.items.length;
-    // となりに戻してから攻撃
+    // 毎回となりに戻してから攻撃 (攻撃は ときどき はずれて、そのあいだに逃げるので)
     const dx = [1, -1].find(d => D.canMove(s.map, p.x, p.y, d, 0));
-    e.x = e.fx = p.x + dx;
-    e.y = e.fy = p.y;
-    e.anim = null;
     e.hp = 1;
     p.dir = [dx, 0];
-    for (let i = 0; i < 5 && s.enemies.length; i++) { game.attack(); run(800); }
+    for (let i = 0; i < 10 && s.enemies.length; i++) {
+        e.x = e.fx = p.x + dx;
+        e.y = e.fy = p.y;
+        e.anim = null;
+        game.attack();
+        run(800);
+    }
     assert.equal(s.enemies.length, 0);
     assert.equal(s.items.length, n + 1, '落とした');
 });

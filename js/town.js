@@ -23,6 +23,11 @@
         return base + bonus;
     }
 
+    // ----- 施設の開放 (2026-10-22 ユーザー指定: 借金を返していくと、決めた額で開く) -----
+    // 返した合計がこの額になると使えるようになる (書いていない施設は はじめから使える)
+    const UNLOCK = { storage: 2000, plaza: 5000, tree: 10000, smith: 20000, trade: 30000 };
+    const isOpen = (place, paid) => (UNLOCK[place] || 0) <= paid;
+
     // ----- バトルツリー (仕様書 6.4) -----
     // まんなかから 5 つの役職の枝: 役職の開放 → 能力アップ → 役職のわざ → 能力アップ → 奥義。
     // 枝と枝のあいだに、どの役職でも効く能力アップ。となりが開放されていないと、その先は開放できない
@@ -119,7 +124,22 @@
         { make: 'sleep_seed', n: 2, need: { sleep_spore: 3 }, cost: 0 },
         { make: 'warp_orb', need: { owl_feather: 2, bee_wing: 2 }, cost: 50 },
         { make: 'ice_pellet', n: 5, need: { acorn_shell: 2 }, cost: 30 },
-        { make: 'revive_seed', need: { sleep_spore: 2, fluffy_fur: 2, tough_vine: 2 }, cost: 300 }
+        { make: 'revive_seed', need: { sleep_spore: 2, fluffy_fur: 2, tough_vine: 2 }, cost: 300 },
+        // ダンジョン 2〜7 の素材 (段階 7)
+        { make: 'shell_armor', need: { sea_shell: 5, kelp: 2 }, cost: 500 },
+        { make: 'kelp_band', need: { kelp: 5, sea_shell: 2 }, cost: 500 },
+        { make: 'big_onigiri', n: 2, need: { kelp: 2 }, cost: 20 },
+        { make: 'incense_charm', need: { temple_incense: 5, broken_cable: 2 }, cost: 700 },
+        { make: 'cable_whip', need: { broken_cable: 5, temple_incense: 2 }, cost: 700 },
+        { make: 'ninja_garb', need: { ninja_scroll: 5, iron_kunai: 2 }, cost: 900 },
+        { make: 'kunai_blade', need: { iron_kunai: 5, ninja_scroll: 2 }, cost: 900 },
+        { make: 'moon_cape', need: { moon_dust: 5, star_piece: 2 }, cost: 1200 },
+        { make: 'star_wand', need: { star_piece: 5, moon_dust: 2 }, cost: 1200 },
+        { make: 'sweep_orb', n: 2, need: { star_piece: 2 }, cost: 100 },
+        { make: 'protein_belt', need: { protein_powder: 5, magma_stone: 2 }, cost: 1500 },
+        { make: 'magma_armor', need: { magma_stone: 5, protein_powder: 2 }, cost: 1500 },
+        { make: 'maou_blade', need: { aso_ash: 5, cursed_coin: 3 }, cost: 2500 },
+        { make: 'cursed_crown', need: { cursed_coin: 6, aso_ash: 2 }, cost: 2500 }
     ];
     const recipeText = r => Object.entries(r.need).map(([id, n]) => `${I.ITEMS[id].name}×${n}`).join('・') + (r.cost ? `・${r.cost}えん` : '');
 
@@ -148,31 +168,37 @@
     const QUEST_ALLY = { kind: 'haribaby', name: 'ハリ坊', lv: 5 };   // ★ クエストでしか仲間にならない (ハリーの孫)
 
     // その日の掲示板。owned: すでに手に入れた限定品 (同じものは出さない)。allyKinds: いっしょに行ける仲間の種類
-    function questBoard(rng, day, { owned = [], allyKinds = [] } = {}) {
-        const table = U.FOREST_TABLE;
+    // dungeons: 行けるダンジョン (深いダンジョンほど ごほうびが多い)
+    function questBoard(rng, day, { owned = [], allyKinds = [], dungeons = [] } = {}) {
+        const DG = KD.Dungeons;
+        const ds = dungeons.length ? dungeons : [DG.LIST[0]];
         const list = [];
         const stars = [...QUEST_ITEMS.filter(id => !owned.includes(id)), ...(owned.includes('ally:hari') ? [] : ['ally:hari'])];
         const n = rng.int(3, 5);
         for (let i = 0; i < n; i++) {
             const type = rng.pick(['kill', 'kill', 'deliver', 'reach', ...(allyKinds.length ? ['ally'] : [])]);
+            const d = rng.pick(ds);
+            const deep = 1 + DG.LIST.indexOf(d) * 0.6;   // 深いダンジョンほど ごほうびが多い
             let q;
             if (type === 'kill') {
-                const floor = rng.int(1, 5);
-                const kind = rng.pick(table[floor - 1]);
+                const floor = rng.int(1, d.floors);
+                const kind = rng.pick(DG.tableFor(d, floor));
                 const count = rng.int(2, 4);
-                q = { type, kind, count, text: `ハリーの森で ${U.ENEMIES[kind].name}を ${count} 体たおして`, money: 150 * count + 60 * floor };
+                q = { type, kind, count, text: `${d.name}で ${U.ENEMIES[kind].name}を ${count} 体たおして`, money: Math.round((150 * count + 60 * floor) * deep) };
             } else if (type === 'deliver') {
-                const id = rng.pick(['onigiri', 'ice_shard', 'pebble', 'soft_needle', 'acorn_shell', 'sleep_spore', 'bee_wing']);
+                const mats = [...new Set(d.enemies.map(k => I.DROPS[k]).filter(Boolean))];
+                const id = rng.pick(['onigiri', 'ice_shard', 'pebble', ...mats, ...mats]);
                 const count = I.ITEMS[id].count ? rng.int(3, 6) : rng.int(1, 2);
                 q = { type, want: id, count, text: `${I.ITEMS[id].name}を ${count} 個 持ってきて`, money: Math.round(I.ITEMS[id].price * count * 3 + 200) };
             } else if (type === 'reach') {
-                const floor = rng.int(3, 5);
-                q = { type, floor, text: `ハリーの森の B${floor}F まで行って`, money: 250 * floor };
+                const floor = rng.int(Math.ceil(d.floors * 0.6), d.floors);
+                q = { type, floor, text: `${d.name}の B${floor}F まで行って`, money: Math.round(250 * floor * deep) };
             } else {
                 const kind = rng.pick(allyKinds);
                 const name = U.HEROES[kind] ? U.HEROES[kind].name : U.ENEMIES[kind].name;
-                q = { type, kind, text: `${name}と いっしょに ハリーの森を抜けて`, money: 1500 };
+                q = { type, kind, text: `${name}と いっしょに ${d.name}を抜けて`, money: Math.round(1500 * deep) };
             }
+            q.dungeon = d.id;
             // ときどき ★ 限定のごほうび
             if (stars.length && rng.chance(0.25)) {
                 const star = stars.splice(rng.int(0, stars.length - 1), 1)[0];
@@ -195,7 +221,7 @@
     }
 
     KD.Town = {
-        DEBT_START, BP_PER, BONUS_EVERY, BONUS_BP, INTEREST, bpFor,
+        DEBT_START, BP_PER, BONUS_EVERY, BONUS_BP, INTEREST, bpFor, UNLOCK, isOpen,
         ROLE_ORDER, OUGI, treeNodes, TREE_START, canUnlock, treeStats, rolesOpen, treeSkills, nodeText,
         shopStock, shopUnit, buyPrice, RECIPES, recipeText,
         RARE, rareStock, RIVALS, rivalListings, sellChance,

@@ -32,6 +32,14 @@
                 [...KOORI_BODY, '....odo..odo....', '....ooo..ooo....', '................']
             ]
         },
+        // コオリモドキ (敵キャラ表 050): 色の暗いこおりくんの そっくりさん
+        koorimodoki: {
+            palette: { o: '#0a1a3a', w: '#8a9ab0', c: '#4a7a9a', b: '#3a5a7a', d: '#2a4a6a', k: '#ff4040', p: '#8a5a6a' },
+            frames: [
+                [...KOORI_BODY, '...odo....odo...', '...ooo....ooo...', '................'],
+                [...KOORI_BODY, '....odo..odo....', '....ooo..ooo....', '................']
+            ]
+        },
         // おにおに (16x16): スロットの絵 (赤鬼・角・牙・虎柄の腰巻・金棒) を小さくしたもの
         onioni: {
             palette: { h: '#f0e0a0', k: '#1a1a1a', r: '#d83a2a', d: '#b02a1a', y: '#ffe040', w: '#ffffff', m: '#5a0a0a', t: '#f0b020', g: '#4a3a2a', s: '#d0d0d0' },
@@ -176,7 +184,9 @@
     }
 
     // ----- マス -----
-    // ダンジョンごとの色 (段階 1 はハリーの森だけ)
+    // ダンジョンごとの色と模様 (仕様書 12章)
+    //   wall: trees 木 / block 石や木のかたまり。floorPattern: grass 草 / speck 小さな点 / boards 板 / tatami たたみ / stars 星
+    const block = (wall, brick, top, extra = {}) => ({ wallStyle: 'block', wall, brick, top, ...extra });
     const THEMES = {
         forest: {
             floor: ['#5fa84a', '#57a043', '#6ab454'], tuft: '#4a8f38', flower: ['#ffe680', '#ffb0c8'],
@@ -184,6 +194,36 @@
             wall: '#1d4a22', leaf: ['#2f6a2f', '#3f8a3a', '#4fa046'], trunk: '#6a4a2a',
             stairs: ['#8a8f9f', '#5a5f6f', '#c8ccd8'],
             void: '#06100a', mini: { floor: '#9adf8a', path: '#d8c090', wall: '#1d4a22' }
+        },
+        coast: {
+            floor: ['#d8c890', '#d0c088', '#e0d098'], floorPattern: 'speck', speck: '#b8a870', path: '#a89870', pathDark: '#8a7a58', pebble: '#e8e0c0',
+            ...block('#3a4a5a', '#2a3a4a', '#5a6a7a'), stairs: ['#8a8f9f', '#5a5f6f', '#c8ccd8'],
+            water: ['#2a6ab0', '#5a9ad8'], void: '#020810', mini: { floor: '#e0d8a0', path: '#c0b080', water: '#5a9ad8' }
+        },
+        temple: {
+            floor: ['#8a5a3a', '#80523a', '#946440'], floorPattern: 'boards', speck: '#6a4228', path: '#7a7a7a', pathDark: '#5a5a5a', pebble: '#9a9a9a',
+            ...block('#5a5a62', '#46464e', '#7a7a84', { accent: '#a02a2a' }), stairs: ['#a08a6a', '#6a5a3a', '#d8c8a0'],
+            void: '#0a0606', mini: { floor: '#c89a6a', path: '#aaaaaa' }
+        },
+        mansion: {
+            floor: ['#a8b860', '#a0b058', '#b0c068'], floorPattern: 'tatami', speck: '#7a8a3a', path: '#8a6a4a', pathDark: '#6a4a2a', pebble: '#a08060',
+            ...block('#4a2e1a', '#3a2210', '#6a4a2a', { accent: '#f0e8d0' }), stairs: ['#8a6a4a', '#5a3a1a', '#c09a6a'],
+            void: '#080604', mini: { floor: '#c8d880', path: '#b08a5a' }
+        },
+        moon: {
+            floor: ['#3a3260', '#362e5a', '#40386a'], floorPattern: 'stars', speck: '#e8e0ff', path: '#2a2448', pathDark: '#1e1a38', pebble: '#8a80c0',
+            ...block('#1a1630', '#120e24', '#3a3460', { accent: '#ffe080' }), stairs: ['#8a80c0', '#4a4070', '#d0c8ff'],
+            void: '#04020a', mini: { floor: '#8a80d0', path: '#6a60a0' }
+        },
+        mountain: {
+            floor: ['#7a8a5a', '#748452', '#829262'], floorPattern: 'speck', speck: '#5a6a3a', path: '#8a7a6a', pathDark: '#6a5a4a', pebble: '#a89888',
+            ...block('#5a4a3a', '#4a3a2a', '#7a6a5a'), stairs: ['#9a8f8f', '#5a4f4f', '#d8ccc8'],
+            lava: ['#e85a1a', '#ffb040'], void: '#0a0604', mini: { floor: '#a8b880', path: '#a89880', lava: '#ff7a3a' }
+        },
+        aso: {
+            floor: ['#4a2a2a', '#442626', '#523030'], floorPattern: 'speck', speck: '#7a3a2a', path: '#3a2020', pathDark: '#2a1414', pebble: '#6a3a3a',
+            ...block('#2a1414', '#1e0e0e', '#5a2a2a', { accent: '#e85a1a' }), stairs: ['#8a6a6a', '#4a2a2a', '#c8a0a0'],
+            lava: ['#e85a1a', '#ffb040'], void: '#080202', mini: { floor: '#a86a6a', path: '#7a4a4a', lava: '#ff7a3a' }
         }
     };
 
@@ -199,6 +239,7 @@
     function drawFloor(ctx, th, x, y, px, py) {
         ctx.fillStyle = th.floor[Math.floor(hash(x, y) * th.floor.length)];
         ctx.fillRect(px, py, T, T);
+        if (th.floorPattern) return drawPattern(ctx, th, x, y, px, py);
         // 草の葉と、ときどき花
         for (let i = 0; i < 3; i++) {
             const tx = Math.floor(hash(x, y, i + 1) * 14), ty = Math.floor(hash(x, y, i + 7) * 13);
@@ -213,6 +254,40 @@
         }
     }
 
+    // 草のほかの床の模様
+    function drawPattern(ctx, th, x, y, px, py) {
+        ctx.fillStyle = th.speck;
+        if (th.floorPattern === 'boards') {
+            ctx.fillRect(px, py + 7, T, 1);
+            ctx.fillRect(px + ((x + y) % 2 ? 4 : 11), py, 1, 7);
+            ctx.fillRect(px + ((x + y) % 2 ? 10 : 2), py + 8, 1, 8);
+        } else if (th.floorPattern === 'tatami') {
+            if ((x + y) % 2) ctx.fillRect(px, py, 1, T);
+            else ctx.fillRect(px, py, T, 1);
+            ctx.globalAlpha = 0.3;
+            for (let i = 2; i < T; i += 3) ctx.fillRect(px, py + i, T, 1);
+            ctx.globalAlpha = 1;
+        } else {
+            const n = th.floorPattern === 'stars' ? 1 : 3;
+            for (let i = 0; i < n; i++) {
+                if (th.floorPattern === 'stars' && hash(x, y, 70) > 0.35) break;
+                ctx.fillRect(px + Math.floor(hash(x, y, i + 71) * 15), py + Math.floor(hash(x, y, i + 81) * 15), 1, 1);
+            }
+        }
+    }
+
+    // 水 (泳げるキャラだけ入れる) と 溶岩 (入るとダメージ)。now で ゆらゆら
+    function drawLiquid(ctx, th, kind, x, y, px, py, now) {
+        const [base, light] = th[kind] || (kind === 'water' ? ['#2a6ab0', '#5a9ad8'] : ['#e85a1a', '#ffb040']);
+        ctx.fillStyle = base;
+        ctx.fillRect(px, py, T, T);
+        ctx.fillStyle = light;
+        const k = Math.floor(now / 400 + hash(x, y) * 4) % 4;
+        ctx.fillRect(px + 2 + k * 2, py + 4, 4, 1);
+        ctx.fillRect(px + 9 - k, py + 10, 4, 1);
+        if (kind === 'lava' && k === 1) ctx.fillRect(px + 6, py + 7, 2, 2);
+    }
+
     function drawPath(ctx, th, x, y, px, py) {
         ctx.fillStyle = th.path;
         ctx.fillRect(px, py, T, T);
@@ -222,8 +297,9 @@
         ctx.fillRect(px + Math.floor(hash(x, y, 50) * 13), py + Math.floor(hash(x, y, 51) * 13), 2, 2);
     }
 
-    // 壁 (森の木)。下が歩けるマスなら、木の幹を見せる
+    // 壁。森は木 (下が歩けるマスなら、木の幹を見せる)、ほかは石や木のかたまり
     function drawWall(ctx, th, x, y, px, py, openBelow) {
+        if (th.wallStyle === 'block') return drawBlock(ctx, th, x, y, px, py, openBelow);
         ctx.fillStyle = th.wall;
         ctx.fillRect(px, py, T, T);
         const top = openBelow ? 0 : 2;
@@ -241,6 +317,28 @@
             ctx.fillRect(px + 6, py + 11, 4, 5);
             ctx.fillStyle = 'rgba(0,0,0,.25)';
             ctx.fillRect(px, py + 14, T, 2);
+        }
+    }
+
+    function drawBlock(ctx, th, x, y, px, py, openBelow) {
+        ctx.fillStyle = th.wall;
+        ctx.fillRect(px, py, T, T);
+        ctx.fillStyle = th.brick;
+        const off = y % 2 ? 4 : 0;
+        ctx.fillRect(px, py + 5, T, 1);
+        ctx.fillRect(px, py + 11, T, 1);
+        ctx.fillRect(px + ((off + 8) % 16), py, 1, 5);
+        ctx.fillRect(px + off, py + 6, 1, 5);
+        ctx.fillRect(px + ((off + 12) % 16), py + 12, 1, 4);
+        if (th.accent && hash(x, y, 90) < 0.08) {
+            ctx.fillStyle = th.accent;
+            ctx.fillRect(px + 6, py + 6, 3, 3);
+        }
+        if (openBelow) {
+            ctx.fillStyle = th.top;
+            ctx.fillRect(px, py + 13, T, 3);
+            ctx.fillStyle = 'rgba(0,0,0,.25)';
+            ctx.fillRect(px, py + 15, T, 1);
         }
     }
 
@@ -268,6 +366,14 @@
     function drawItem(ctx, id, kind, x, y) {
         ctx.fillStyle = 'rgba(0,0,0,.25)';
         ctx.fillRect(x + 4, y + 12, 8, 2);
+        if (id === 'chest') {
+            // 宝箱 (タカラミミックが化けている)
+            px1(ctx, '#a0602a', x + 2, y + 6, 12, 8);
+            px1(ctx, '#c0802a', x + 2, y + 3, 12, 3);
+            px1(ctx, '#ffd84a', x + 2, y + 8, 12, 1);
+            px1(ctx, '#ffd84a', x + 7, y + 6, 2, 4);
+            return;
+        }
         if (id === 'money') {
             // 金貨を 3 枚
             [[4, 7], [8, 8], [6, 4]].forEach(([cx, cy]) => {
@@ -334,5 +440,5 @@
         (marks[id] || marks.spike)();
     }
 
-    KD.Art = { T, THEMES, SPRITES, drawSprite, drawFloor, drawPath, drawWall, drawStairs, drawItem, drawTrap };
+    KD.Art = { T, THEMES, SPRITES, drawSprite, drawFloor, drawPath, drawWall, drawStairs, drawLiquid, drawItem, drawTrap };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);
