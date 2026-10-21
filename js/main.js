@@ -4,8 +4,8 @@
 // 仕様書 15章:
 //   移動: 矢印キー・テンキー (斜めはテンキーか、矢印を2つ同時に。Shift を押しているあいだは斜めだけ)
 //   ダッシュ: B を押しながら移動 / 向きだけ変える: R を押しながら方向 / 足踏み: Space
-//   攻撃・決定: Z・Enter (階段の上なら「降りますか？」) / わざ: 1〜4 / 道具: X (えらぶ画面では戻る) / 戻る: Esc / ミニマップ: M
-//   スマホ: 十字ボタン (斜めあり。長押しでダッシュ)・攻撃・道具・足踏み・ミニマップ・わざのボタン
+//   攻撃・決定: Z・Enter (階段の上なら「降りますか？」) / わざ: 1〜4 / 道具: X (えらぶ画面では戻る) / 作戦: T / 戻る: Esc / ミニマップ: M
+//   スマホ: 十字ボタン (斜めあり。長押しでダッシュ)・攻撃・道具・作戦・足踏み・ミニマップ・わざのボタン
 // =====================================================================
 (function (KD) {
     'use strict';
@@ -118,6 +118,7 @@
             } else if ((k === 'KeyZ' || k === 'Enter') && !e.repeat) game.confirm();
             else if (k === 'KeyM' && !e.repeat) game.toggleMinimap();
             else if (k === 'KeyX' && !e.repeat) game.itemMenu();
+            else if (k === 'KeyT' && !e.repeat) game.tacticMenu();
             else if (/^(Digit|Numpad)[1-4]$/.test(k) && !e.repeat && !NUMPAD[k]) game.useSkill(Number(k.slice(-1)) - 1);
         });
         window.addEventListener('keyup', e => {
@@ -158,6 +159,7 @@
         tap('btn-wait', () => (ask.asking() ? ask.key('back') : game.wait()));
         tap('btn-map', () => game.toggleMinimap());
         tap('btn-item', () => (ask.asking() ? ask.key('back') : game.itemMenu()));
+        tap('btn-tactic', () => (ask.asking() ? ask.key('back') : game.tacticMenu()));
 
         // ----- わざのボタン (変わったときだけ作り直す) -----
         const skillBox = document.getElementById('skills');

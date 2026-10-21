@@ -1,4 +1,4 @@
-// ゲームの進行のテスト (主人公・役職をえらぶ・歩く・ダッシュ・階段・最後の階・戦い・わざ・状態異常・道具・満腹度・ワナ・お金)
+// ゲームの進行のテスト (主人公・役職をえらぶ・歩く・ダッシュ・階段・最後の階・戦い・わざ・状態異常・道具・満腹度・ワナ・お金・仲間)
 // canvas は何もしない偽物、時間 (performance.now) はテストで進める
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,7 +17,7 @@ function setup(opts = { enemies: false }, hero = 0, role = 0) {
     const ctx = new Proxy({ measureText: t => ({ width: t.length * 9 }) }, { get: (t, k) => (k in t ? t[k] : noop), set: (t, k, v) => { t[k] = v; return true; } });
     const asks = [];
     const ui = { ask: (message, options, done) => asks.push({ message, options, done }), asking: () => asks.length > 0 };
-    const game = globalThis.KD.createGame({ getContext: () => ctx }, ui, { seed: 12345, things: false, ...opts });
+    const game = globalThis.KD.createGame({ getContext: () => ctx }, ui, { seed: 12345, things: false, partner: false, recruit: false, ...opts });
     const run = ms => { for (let i = 0; i < ms; i += 16) { fakeNow += 16; game.draw(fakeNow); } };
     const answer = i => asks.shift().done(i);
     // はじめに主人公と役職をえらぶ
@@ -509,4 +509,151 @@ test('サポーターは見えているワナに気づき、お金を多く拾�
     game.moveInput(dx, 0); run(300);
     assert.equal(p.money, 30);
     assert.equal(s.traps[0].seen, true, '同じ部屋のワナに気づいた');
+});
+
+// ----- 仲間 (段階 5) -----
+// 仲間を主人公のとなり (右か左) に置きなおす。向きを返す
+function allyBeside(s, a) {
+    const p = s.player;
+    const dx = [1, -1].find(d => D.canMove(s.map, p.x, p.y, d, 0) && !s.enemies.some(e => e.x === p.x + d && e.y === p.y));
+    a.x = a.fx = p.x + dx;
+    a.y = a.fy = p.y;
+    a.anim = null;
+    return dx;
+}
+
+test('えらばなかったほうが最初の仲間になり、主人公のとなりから始まる', () => {
+    const { s } = setup({ enemies: false, partner: true }, 0);
+    assert.equal(s.allies.length, 1);
+    const a = s.allies[0];
+    assert.equal(a.kind, 'onioni');
+    assert.equal(a.role, 'attacker');
+    assert.equal(Math.max(Math.abs(a.x - s.player.x), Math.abs(a.y - s.player.y)), 1);
+    const b = setup({ enemies: false, partner: true }, 1).s.allies[0];
+    assert.equal(b.kind, 'koori');
+});
+
+test('仲間は主人公についてくる。歩く先に仲間がいたら入れかわる', () => {
+    const { game, s, run } = setup({ enemies: false, partner: true });
+    toWideSpot(s);
+    const p = s.player, a = s.allies[0];
+    const dx = allyBeside(s, a);
+    const [px, ax] = [p.x, a.x];
+    game.moveInput(dx, 0); run(400);
+    assert.equal(p.x, ax, '主人公が仲間のいたマスへ');
+    assert.equal(a.x, px, '仲間は主人公のいたマスへ');
+    // はなれたところから、ついてくる
+    a.x = a.fx = p.x - dx * 3;
+    for (let i = 0; i < 4; i++) { game.wait(); run(300); }
+    assert.ok(Math.max(Math.abs(a.x - p.x), Math.abs(a.y - p.y)) <= 1, 'となりまで来た');
+});
+
+test('作戦「みんなで戦う」なら仲間がとなりの敵を攻撃する。「にげて」なら攻撃しない', () => {
+    const { game, s, run, asks, answer } = setup({ partner: true });
+    toWideSpot(s);
+    const p = s.player, a = s.allies[0];
+    // 主人公の右に仲間、その右に敵 (主人公からは届かない)
+    a.x = a.fx = p.x + 1; a.y = a.fy = p.y; a.anim = null;
+    const e = game.makeEnemy('haribaby', 1, p.x + 2, p.y);
+    e.stats.hp = e.hp = 999;
+    e.ai = 'wait';
+    e.awake = false;
+    s.enemies.splice(0, s.enemies.length, e);
+    game.tacticMenu();
+    answer(Object.keys({ fight: 0, follow: 0, flee: 0 }).indexOf('flee'));
+    assert.equal(s.tactic, 'flee');
+    for (let i = 0; i < 3; i++) { game.wait(); run(700); }
+    assert.equal(e.hp, 999, 'にげて: 攻撃しない');
+    a.x = a.fx = p.x + 1; a.y = a.fy = p.y; a.anim = null;
+    e.x = e.fx = p.x + 2; e.y = e.fy = p.y; e.awake = false;
+    game.tacticMenu();
+    answer(0);
+    assert.equal(s.tactic, 'fight');
+    for (let i = 0; i < 3; i++) { game.wait(); run(700); }
+    assert.ok(e.hp < 999, 'みんなで戦う: 攻撃した');
+    assert.equal(asks.length, 0);
+});
+
+test('敵は となりの仲間もねらう。たおれた仲間は やり直すと戻る', () => {
+    const { game, s, run, asks, answer } = setup({ partner: true });
+    toWideSpot(s);
+    const p = s.player, a = s.allies[0];
+    a.x = a.fx = p.x + 1; a.y = a.fy = p.y; a.anim = null;
+    // 敵は仲間のとなりで、主人公からは 2 マス
+    const e = game.makeEnemy('haribaby', 1, p.x + 2, p.y);
+    e.stats.atk = 99;
+    e.stats.hp = e.hp = 999;
+    s.enemies.splice(0, s.enemies.length, e);
+    s.tactic = 'follow';
+    a.hp = 1;
+    for (let i = 0; i < 10 && s.allies.length; i++) { game.wait(); run(700); }
+    assert.equal(s.allies.length, 0, '仲間がたおれた');
+    assert.equal(s.fallen.length, 1);
+    assert.equal(s.over, false, '探検は続く');
+    // 主人公もたおれると、仲間は戻ってやり直し
+    p.hp = 1;
+    s.enemies[0].x = s.enemies[0].fx = p.x + 1;
+    s.enemies[0].y = s.enemies[0].fy = p.y;
+    for (let i = 0; i < 20 && !asks.length; i++) { game.wait(); run(1500); }
+    answer(0);
+    run(1300);
+    assert.equal(s.allies.length, 1);
+    assert.equal(s.allies[0].hp, s.allies[0].stats.hp);
+});
+
+test('敵をたおすと、仲間にもけいけんちが入る', () => {
+    const { game, s, run } = setup({ partner: true });
+    const e = besideEnemy(game, s);
+    e.hp = 1;
+    const a = s.allies[0];
+    placeAway(s, a);
+    for (let i = 0; i < 5 && s.enemies.length; i++) { game.attack(); run(800); }
+    assert.equal(s.enemies.length, 0);
+    assert.equal(a.exp, e.exp);
+});
+
+// 仲間を主人公から 2 マスはなれた、敵のいないところへ
+function placeAway(s, a) {
+    const p = s.player;
+    for (const [dx, dy] of [[0, 2], [0, -2], [2, 2], [-2, -2], [2, -2], [-2, 2]]) {
+        const x = p.x + dx, y = p.y + dy;
+        if (D.walkable(s.map, x, y) && !s.enemies.some(e => Math.abs(e.x - x) <= 1 && Math.abs(e.y - y) <= 1)) {
+            a.x = a.fx = x; a.y = a.fy = y; a.anim = null;
+            return;
+        }
+    }
+}
+
+test('ヒーラーの仲間は、となりの HP が少ない仲間を回復する', () => {
+    const { game, s, run } = setup({ enemies: false });
+    const p = s.player;
+    const h = game.makeAlly('yofukashi', 1);
+    h.role = 'healer';
+    h.skills = [U.newSkill('heal')];
+    s.allies.push(h);
+    allyBeside(s, h);
+    p.hp = 3;
+    game.wait(); run(800);
+    assert.ok(p.hp > 3 + 1, '回復した');
+    assert.equal(h.skills[0].pp, h.skills[0].max - 1);
+});
+
+test('たおした敵が仲間になりたそうにする。はいで仲間に。3 人をこえたら町の広場で待つ', () => {
+    const { game, s, run, asks, answer } = setup({ recruit: 1 });
+    const p = s.player;
+    for (let n = 0; n < 3; n++) {
+        const e = besideEnemy(game, s, 'donguriko');
+        s.allies.forEach(a => placeAway(s, a));
+        e.hp = 1;
+        for (let i = 0; i < 6 && !asks.length; i++) { game.attack(); run(800); }
+        assert.match(asks[0].message, /仲間になりたそう/);
+        answer(0);
+        run(400);
+    }
+    assert.equal(s.allies.length, 2, '主人公をふくめて 3 人まで');
+    assert.equal(s.plaza.length, 1);
+    assert.equal(s.allies[0].kind, 'donguriko');
+    assert.equal(s.allies[0].role, 'defender');
+    assert.ok(s.allies[0].skills.some(k => k.id === 'korogari'));
+    assert.ok(p.hp > 0);
 });

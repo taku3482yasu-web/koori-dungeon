@@ -53,16 +53,16 @@
         oni_smash: { name: '鬼のかちわり', element: 'ほのお', range: 'front', power: 2.2, acc: 0.8, pp: 8, status: 'flinch', chance: 0.3 },
         // 役職のわざ (その役職のときだけ持てる。仕様書 6.3)
         kiai: { name: 'きあいため', range: 'self', pp: 10, buff: 'kiai', note: 'つぎの攻撃のダメージが 2 倍' },
-        heal: { name: 'いやしの風', range: 'self', pp: 8, heal: 0.4, note: 'HP を 4 割回復して、状態異常も治す' },
+        heal: { name: 'いやしの風', range: 'self', pp: 8, heal: 0.4, note: '自分と となりの仲間の HP を 4 割回復して、状態異常も治す' },
         guard: { name: 'まもりのかまえ', range: 'self', pp: 8, buff: 'guard', note: '5 ターン、受けるダメージが半分' },
         lullaby: { name: 'ねむりのうた', element: 'ふしぎ', range: 'around', power: 0, acc: 0.8, pp: 6, status: 'sleep', chance: 1, note: '周りの敵をねむらせる' },
         scout: { name: 'みとおし', range: 'self', pp: 3, reveal: true, note: '階段の場所がわかる' },
-        // 敵のわざ
-        tsukkomi: { name: 'つっこみ', element: 'かぜ', range: 'front', power: 1.3, acc: 0.9 },
-        korogari: { name: 'ころがりタックル', element: 'しぜん', range: 'front', power: 1.3, acc: 0.9 },
-        nemurigona: { name: 'ねむりごな', element: 'しぜん', range: 'front', power: 0, acc: 0.8, status: 'sleep', chance: 1 },
-        karamitsuku: { name: 'からみつく', element: 'しぜん', range: 'front', power: 0.8, acc: 0.9, status: 'bind', chance: 0.7 },
-        habataki: { name: 'はばたき', element: 'かぜ', range: 'line', power: 0.9, acc: 0.9 }
+        // 敵のわざ (仲間になったら PP つきで使う)
+        tsukkomi: { name: 'つっこみ', element: 'かぜ', range: 'front', power: 1.3, acc: 0.9, pp: 15 },
+        korogari: { name: 'ころがりタックル', element: 'しぜん', range: 'front', power: 1.3, acc: 0.9, pp: 15 },
+        nemurigona: { name: 'ねむりごな', element: 'しぜん', range: 'front', power: 0, acc: 0.8, status: 'sleep', chance: 1, pp: 10 },
+        karamitsuku: { name: 'からみつく', element: 'しぜん', range: 'front', power: 0.8, acc: 0.9, status: 'bind', chance: 0.7, pp: 12 },
+        habataki: { name: 'はばたき', element: 'かぜ', range: 'line', power: 0.9, acc: 0.9, pp: 15 }
     };
     const MAX_SKILLS = 4;
 
@@ -112,14 +112,15 @@
     //   speed: 2 なら 1 ターンに 2 回動く (はやい)
     //   move: わざ、rate: ふつうの攻撃のかわりに わざを使う確率。immune: かからない状態異常
     //   steal: となりに来ると道具をぬすんで逃げる。たおすと落とす。ほかに、HP が半分を切っても逃げる
+    //   role: 仲間になったときの役職 (仕様書 6.3。敵ごとに決める)
     const ENEMIES = {
-        haribaby:   { no: '001', name: 'ハリベビー', element: 'ふつう', ai: 'approach', speed: 1, hp: 10, atk: 7, def: 4, exp: 6, line: 'ハリ…！' },
-        mumenbachi: { no: '002', name: 'ムメンキョバチ', element: 'かぜ', ai: 'approach', speed: 2, hp: 7, atk: 5, def: 3, exp: 8, line: 'メンキョナイー！', move: 'tsukkomi', rate: 0.3 },
-        donguriko:  { no: '003', name: 'ドングリコ', element: 'しぜん', ai: 'approach', speed: 1, hp: 12, atk: 6, def: 7, exp: 7, line: 'コロコロ～', move: 'korogari', rate: 0.3 },
-        nemuridake: { no: '004', name: 'ネムリダケ', element: 'しぜん', ai: 'wait', speed: 1, hp: 15, atk: 7, def: 5, exp: 9, line: 'ふぁ～…', move: 'nemurigona', rate: 0.3 },
-        pekorisu:   { no: '005', name: 'ペコリス', element: 'ふつう', ai: 'flee', speed: 1, hp: 16, atk: 8, def: 6, exp: 12, line: 'いただきっ！', steal: true },
-        tsutankobu: { no: '006', name: 'ツタンコブ', element: 'しぜん', ai: 'wait', speed: 1, hp: 22, atk: 10, def: 8, exp: 14, line: 'からまっちゃえ', move: 'karamitsuku', rate: 0.35 },
-        yofukashi:  { no: '007', name: 'ヨフカシフクロウ', element: 'かぜ', ai: 'shoot', speed: 1, hp: 15, atk: 8, def: 5, exp: 14, line: 'まだ寝ないホー', move: 'habataki', immune: ['sleep'] }
+        haribaby:   { no: '001', name: 'ハリベビー', element: 'ふつう', ai: 'approach', speed: 1, hp: 10, atk: 7, def: 4, exp: 6, role: 'attacker', line: 'ハリ…！' },
+        mumenbachi: { no: '002', name: 'ムメンキョバチ', element: 'かぜ', ai: 'approach', speed: 2, hp: 7, atk: 5, def: 3, exp: 8, role: 'attacker', line: 'メンキョナイー！', move: 'tsukkomi', rate: 0.3 },
+        donguriko:  { no: '003', name: 'ドングリコ', element: 'しぜん', ai: 'approach', speed: 1, hp: 12, atk: 6, def: 7, exp: 7, role: 'defender', line: 'コロコロ～', move: 'korogari', rate: 0.3 },
+        nemuridake: { no: '004', name: 'ネムリダケ', element: 'しぜん', ai: 'wait', speed: 1, hp: 15, atk: 7, def: 5, exp: 9, role: 'jammer', line: 'ふぁ～…', move: 'nemurigona', rate: 0.3 },
+        pekorisu:   { no: '005', name: 'ペコリス', element: 'ふつう', ai: 'flee', speed: 1, hp: 16, atk: 8, def: 6, exp: 12, role: 'supporter', line: 'いただきっ！', steal: true },
+        tsutankobu: { no: '006', name: 'ツタンコブ', element: 'しぜん', ai: 'wait', speed: 1, hp: 22, atk: 10, def: 8, exp: 14, role: 'defender', line: 'からまっちゃえ', move: 'karamitsuku', rate: 0.35 },
+        yofukashi:  { no: '007', name: 'ヨフカシフクロウ', element: 'かぜ', ai: 'shoot', speed: 1, hp: 15, atk: 8, def: 5, exp: 14, role: 'jammer', line: 'まだ寝ないホー', move: 'habataki', immune: ['sleep'] }
     };
 
     // 階ごとに出る敵 (ハリーの森 B1F〜B5F)。下の階ほど強い敵がまざる
@@ -149,6 +150,22 @@
         const k = 1 + 0.2 * (lv - 1);
         const atk = Math.round(e.atk * k), def = Math.round(e.def * k);
         return { hp: Math.round(e.hp * k), atk, def, spa: atk, spd: def, exp: Math.round(e.exp * (1 + 0.3 * (lv - 1))) };
+    }
+
+    // 仲間の能力。こおりくん・おにおには主人公と同じ、仲間になった敵は敵の能力に役職の変わり方をかける
+    function allyStats(kind, lv, role) {
+        if (HEROES[kind]) return heroStats(kind, lv, role);
+        const e = enemyStats(kind, lv);
+        const mod = ROLES[role].mod;
+        const s = {};
+        for (const k of ['hp', 'atk', 'def', 'spa', 'spd']) s[k] = Math.floor(e[k] * (mod[k] || 1));
+        return s;
+    }
+
+    // 仲間になった敵のわざ: 役職のわざ + その敵のわざ
+    function enemyAllySkills(kind) {
+        const e = ENEMIES[kind];
+        return [ROLES[e.role].skill, ...(e.move ? [e.move] : [])].map(newSkill);
     }
 
     // はじめに持っているわざ: 役職のわざ + Lv1 で覚えるわざ
@@ -190,6 +207,6 @@
 
     KD.Units = {
         ELEMENTS, CHART, effect, STATUS, SKILLS, MAX_SKILLS, ROLES, ROLE_IDS, roleText, HEROES, ENEMIES, FOREST_TABLE, HIT,
-        heroStats, enemyStats, startSkills, newSkill, learnedBetween, expToNext, gainExp, hitDamage, damage
+        heroStats, enemyStats, allyStats, enemyAllySkills, startSkills, newSkill, learnedBetween, expToNext, gainExp, hitDamage, damage
     };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);
