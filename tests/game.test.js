@@ -165,7 +165,7 @@ test('HP が 0 になるとたおれて町に戻る。Lv はそのまま。借�
         run(1500);
     }
     assert.equal(s.phase, 'town');
-    assert.match(asks[0].message, /町に運ばれた/);
+    assert.match(asks[0].message, /SEタウンに運ばれた/);
     assert.equal(s.over, false);
     assert.equal(p.lv, 3);
     assert.equal(p.hp, p.stats.hp);

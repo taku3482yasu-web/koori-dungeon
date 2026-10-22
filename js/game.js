@@ -444,7 +444,7 @@
             state.queue.length = 0;
             dash = null;
             state.fade = {
-                at: performance.now(), label: '町へ', then: () => {
+                at: performance.now(), label: `${KD.Town.NAME}へ`, then: () => {
                     state.allies.push(...state.fallen);
                     state.fallen = [];
                     party().forEach(u => {
@@ -982,7 +982,7 @@
                         say(`${a.name}が 仲間になった！（役職：${U.ROLES[a.role].name}）`);
                     } else {
                         state.roster.push(a);
-                        say(`${a.name}が 仲間になった！ いっぱいなので、町の広場で待っている。`);
+                        say(`${a.name}が 仲間になった！ いっぱいなので、${KD.Town.NAME}の広場で待っている。`);
                     }
                 });
                 return 0;

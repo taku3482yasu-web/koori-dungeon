@@ -9,6 +9,7 @@
     const { Units: U, Items: I } = KD;
 
     // ----- 借金 (仕様書 2章・6.4) -----
+    const NAME = 'SEタウン';         // 町の名前 (2026-10-22 ユーザー指定)
     const DEBT_START = 100000;     // はじめの借金
     const BP_PER = 1000;           // 1,000 えん返すごとに 1 BP
     const BONUS_EVERY = 10000;     // 合わせて 10,000 えん返すごとに、おまけの BP
@@ -264,7 +265,7 @@
     }
 
     KD.Town = {
-        DEBT_START, BP_PER, BONUS_EVERY, BONUS_BP, INTEREST, bpFor, UNLOCK, isOpen,
+        NAME, DEBT_START, BP_PER, BONUS_EVERY, BONUS_BP, INTEREST, bpFor, UNLOCK, isOpen,
         ROLE_ORDER, OUGI, treeNodes, TREE_START, canUnlock, treeStats, rolesOpen, treeSkills, nodeText,
         shopStock, shopUnit, buyPrice, RECIPES, recipeText,
         RARE, rareStock, RIVALS, rivalListings, sellChance,

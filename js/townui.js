@@ -143,7 +143,7 @@
             const lines = [
                 '摩天楼の財宝で 借金を返したはずが……\n打ち上げで散財して、また借金ができてしまった。',
                 'こおりくん「どうしよう。こおり生きていけないよ～～！！」',
-                'ふるカワ「町の近くに、不思議なダンジョンが いくつも現れたんだって。\n探検隊になって依頼をこなせば、お金がもらえるよ！」',
+                'ふるカワ「SEタウンの近くに、不思議なダンジョンが いくつも現れたんだって。\n探検隊になって依頼をこなせば、お金がもらえるよ！」',
                 oni ? 'おにおに「貸した金は 自分で取り返す！ こおりくん、ダンジョンへ ついてこい！」'
                     : 'おにおに「見張りで ついていく。貸した金は きっちり返してもらうからな！」',
                 `探検隊「ばりきつよめ」結成！\n借金：${money(t().debt)}。クエストをこなして、おにおにに返していこう。`
@@ -163,18 +163,18 @@
             if (reason === 'down') {
                 const interest = Math.round(t().debt * TW.INTEREST / 10) * 10;
                 t().debt += interest;
-                lines.push(`${p().name}は 町に運ばれた…`, `お金（${money(info.money || 0)}）と、道具を ${info.lost || 0} 個 なくした。`);
+                lines.push(`${p().name}は ${TW.NAME}に運ばれた…`, `お金（${money(info.money || 0)}）と、道具を ${info.lost || 0} 個 なくした。`);
                 if (interest) lines.push(`おにおに「金返せ！」 借金に利子 ${money(interest)}が 足された。`);
             } else if (reason === 'clear') {
-                lines.push(`${info.dungeon}を 突破して、町に戻った！`);
+                lines.push(`${info.dungeon}を 突破して、${TW.NAME}に戻った！`);
                 // はじめてボスをたおした: ストーリーが進む
                 const d = DG.byId(info.id);
                 if (info.boss && d && d.bonus) return bonusClear(d, lines);
                 if (info.boss && d && DG.LIST.indexOf(d) === (t().cleared || 0)) return storyClear(d, lines);
             }
-            else if (reason === 'escape') lines.push(`${info.dungeon}から 脱出して、町に戻った。`);
-            else if (reason === 'rest') lines.push(`${info.dungeon}の 休憩の階（B${info.floor}F）から 町に戻った。次は ここから 始められる。`);
-            else if (reason === 'quest') lines.push('クエストを達成して、町に戻った。ギルドで報告しよう。');
+            else if (reason === 'escape') lines.push(`${info.dungeon}から 脱出して、${TW.NAME}に戻った。`);
+            else if (reason === 'rest') lines.push(`${info.dungeon}の 休憩の階（B${info.floor}F）から ${TW.NAME}に戻った。次は ここから 始められる。`);
+            else if (reason === 'quest') lines.push(`クエストを達成して、${TW.NAME}に戻った。ギルドで報告しよう。`);
             state.run = null;
             save();
             if (lines.length) return ask(lines.join('\n'), ['町へ'], () => menu(), { list: false });
@@ -231,7 +231,7 @@
             const town = t();
             const news = town.news.splice(0);
             const done = town.quests.filter(questDone).length;
-            const head = [`${town.day}日目　借金 ${money(town.debt)}　お金 ${money(p().money)}　BP ${town.bp}`,
+            const head = [`${TW.NAME}　${town.day}日目　借金 ${money(town.debt)}　お金 ${money(p().money)}　BP ${town.bp}`,
                 ...news, ...(done ? [`達成したクエストが ${done} 件ある。ギルドで報告しよう。`] : [])];
             ui.ask(head.join('\n'), PLACES.map(pl => (isOpen(pl.id) ? pl.name : `${pl.name}（あと ${money(paidNeed(pl.id))}）`)), i => {
                 const pl = PLACES[i];
@@ -361,7 +361,7 @@
             save();
             const lines = ['おにおに「……全部、返したな」', 'こおりくん「やったー！ これで こおり 生きていけるよ～～！！」',
                 'ふるカワ「探検隊『ばりきつよめ』、大活躍だったね！」', '～ おしまい ～\n（このあとも 遊べます）',
-                'ふるカワ「たいへん！ 町のはずれに、底の見えない 大きな穴が 開いたよ！」', '新しいダンジョン「ドタバタ大迷宮」（99 階）が 現れた！'];
+                'ふるカワ「たいへん！ SEタウンのはずれに、底の見えない 大きな穴が 開いたよ！」', '新しいダンジョン「ドタバタ大迷宮」（99 階）が 現れた！'];
             const next = k => (k >= lines.length ? menu() : ask(lines[k], ['つぎへ'], () => next(k + 1), { list: false }));
             next(0);
         }
