@@ -225,16 +225,8 @@
         // キャラをえらんだら始まる。1 枚ごとに 場面の絵が動く (drawOpening)。「スキップ」で 町へ (2026-10-22 ユーザー指定)
         let opening = { scene: 0, at: 0 };
         function story(i) {
-            const oni = p().kind === 'onioni';
-            const lines = [
-                // 1 枚目に バージョン (氷隊 / 鬼鬼団) を 出す (2026-10-22 ユーザー指定)
-                `【${GAME_TITLE} ${version().name}】\n摩天楼の財宝で 借金を返したはずが……打ち上げで散財して、また借金ができてしまった。`,
-                'こおりくん「どうしよう。こおり生きていけないよ～～！！」',
-                'ふるカワ「SEタウンの近くに、不思議なダンジョンが いくつも現れたんだって。\n探検隊になって依頼をこなせば、お金がもらえるよ！」',
-                oni ? 'おにおに「貸した金は 自分で取り返す！ こおりくん、ダンジョンへ ついてこい！」'
-                    : 'おにおに「見張りで ついていく。貸した金は きっちり返してもらうからな！」',
-                `探検隊「ばりきつよめ」結成！\n借金：${money(t().debt)}。クエストをこなして、おにおにに返していこう。`
-            ];
+            // 1 枚目に バージョン (氷隊 / 鬼鬼団) を 出す (2026-10-22 ユーザー指定)。台詞は dungeons.js の STORY.opening
+            const lines = storyLines(DG.STORY.opening);
             if (i >= lines.length) {
                 save();
                 return menu();
@@ -295,8 +287,7 @@
             refreshDay();
             save();
             // ストーリーをクリアすると、ライバル探検隊から クエストが届く (2026-10-22 ユーザー指定)
-            const rivals = st.last ? ['ふるカワ「たいへん！ ギルドに ライバル探検隊のみんなから クエストが 届いてるよ！」',
-                'ふるカワ「頼みを かなえたら 仲間になってくれるって。メンバーが そろうと、リーダーが 勝負を 挑んでくるみたい！」'] : [];
+            const rivals = st.last ? storyLines(DG.STORY.rivalsQuest) : [];
             if (st.last) {
                 return cutscene([...withScenes([...lines, ...(st.clear || [])], ['asoDown', 'asoDown', 'asoSeal', 'townParty', 'stillDebt', 'stillDebt', 'clearCard']),
                     ...withScenes(rivals, ['rivalsQuest'])], () => menu());
@@ -310,7 +301,7 @@
             t().bonusClear = true;
             state.run = null;
             save();
-            if (!first) return g.talk([...lines, 'ふるカワ「また 大魔王ASO・真を たおしたね！ すごい！」'], () => menu());
+            if (!first) return g.talk([...lines, ...storyLines(DG.STORY.bonusAgain)], () => menu());
             cutscene(withScenes([...lines, ...d.story.clear], ['shinDown', 'shinDown', 'shinFade', 'rivalsCheer', 'rivalsCheer', 'rivalsCheer', 'oniPraise', 'allParade', 'trueEnd']), () => menu());
         }
 
@@ -330,6 +321,10 @@
         }
         // 行ごとに 場面をわりあてる (scenes の長さが足りなければ 最後の場面のまま)
         const withScenes = (lines, scenes) => lines.map((text, i) => ({ text, scene: scenes[Math.min(i, scenes.length - 1)] }));
+
+        // dungeons.js の STORY の 台詞を 今の ゲームに 合わせる ({title} などを うめる・主人公ごとの 台詞を えらぶ)
+        const storyLines = list => list.map(l => (typeof l === 'string' ? l : l[p().kind] || l.koori))
+            .map(l => l.replace(/\{title\}/g, GAME_TITLE).replace(/\{version\}/g, version().name).replace(/\{debt\}/g, money(t().debt)).replace(/\{town\}/g, TW.NAME));
 
         // ----- ストーリーデモ (2026-10-22 ユーザー指定: 途中の ストーリーも オープニングのように 絵を付ける) -----
         // ダンジョンに はじめて行くとき (intro) と、ボスを たおしたあと (clear) の 台詞に、1 行ずつ 場面の絵を 付ける。
@@ -563,9 +558,8 @@
         function ending() {
             t().ended = true;
             save();
-            const lines = ['おにおに「……全部、返したな」', 'こおりくん「やったー！ これで こおり 生きていけるよ～～！！」',
-                'ふるカワ「探検隊『ばりきつよめ』、大活躍だったね！」', ...((version().lines || {}).ending || []), '～ おしまい ～\n（このあとも 遊べます）',
-                'ふるカワ「たいへん！ SEタウンのはずれに、底の見えない 大きな穴が 開いたよ！」', '新しいダンジョン「ドタバタ大迷宮」（99 階）が 現れた！'];
+            const end = DG.STORY.ending;
+            const lines = storyLines([...end.before, ...((version().lines || {}).ending || []), ...end.after]);
             const vEnd = ((version().lines || {}).ending || []).map(() => 'townParty');
             cutscene(withScenes(lines, ['paid', 'paidJoy', 'townParty', ...vEnd, 'endCard', 'hole', 'hole']), () => menu());
         }
@@ -1329,17 +1323,6 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
         // 0 摩天楼の財宝と打ち上げ (コインが飛んでいく) / 1 泣くこおりくんに 借用書が降る / 2 ふるカワと 現れるダンジョン /
         // 3 おにおにの取り立て / 4 探検隊「ばりきつよめ」結成
         const hash = n => { const x = Math.sin(n * 12.9898) * 43758.5453; return x - Math.floor(x); };
-        function drawFurukawa(ctx, x, y, s, bob) {
-            // ふるカワ (茶色のロングヘア・ピンクの服) 12 x 22 ドット
-            const r = (rx, ry, rw, rh, c) => { ctx.fillStyle = c; ctx.fillRect(x + rx * s, y + (ry + bob) * s, rw * s, rh * s); };
-            r(2, 0, 8, 3, '#7a4a2a'); r(1, 2, 10, 9, '#7a4a2a');
-            r(3, 3, 6, 6, '#f8d8b8'); r(3, 3, 6, 1, '#7a4a2a');
-            r(4, 5, 1, 2, '#2a1a10'); r(7, 5, 1, 2, '#2a1a10'); r(3, 7, 1, 1, '#ff9ab0'); r(8, 7, 1, 1, '#ff9ab0'); r(5, 8, 2, 1, '#d0506a');
-            r(9, 1, 2, 2, '#ff6a9a');
-            r(2, 11, 8, 7, '#ff8ab8'); r(4, 11, 4, 2, '#ffffff');
-            r(0, 12, 2, 5, '#f8d8b8'); r(10, 12, 2, 5, '#f8d8b8');
-            r(3, 18, 2, 3, '#f8d8b8'); r(7, 18, 2, 3, '#f8d8b8'); r(3, 21, 2, 1, '#c03a5a'); r(7, 21, 2, 1, '#c03a5a');
-        }
         function drawOpening(ctx, now, W, H) {
             const t = (now - opening.at) / 1000;   // この場面になってからの秒
             const bob = Math.floor(now / 400) % 2;
@@ -1607,7 +1590,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                     rect(x - w / 2, y - h, w, h, '#1a1410');
                     if (k < 1) for (let j = 0; j < 6; j++) rect(x + Math.cos(j) * 24 * (1 - k) * 2, y - h / 2 + Math.sin(j) * 18 * (1 - k) * 2, 3, 3, '#ffe680');
                 });
-                drawFurukawa(ctx, 30, 60, 4, bob);
+                A.drawSprite(ctx, 'furukawa', bob, 30, 58, { scale: 4 });   // 口を ぱくぱく (話している)
                 label('！', 92, 66, 18, '#ff6a6a');
             } else if (scene === 'oni') {
                 // おにおにの取り立て
@@ -1659,11 +1642,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             if (!id) return;
             const before = ctx.globalAlpha;
             if (dark && 'filter' in ctx) ctx.filter = 'brightness(0)';
-            if (id === 'furukawa') {
-                const s = Math.max(1, Math.round(h / 22));
-                ctx.globalAlpha = before * alpha;
-                drawFurukawa(ctx, x - 6 * s, groundY - 22 * s - frame * s, s, 0);
-            } else if (KD.BigArt.has(id)) KD.BigArt.drawBig(ctx, id, frame, x, groundY, { height: h, flip, alpha });
+            if (KD.BigArt.has(id)) KD.BigArt.drawBig(ctx, id, frame, x, groundY, { height: h, flip, alpha });
             else if (A.SPRITES[id]) {
                 const rows = A.SPRITES[id].frames[0];
                 const s = Math.max(1, Math.round(h / rows.length));
@@ -1948,27 +1927,22 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
         const ACT_TIME = 2600;                        // あいさつの 長さ (ミリ秒)
         const SUBS = {
             furukawa: { name: 'ふるカワ', lines: ['クエスト、がんばってね！', '今日も いい天気だね！', 'ギルドに 新しい 依頼が 来てるよ！'] },
-            tomoishi: { name: 'ともいし', lines: ['いいもの 入ったよ！', 'おにぎり 持った？', '帰りに 寄ってってね！'] }
+            // ともいしは こおりくんの お母さん。台詞は 前作 (スロット・パチンコ) から
+            tomoishi: { name: 'ともいし', lines: ['お金返しなさい！', '内定はまだなの？', 'こおり、がんばって！', '内定とりなさい！'] }
         };
         const ACTIONS = ['wave', 'highfive', 'jump', 'bow', 'gift'];
         const ALLY_LINES = ['おーい！ 今度は つれてってね！', '広場で 待ってるよ～', 'いっしょに 冒険したいな！', '修行してたんだ！'];
         const REPLY = { wave: 'やあ！', highfive: 'イェーイ！', jump: 'わーい！', bow: 'どうも！', gift: 'ありがとう！' };
         const street = { scroll: 0, last: 0, visitor: null, nextAt: 0 };
-        function drawTomoishi(ctx, x, y, s, bob) {
-            // ともいし (お店の 人。白い ハチマキ・オレンジの エプロン) 12 x 22 ドット
-            const r = (rx, ry, rw, rh, c) => { ctx.fillStyle = c; ctx.fillRect(x + rx * s, y + (ry + bob) * s, rw * s, rh * s); };
-            r(2, 0, 8, 4, '#2a1a10'); r(2, 3, 8, 1, '#ffffff'); r(10, 2, 2, 2, '#ffffff');
-            r(3, 4, 6, 6, '#f8d8b8');
-            r(4, 6, 1, 1, '#2a1a10'); r(7, 6, 1, 1, '#2a1a10'); r(5, 8, 2, 1, '#c0504a');
-            r(2, 10, 8, 8, '#4a9a5a'); r(3, 11, 6, 7, '#f0902a'); r(5, 14, 2, 2, '#c86a1a');
-            r(0, 11, 2, 5, '#f8d8b8'); r(10, 11, 2, 5, '#f8d8b8');
-            r(3, 18, 2, 3, '#5a4a3a'); r(7, 18, 2, 3, '#5a4a3a'); r(3, 21, 2, 1, '#2a1a10'); r(7, 21, 2, 1, '#2a1a10');
-        }
+        // ふるカワ・ともいし (前作の絵) は 2 コマめが 口を開けた絵。歩くときは 1 コマめで はねる
+        const TALKERS = ['furukawa', 'tomoishi'];
         // キャラ 1 人 (足元の まんなか が x, FEET)。flip: 左を 向く
-        function walker(ctx, kind, frame, x, lift = 0, flip = false) {
+        function walker(ctx, kind, frame, x, lift = 0, flip = false, talking = false) {
+            if (TALKERS.includes(kind)) {
+                lift += talking ? 0 : frame * 2;
+                frame = talking ? Math.floor(performance.now() / 160) % 2 : 0;
+            }
             const y = FEET - lift, s = SCALE;
-            if (kind === 'furukawa') return drawFurukawa(ctx, Math.round(x - 6 * s), y - 22 * s, s, frame);
-            if (kind === 'tomoishi') return drawTomoishi(ctx, Math.round(x - 6 * s), y - 22 * s, s, frame);
             if (A.SPRITES[kind]) {
                 const rows = A.SPRITES[kind].frames[0];
                 return A.drawSprite(ctx, kind, frame, Math.round(x - rows[0].length * s / 2), y - rows.length * s, { flip, scale: s });
@@ -2071,7 +2045,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             }
             const vStep = v.phase === 'act' ? 0 : Math.floor(now / 220) % 2;
             const bowing = v.phase === 'act' && v.action === 'bow' && act > 0.15 && act < 0.6;
-            walker(ctx, v.kind, vStep, v.x, v.phase === 'act' ? lift(1, 0) : 0, true);
+            walker(ctx, v.kind, vStep, v.x, v.phase === 'act' ? lift(1, 0) : 0, true, v.phase === 'act' && act < 0.55);
             if (bowing) {
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(Math.round(v.x) - 14, FEET - 46, 4, 4);

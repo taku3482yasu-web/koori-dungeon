@@ -195,8 +195,15 @@ test('町の道: 探検隊が 歩き、向かい側から 仲間や ふるカワ
         fakeNow += 16;
         game.town.draw(rec, fakeNow, 384, 240);
     }
-    const lines = ['クエスト、がんばってね！', '今日も いい天気だね！', 'ギルドに 新しい 依頼が 来てるよ！', 'いいもの 入ったよ！', 'おにぎり 持った？', '帰りに 寄ってってね！',
+    const lines = ['クエスト、がんばってね！', '今日も いい天気だね！', 'ギルドに 新しい 依頼が 来てるよ！', 'お金返しなさい！', '内定はまだなの？', 'こおり、がんばって！', '内定とりなさい！',
         'おーい！ 今度は つれてってね！', '広場で 待ってるよ～', 'いっしょに 冒険したいな！', '修行してたんだ！'];
     assert.ok(said.some(t => lines.includes(t)), '40 秒の あいだに だれかが 来て 話す');
     assert.ok(said.some(t => ['やあ！', 'イェーイ！', 'わーい！', 'どうも！', 'ありがとう！'].includes(t)), '探検隊が 返事をする');
+});
+
+test('ストーリーの 書き出し (docs/story.md) が ゲームの データと 同じ', async () => {
+    const { spawnSync } = await import('node:child_process');
+    const { fileURLToPath } = await import('node:url');
+    const r = spawnSync(process.execPath, [fileURLToPath(new URL('../tools/export-story.mjs', import.meta.url)), '--check']);
+    assert.equal(r.status, 0, 'node tools/export-story.mjs で 書き出しなおす');
 });

@@ -32,6 +32,101 @@
                 [...KOORI_BODY, '....odo..odo....', '....ooo..ooo....', '................']
             ]
         },
+        // ともいし (16x18): こおりくんのお母さん。パーマ頭の石に黄色いエプロン。
+        //   前作 (スロット・パチンコ) の sprites.js と同じ絵。frames は [ふつう, 口を開けて叫ぶ]
+        tomoishi: {
+            palette: {
+                o: '#2a2a30',  // 輪郭
+                h: '#7a4ab0',  // パーマの髪
+                H: '#a87ad8',  // 髪のつや
+                G: '#d0d0da',  // 石 (明)
+                g: '#a0a0ac',  // 石
+                d: '#70707c',  // 石 (影)
+                k: '#10162a',  // 目
+                p: '#ff9eb5',  // ほっぺ
+                m: '#c03048',  // 口
+                a: '#ffe08a',  // エプロン
+                A: '#d8a840',  // エプロンの影
+                f: '#4a4a54'   // 足
+            },
+            frames: (() => {
+                const top = [
+                    '...hHhhHhhHh....',
+                    '..hhhhhhhhhhhh..',
+                    '.hHhhhHhhhhHhhh.',
+                    '.hoooooooooooohh',
+                    '.oGGGgggggggggo.',
+                    'oGGgggggggggggdo',
+                    'oGgggkgggggkggdo',
+                    'oggggkgggggkggdo',
+                    'ogpgggggggggpgdo'
+                ];
+                // エプロン (肩ひもつき)
+                const apron = [
+                    'oggaggggggggaddo',
+                    'oggaaaaaaaaaaddo',
+                    'odgaaaappaaaAddo',
+                    '.oddAAAAAAAAddo.',
+                    '..oooooooooooo..',
+                    '...ofo....ofo...',
+                    '...ooo....ooo...'
+                ];
+                return [
+                    [...top, 'oggggggmmgggggdo', 'oggggggggggggddo', ...apron],
+                    // 口を縦に開けて叫ぶ
+                    [...top, 'oggggmmmmmggggdo', 'oggggmmkmmgggddo', ...apron]
+                ];
+            })()
+        },
+
+        // ふるカワ (16x20): リボンのボブヘアの女の子。前作と同じ絵。frames は [ふつう, 口が開く]
+        furukawa: {
+            palette: {
+                o: '#2a1a1a',  // 輪郭
+                h: '#7a4a2a',  // 髪
+                H: '#b07a48',  // 髪のつや
+                r: '#ff4f8b',  // リボン
+                s: '#ffe2cc',  // 肌
+                e: '#2a1830',  // 目
+                w: '#ffffff',  // 目のハイライト
+                p: '#ff9eb5',  // ほっぺ
+                k: '#a03048',  // 口
+                d: '#ff8ab8',  // 服
+                D: '#e0609a',  // 服の影
+                f: '#6a3a2a'   // くつ
+            },
+            frames: (() => {
+                const head = [
+                    '....oooooooo....',
+                    '...ohhhhhhhhorr.',
+                    '..ohhHHhhhhhhorr',
+                    '..ohhhhhhhhhhho.',
+                    '.ohhhsssssshhhho',
+                    '.ohhsssssssshho.',
+                    '.ohssewssewssho.',
+                    '.ohsseessseesho.',
+                    '.ohspsssssspsho.'
+                ];
+                const body = [
+                    '..ohhsssssshhho.',
+                    '...oooddddooo...',
+                    '...odDddddDdo...',
+                    '..osdddrrdddso..',
+                    '..osddddddddso..',
+                    '...oDddddddDo...',
+                    '...oDDDDDDDDo...',
+                    '....oso..oso....',
+                    '....off..off....',
+                    '....ooo..ooo....'
+                ];
+                const mouth = '.ohhssskkssshho.';
+                return [
+                    [...head, mouth, ...body],
+                    // 口を縦に開ける (あごの行にも口を描く)
+                    [...head, mouth, '..ohhsskksshhho.', ...body.slice(1)]
+                ];
+            })()
+        },
         // コオリモドキ (敵キャラ表 050): 色の暗いこおりくんの そっくりさん
         koorimodoki: {
             palette: { o: '#0a1a3a', w: '#8a9ab0', c: '#4a7a9a', b: '#3a5a7a', d: '#2a4a6a', k: '#ff4040', p: '#8a5a6a' },
