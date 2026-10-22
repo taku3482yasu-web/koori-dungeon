@@ -648,7 +648,7 @@ test('ヒーラーの仲間は、となりの HP が少ない仲間を回復す�
     assert.equal(h.skills[0].pp, h.skills[0].max - 1);
 });
 
-test('たおした敵が仲間になりたそうにする。はいで仲間に。3 人をこえたら町の広場で待つ', () => {
+test('たおした敵が仲間になりたそうにする。はいで仲間に。いっぱいなら 入れかえるか聞く (入れかえないと 町の広場で待つ)', () => {
     const { game, s, run, asks, answer } = setup({ recruit: 1 });
     const p = s.player;
     for (let n = 0; n < 3; n++) {
@@ -659,6 +659,13 @@ test('たおした敵が仲間になりたそうにする。はいで仲間に�
         assert.match(asks[0].message, /仲間になりたそう/);
         answer(0);
         run(400);
+        if (n === 2) {
+            // 3 人目: いっぱいなので 入れかえるか聞かれる → 入れかえない
+            assert.match(asks[0].message, /いっぱい。だれかと 入れかえますか/);
+            assert.equal(asks[0].options.length, 3);
+            answer(2);
+            run(200);
+        }
     }
     assert.equal(s.allies.length, 2, '主人公をふくめて 3 人まで');
     assert.equal(s.roster.length, 1);
@@ -666,4 +673,19 @@ test('たおした敵が仲間になりたそうにする。はいで仲間に�
     assert.equal(s.allies[0].role, 'defender');
     assert.ok(s.allies[0].skills.some(k => k.id === 'korogari'));
     assert.ok(p.hp > 0);
+    // 4 人目: 1 人目と 入れかえる → 1 人目は 広場へ、4 人目が いっしょに
+    const first = s.allies[0];
+    const e = besideEnemy(game, s, 'nemuridake');
+    s.allies.forEach(a => placeAway(s, a));
+    e.hp = 1;
+    for (let i = 0; i < 6 && !asks.length; i++) { game.attack(); run(800); }
+    answer(0);
+    run(200);
+    assert.match(asks[0].message, /入れかえますか/);
+    answer(0);
+    run(200);
+    assert.ok(!s.allies.includes(first) && s.roster.includes(first));
+    assert.ok(s.allies.some(a => a.kind === 'nemuridake'));
+    assert.equal(s.allies.length, 2);
+    assert.ok(s.messages.some(m => /入れかわって/.test(m.text)));
 });

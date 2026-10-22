@@ -183,7 +183,8 @@ test('施設は 借金を返していくと開く。開いたら おにおにが
     choose('やめる');
     assert.ok(asks[0].options.includes('バトルツリー'));
     assert.ok(asks[0].options.some(o => o.startsWith('交易所（あと')));
-    assert.deepEqual(Object.keys(TW.UNLOCK), ['storage', 'plaza', 'tree', 'smith', 'trade']);
+    assert.deepEqual(Object.keys(TW.UNLOCK), ['storage', 'tree', 'smith', 'trade']);
+    assert.ok(asks[0].options.includes('仲間の広場'), '仲間の広場は はじめから');
 });
 
 test('クエストは 行けるダンジョンから出る。深いダンジョンほど ごほうびが多い', () => {

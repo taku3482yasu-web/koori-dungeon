@@ -980,13 +980,41 @@
                     if (party().length < partyMax() && placeNear(a, state.player.x, state.player.y)) {
                         state.allies.push(a);
                         say(`${a.name}が 仲間になった！（役職：${U.ROLES[a.role].name}）`);
+                    } else if (state.allies.length) {
+                        // いっしょに行く仲間が いっぱい: このときだけ だれかと 入れかえられる (2026-10-22 ユーザー指定)
+                        askSwap(a);
                     } else {
                         state.roster.push(a);
-                        say(`${a.name}が 仲間になった！ いっぱいなので、${KD.Town.NAME}の広場で待っている。`);
+                        say(`${a.name}が 仲間になった！ ${KD.Town.NAME}の広場で待っている。`);
                     }
                 });
                 return 0;
             });
+        }
+
+        // 仲間になったときに いっぱいだったら、だれかと 入れかえるか聞く。入れかえた仲間は 町の広場で待つ
+        function askSwap(a) {
+            const star = KD.Allies.star(a.kind) ? ` ${'★'.repeat(KD.Allies.star(a.kind))}` : '';
+            ui.ask(`${a.name}${star} Lv${a.lv}（${U.ROLES[a.role].name}）が 仲間になった！
+いっしょに行く仲間が いっぱい。だれかと 入れかえますか？
+（入れかえた仲間は ${KD.Town.NAME}の広場で待つ）`,
+                [...state.allies.map(o => `${o.name} Lv${o.lv}（${U.ROLES[o.role].name}）と 入れかえる`), '入れかえない'], j => {
+                    const old = state.allies[j];
+                    if (!old) {
+                        state.roster.push(a);
+                        return say(`${a.name}は ${KD.Town.NAME}の広場で待っている。`);
+                    }
+                    const [x, y] = [old.x, old.y];
+                    state.allies.splice(j, 1);
+                    old.x = old.y = -1;
+                    state.roster.push(old);
+                    if (x >= 0 && !occupied(x, y)) {
+                        a.x = a.fx = x;
+                        a.y = a.fy = y;
+                    } else placeNear(a, state.player.x, state.player.y);
+                    state.allies.push(a);
+                    say(`${old.name}と 入れかわって、${a.name}が いっしょに来た！（${old.name}は 広場で待っている）`);
+                }, { list: true });
         }
 
         // 仲間がたおれた。探検は続く (仕様書 8章)
