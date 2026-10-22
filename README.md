@@ -53,6 +53,7 @@
 | `js/dungeons.js` | ダンジョン 7 つ（階数・敵の Lv・出る敵・特徴・ボス・ストーリーの台詞） |
 | `js/bigart.js` | ボス・強敵・やすさんたちの大きい絵（前作スロットの絵を写したもの） |
 | `js/enemyart.js` | ダンジョン 2〜7 の敵の絵 |
+| `js/enemyart9.js` | 段階 9（案）の敵 053〜092 と 大魔王ASO・真 の絵。進化形は元の絵の色を変えて しるしを足す。`docs/enemies9.html` をダブルクリックすると一覧で見られる |
 | `js/market.js`・`js/config.js` | 交易所のオンライン（Supabase）・その設定 |
 | `js/collection.js` | 口ぐせ・ライバル探検隊・ハプニング・図鑑・実績のデータ |
 | `js/sound.js` | 効果音と BGM（WebAudio） |
