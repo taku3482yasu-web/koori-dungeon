@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------
 // Chrome を DevTools Protocol で動かし、本物のマウス操作・タッチで ゲームを遊んで、エラーが出ないか・ボタンが効くかを確かめる。
 // (tests/*.test.js は 画面を使わないので、「1 歩動くと画面が止まる」ような不具合を見つけられなかった)
-// 流れ: はじめから → キャラ選択 → オープニング → 町 → ダンジョン → 十字ボタン・ゲーム画面・攻撃・道具・作戦・わざ・キーボード
+// 流れ: はじめから → キャラ選択 → オープニング → 町 → ダンジョン → 十字ボタン・ゲーム画面・攻撃・道具・作戦・わざ・交代・キーボード
 // 使い方 (koori-dungeon フォルダで): node tools/browser-test.mjs
 // 失敗したら 終了コード 1。Chrome が見つからないときは 飛ばす (終了コード 0)。.githooks/pre-commit が走らせる。
 // =====================================================================
@@ -167,6 +167,22 @@ try {
     await press('#btn-ok');
     await press('#skills button');
     check((await evaluate('window.kdGame.state.messages.map(m => m.text).join(" ")')).includes('コオリソード'), 'わざのボタンで わざを使う');
+    // 交代: おにおにを 操作して 歩く → 主人公に もどす
+    await press('#btn-switch');
+    check(/だれを 操作する/.test(await asking()), '「交代」で 操作するキャラを えらぶ画面');
+    await press('.ask-choices button', { text: 'おにおに' });
+    check(await evaluate('window.kdGame.state.player.kind') === 'onioni', 'おにおにを 操作する');
+    await calm();
+    {
+        const d = await openDir();
+        const before = await pos();
+        if (d) await press(DIRS[d], { hold: 0 });
+        await sleep(400);
+        check(!d || await pos() !== before, 'おにおにで 歩ける');
+    }
+    await key('KeyC', 67);
+    await press('.ask-choices button', { text: 'こおりくん' });
+    check(await evaluate('window.kdGame.state.player.kind') === 'koori', 'C キーで 主人公に もどす');
     await press('#btn-map');
     await press('#btn-sound');
     await sleep(800);

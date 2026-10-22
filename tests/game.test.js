@@ -689,3 +689,44 @@ test('たおした敵が仲間になりたそうにする。はいで仲間に�
     assert.equal(s.allies.length, 2);
     assert.ok(s.messages.some(m => /入れかわって/.test(m.text)));
 });
+
+test('操作するキャラの交代: いつでも 仲間を操作できる。道具袋・お金・満腹度は チームで共有。操作している仲間が たおれると 主人公に もどる', () => {
+    const { game, s, run, asks, answer } = setup({ enemies: false, partner: true });
+    const hero = s.player;
+    const oni = s.allies[0];
+    assert.ok(hero.hero && oni.kind === 'onioni');
+    hero.money = 120;
+    // 交代の画面 → おにおにを えらぶ
+    game.switchMenu();
+    assert.match(asks[0].message, /だれを 操作する/);
+    answer(1);
+    run(200);
+    assert.equal(s.player, oni);
+    assert.ok(s.allies.includes(hero), '主人公は 仲間の側で 自分で動く');
+    assert.equal(game.heroUnit(), hero);
+    // 共有: 道具袋・お金・満腹度
+    assert.equal(s.player.bag, hero.bag);
+    s.player.money += 30;
+    assert.equal(hero.money, 150);
+    assert.equal(s.player.belly, hero.belly);
+    // 操作しているキャラで 歩く (主人公も ついてくる)
+    const [x0, y0] = [oni.x, oni.y];
+    const dir = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dx, dy]) => globalThis.KD.Dungeon.canMove(s.map, oni.x, oni.y, dx, dy) && !(hero.x === oni.x + dx && hero.y === oni.y + dy));
+    game.moveInput(dir[0], dir[1]);
+    run(600);
+    assert.notDeepEqual([oni.x, oni.y], [x0, y0]);
+    assert.equal(game.skills()[0].name, U.SKILLS[oni.skills[0].id].name, 'わざのボタンは 操作しているキャラのわざ');
+    // 主人公に もどす・また おにおにを 操作する
+    game.switchTo(hero);
+    run(100);
+    assert.equal(s.player, hero);
+    game.switchTo(oni);
+    // 操作している仲間が 敵に たおされる → 主人公の操作に もどる (失敗ではない)
+    oni.hp = 5;
+    const e = game.makeEnemy('haribaby', 30, oni.x + dir[0], oni.y + dir[1]);
+    e.awake = true;
+    if (!s.enemies.length) s.enemies.push(e);
+    for (let i = 0; i < 20 && s.player === oni; i++) { game.wait(); run(500); while (asks.length) answer(asks[0].options.length - 1); }
+    assert.equal(s.player, hero, '主人公に もどった');
+    assert.ok(!s.over, '主人公は 無事なので 失敗ではない');
+});

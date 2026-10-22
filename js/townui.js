@@ -42,7 +42,7 @@
         const net = g.opts.market === false ? { online: false } : KD.createMarket((KD.CONFIG || {}).supabase || {}, g.opts.marketDeps || {});
 
         const t = () => state.town;
-        const p = () => state.player;
+        const p = () => g.heroUnit();   // 主人公 (ダンジョンで 仲間を操作しているときも)
         const dayRng = salt => KD.createRng((t().seed + t().day * 7919 + salt) >>> 0);
         const money = n => `${n.toLocaleString()}えん`;
         const ask = (message, options, done, extra) => ui.ask(message, options, done, { list: true, ...extra });
@@ -931,7 +931,7 @@
             const data = {
                 v: 1,
                 hero: { ...unitData(hero), tree: hero.tree, bag: hero.bag, money: hero.money, belly: hero.belly },
-                allies: state.allies.map(unitData), roster: state.roster.map(unitData), tactic: state.tactic,
+                allies: [state.player, ...state.allies].filter(u => !u.hero).map(unitData), roster: state.roster.map(unitData), tactic: state.tactic,
                 town: t(), run: state.run || null
             };
             try {

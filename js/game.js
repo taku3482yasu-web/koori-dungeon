@@ -150,6 +150,49 @@
         }
 
         const party = () => [state.player, ...state.allies];
+
+        // ----- 操作するキャラの切りかえ (2026-10-22 ユーザー指定) -----
+        // state.player は「いま操作しているキャラ」。主人公は hero: true のキャラ (操作していないときは state.allies の中で 自分で考えて動く)。
+        // 道具袋・お金・満腹度は チームで共有 (主人公のものを使う)。主人公がたおれたら 失敗なのは そのまま
+        const heroUnit = () => (state.player && state.player.hero ? state.player : state.allies.find(a => a.hero) || state.fallen.find(a => a.hero) || state.player);
+        // 仲間が 主人公の 道具袋・お金・満腹度を 使えるようにする
+        function shareTeam(u, hero) {
+            if (u.hero || u.shared) return;
+            u.shared = true;
+            ['bag', 'money', 'belly'].forEach(k => Object.defineProperty(u, k, { get: () => heroUnit()[k], set: v => { heroUnit()[k] = v; }, configurable: true, enumerable: false }));
+            void hero;
+        }
+        // u を操作する (u は いっしょにいる仲間か 主人公)。quiet: メッセージを出さない
+        function switchTo(u, quiet = false) {
+            if (!u || u === state.player || u.hp <= 0) return false;
+            const i = state.allies.indexOf(u);
+            if (i < 0) return false;
+            const old = state.player;
+            state.allies[i] = old;
+            state.player = u;
+            shareTeam(u);
+            u.anim = old.anim = null;
+            dash = null;
+            if (state.map) look();
+            if (!quiet) {
+                say(`${u.name}を 操作する！`);
+                popup(u, '交代！', '#7fd3f7');
+                sfx('cursor');
+            }
+            return true;
+        }
+        // だれを操作するか えらぶ (ターンは すすまない)
+        function switchMenu() {
+            if (busy() || state.phase !== 'play') return;
+            const list = [state.player, ...state.allies].filter(u => u.hp > 0);
+            if (list.length < 2) return say('いま いっしょにいる仲間が いない。');
+            ui.ask(`だれを 操作する？（いまは ${state.player.name}）`,
+                [...list.map(u => `${u === state.player ? '【いま】' : ''}${u.name} Lv${u.lv}　HP ${u.hp}/${u.stats.hp}　${U.ROLES[u.role].name}${u.hero ? '（主人公）' : ''}`), 'やめる'], i => {
+                    if (i < list.length) switchTo(list[i]);
+                }, { list: true });
+        }
+        // 主人公の 操作に もどす (町に戻るとき・セーブのとき)
+        const backToHero = () => { if (!state.player.hero) switchTo(heroUnit(), true); };
         // 一緒に行ける人数 (ストーリーで ふえる。仕様書 8章)
         const partyMax = () => DG.partyMax(state.town ? state.town.cleared || 0 : 0);
         const equipped = p => p.bag && p.bag.find(it => it.eq);
@@ -440,6 +483,7 @@
 
         // 町へ戻る。reason: clear 突破 / escape 脱出 / down たおれた / quest クエスト達成
         function backToTown(reason, info = {}) {
+            backToHero();
             state.queue.length = 0;
             dash = null;
             state.fade = {
@@ -984,7 +1028,7 @@
                     if (party().length < partyMax() && placeNear(a, state.player.x, state.player.y)) {
                         state.allies.push(a);
                         say(`${a.name}が 仲間になった！（役職：${U.ROLES[a.role].name}）`);
-                    } else if (state.allies.length) {
+                    } else if (swappable().length) {
                         // いっしょに行く仲間が いっぱい: このときだけ だれかと 入れかえられる (2026-10-22 ユーザー指定)
                         askSwap(a);
                     } else {
@@ -997,19 +1041,21 @@
         }
 
         // 仲間になったときに いっぱいだったら、だれかと 入れかえるか聞く。入れかえた仲間は 町の広場で待つ
+        // (仲間を操作しているときの 主人公は 入れかえられない)
+        const swappable = () => state.allies.filter(o => !o.hero);
         function askSwap(a) {
             const star = KD.Allies.star(a.kind) ? ` ${'★'.repeat(KD.Allies.star(a.kind))}` : '';
             ui.ask(`${a.name}${star} Lv${a.lv}（${U.ROLES[a.role].name}）が 仲間になった！
 いっしょに行く仲間が いっぱい。だれかと 入れかえますか？
 （入れかえた仲間は ${KD.Town.NAME}の広場で待つ）`,
-                [...state.allies.map(o => `${o.name} Lv${o.lv}（${U.ROLES[o.role].name}）と 入れかえる`), '入れかえない'], j => {
-                    const old = state.allies[j];
+                [...swappable().map(o => `${o.name} Lv${o.lv}（${U.ROLES[o.role].name}）と 入れかえる`), '入れかえない'], j => {
+                    const old = swappable()[j];
                     if (!old) {
                         state.roster.push(a);
                         return say(`${a.name}は ${KD.Town.NAME}の広場で待っている。`);
                     }
                     const [x, y] = [old.x, old.y];
-                    state.allies.splice(j, 1);
+                    state.allies.splice(state.allies.indexOf(old), 1);
                     old.x = old.y = -1;
                     state.roster.push(old);
                     if (x >= 0 && !occupied(x, y)) {
@@ -1313,7 +1359,13 @@
                 return say(`${t.name}「${U.ENEMIES[t.kind].line}」 ……復活した！`);
             }
             if (t.hero) down();
-            else if (t.side === 'party') allyDown(t);
+            else if (t === state.player) {
+                // 操作している仲間が たおれた: 主人公の操作に もどって、仲間は たおれる
+                const hero = heroUnit();
+                switchTo(hero, true);
+                say(`${t.name}が たおれた！ ${hero.name}の 操作に もどった。`);
+                allyDown(t);
+            } else if (t.side === 'party') allyDown(t);
             else defeat(t, from);
         }
 
@@ -1490,7 +1542,7 @@
 
         // 主人公がたおれた (段階 6 で町に戻るようにする。今は B1F からやり直し)
         function down() {
-            const p = state.player;
+            const p = heroUnit();
             // ふっかつのたね・ふるカワのお守り を持っていたら 1 回だけ復活 (仕様書 9章)
             const rv = p.bag.find(it => it.id === 'revive_seed') || p.bag.find(it => it.id === 'omamori');
             if (rv) {
@@ -1511,6 +1563,7 @@
                 const money = p.money;
                 p.money = 0;
                 recalc(p);
+                backToHero();
                 backToTown('down', { money, lost });
                 return 0;
             });
@@ -1688,7 +1741,7 @@
                 u.x = u.fx = x;
                 u.y = u.fy = y;
                 u.anim = null;
-                if (u.hero) look();
+                if (u === state.player) look();
                 return;
             }
         }
@@ -2480,7 +2533,7 @@
         // 町 (townui.js) に渡す中身
         const town = KD.createTown({
             state, opts, say, later,
-            selectHero, makeHero, makeAlly, recalc, learnNow, startDungeon, resume, backToTown, partyMax, talk, toast, evolve
+            selectHero, makeHero, makeAlly, recalc, learnNow, startDungeon, resume, backToTown, partyMax, talk, toast, evolve, heroUnit, backToHero
         }, ui);
 
         if (opts.start === 'dungeon') {
@@ -2490,7 +2543,7 @@
             });
         } else town.title();
         return {
-            state, town, draw, moveInput, wait, confirm, attack: attackFront, useSkill, itemMenu, tacticMenu, busy, makeEnemy, makeAlly, evolve, startDungeon, spawnBoss,
+            state, town, draw, moveInput, wait, confirm, attack: attackFront, useSkill, itemMenu, tacticMenu, busy, makeEnemy, makeAlly, evolve, startDungeon, switchTo, switchMenu, heroUnit, spawnBoss,
             skills: () => (state.player && state.phase === 'play' ? state.player.skills.map(skillLabel) : []),
             toggleMinimap() { state.mini = !state.mini; },
             toggleSound() {

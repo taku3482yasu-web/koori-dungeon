@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------
 // 仕様書 15章:
 //   移動: 矢印キー・テンキー (斜めはテンキーか、矢印を2つ同時に。Shift を押しているあいだは斜めだけ)
-//   ダッシュ: B を押しながら移動 / 向きだけ変える: R を押しながら方向 / 足踏み: Space
+//   ダッシュ: B を押しながら移動 / 向きだけ変える: R を押しながら方向 / 足踏み: Space / 操作するキャラの交代: C
 //   攻撃・決定: Z・Enter (階段の上なら「降りますか？」) / わざ: 1〜4 / 道具: X (えらぶ画面では戻る) / 作戦: T / 戻る: Esc / ミニマップ: M / 音: S
 //   スマホ: 十字ボタン (斜めあり。長押しでダッシュ)・攻撃・道具・作戦・足踏み・ミニマップ・音・わざのボタン
 //   クリック・タップ (2026-10-22 ユーザー指定): ボタンは 押した瞬間に反応する (すぐ離しても 1 歩動く)。
@@ -132,6 +132,7 @@
             else if (k === 'KeyM' && !e.repeat) game.toggleMinimap();
             else if (k === 'KeyX' && !e.repeat) game.itemMenu();
             else if (k === 'KeyT' && !e.repeat) game.tacticMenu();
+            else if (k === 'KeyC' && !e.repeat) game.switchMenu();   // 操作するキャラの 交代
             else if (k === 'KeyS' && !e.repeat) game.toggleSound();
             else if (/^(Digit|Numpad)[1-4]$/.test(k) && !e.repeat && !NUMPAD[k]) game.useSkill(Number(k.slice(-1)) - 1);
         });
@@ -214,6 +215,7 @@
         tap('btn-map', () => game.toggleMinimap());
         tap('btn-item', () => (ask.asking() ? ask.key('back') : game.itemMenu()));
         tap('btn-tactic', () => (ask.asking() ? ask.key('back') : game.tacticMenu()));
+        tap('btn-switch', () => (ask.asking() ? ask.key('back') : game.switchMenu()));
         tap('btn-sound', () => game.toggleSound());
 
         // ----- わざのボタン (変わったときだけ作り直す) -----
