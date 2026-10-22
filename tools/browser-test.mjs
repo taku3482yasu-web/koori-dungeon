@@ -234,6 +234,12 @@ try {
     await sleep(800);
     check(await phase() === 'town' && await evaluate('window.kdGame.state.town.version') === 'onioni' && /鬼鬼団/.test(await evaluate('document.title')),
         '鬼鬼団の 続きから（ページの 名前にも 鬼鬼団）');
+    // スマホの 町: メニューは ゲーム画面の 下に 出て 全部 見える (スクロールなしで 最後まで)。十字ボタンは かくれる
+    check(await evaluate(`(() => {
+        const st = document.querySelector('.stage').getBoundingClientRect(), box = document.getElementById('ask').getBoundingClientRect();
+        const btns = [...document.querySelectorAll('.ask-choices button')], last = btns[btns.length - 1].getBoundingClientRect();
+        return box.top >= st.bottom - 1 && last.bottom <= innerHeight + 1 && getComputedStyle(document.querySelector('.pad')).display === 'none';
+    })()`), 'スマホの 町: メニューが ゲーム画面に 重ならず 全部 見える・十字ボタンは かくれる');
     await press('.ask-choices button', { text: '交易所' });
     await sleep(1500);
     await press('.ask-choices button', { text: 'ほかの探検隊の出品' });

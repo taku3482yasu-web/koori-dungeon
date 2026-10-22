@@ -74,7 +74,9 @@
                     Object.assign(input, { value: '', placeholder: field.placeholder || '', maxLength: field.maxLength || 40 });
                     setTimeout(() => input.focus(), 0);
                 }
-                box.className = `ask ${place}${list ? ' list' : ''}`;
+                // long: 長い 名前が ある (道具・クエストなど)。スマホでは 1 列に ならべる
+                const long = options.some(o => String(o).length > 9);
+                box.className = `ask ${place}${list ? ' list' : ''}${long ? ' long' : ''}`;
                 box.hidden = false;
                 choices.scrollTop = 0;
                 moveTo(0);
@@ -295,6 +297,9 @@
             }
             // 1 回エラーが出ても 止まらないように (止まると ボタンも キーも 効かなくなる)
             try {
+                // いまの 場面 (title / select / town / play) を body に 書く。スマホでは ダンジョンの外で 操作ボタンを かくす (style.css)
+                const phase = (game.state && game.state.phase) || '';
+                if (document.body.dataset.phase !== phase) document.body.dataset.phase = phase;
                 game.draw(now);
                 renderSkills();
             } catch (e) {

@@ -196,6 +196,61 @@ h1 .howto:hover { border-color: var(--hot); }
     .acts button { height: 46px; font-size: 14px; min-width: 0; }
 }
 
+/* スマホの縦向き (2026-10-22 ユーザー指定: 町の画面が 見切れる → 全体を 調整)
+   - 見出しを 小さく・キーボードの 説明は 出さない
+   - ダンジョンの外 (タイトル・キャラ選択・町) では 十字ボタン・わざを かくす
+   - 聞く画面は ゲーム画面の 上に 重ねず、ゲーム画面の 下に 広げる (下から 出る 板)。えらぶものは 2 列。多いときは 板の 中で スクロール */
+@media (max-width: 520px) {
+    h1 { font-size: 17px; margin-bottom: 6px; }
+    h1 small { font-size: 11px; }
+    h1 .howto { top: 0; font-size: 12px; padding: 2px 10px; }
+    .keys { display: none; }
+    /* 操作ボタンは 画面の 下 (親指の とどくところ) に よせる */
+    .app { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
+    .pad { margin-top: auto; padding-top: 12px; }
+    .dpad { --b: min(60px, 15vw); grid-template-columns: repeat(3, var(--b)); grid-template-rows: repeat(3, var(--b)); }
+    .acts button { height: min(54px, 13.5vw); }
+    .acts button:last-child:nth-child(odd) { grid-column: 1 / -1; }
+    /* わざの 名前は 1 行 (長ければ …)。PP は 2 行目の 右 */
+    .skills button { column-gap: 6px; padding: 6px 8px; }
+    .skills .nm { grid-column: 2 / span 2; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .skills .inf { grid-row: 2; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .skills .pp { grid-row: 2; grid-column: 3; font-size: 11px; }
+    body:not([data-phase="play"]) .pad,
+    body:not([data-phase="play"]) .skills { display: none; }
+    .ask, .ask.bottom, .ask.bottom.list {
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: auto;
+        bottom: 0;
+        transform: none;
+        width: auto;
+        /* ゲーム画面 (見出しの下・横:縦 = 8:5) に かからない 高さまで */
+        max-height: max(40dvh, calc(100dvh - 64px - (100vw - 20px) * .625));
+        padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+        border-width: 2px 0 0;
+        border-radius: 14px 14px 0 0;
+        z-index: 10;
+    }
+    /* 文は 縮めない (長すぎる ときだけ 文の 中で スクロール)。えらぶものが 多ければ そちらを スクロール */
+    .ask-text, .ask.bottom .ask-text { font-size: 14px; margin-bottom: 10px; flex: 0 0 auto; max-height: 34dvh; overflow-y: auto; }
+    .ask-choices, .ask.list .ask-choices {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+        min-height: 0;
+        overflow-y: auto;
+        flex: 0 1 auto;
+    }
+    .ask-choices button, .ask.list .ask-choices button { min-width: 0; padding: 10px 8px; font-size: 14px; text-align: center; }
+    /* 1 つだけ・あまった 最後の 1 つ (もどる・やめる) は 横いっぱい */
+    .ask-choices button:last-child:nth-child(odd) { grid-column: 1 / -1; }
+    /* 長い 名前が あれば 1 列・左よせ */
+    .ask.long .ask-choices { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .ask.long .ask-choices button { text-align: left; padding: 8px 12px; }
+}
+
 /* パソコン (マウス) では十字ボタンを小さく */
 @media (hover: hover) and (pointer: fine) {
     .app { --ui: 330px; }
