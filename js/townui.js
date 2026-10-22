@@ -141,10 +141,11 @@
             // セーブが 1 つなら その バージョン、2 つなら 両方を タイトルに 出す
             titleVersion = slots.length === 1 ? DG.VERSIONS[slots[0]] : slots.length ? { name: slots.map(v => DG.VERSIONS[v].name).join(' ／ '), color: '#ffe680' } : null;
             const label = v => (slots.length > 1 ? `つづきから（${DG.VERSIONS[v].name}）` : 'つづきから');
-            ask(titleVersion ? `${GAME_TITLE}\n${titleVersion.name}` : GAME_TITLE, [...slots.map(label), 'はじめから', '引き継ぎ'], i => {
+            ask(titleVersion ? `${GAME_TITLE}\n${titleVersion.name}` : GAME_TITLE, [...slots.map(label), 'はじめから', '引き継ぎ', '設定'], i => {
                 if (i < slots.length) return load(false, slots[i]);
                 if (i === slots.length) return newGame();
-                transfer();
+                if (i === slots.length + 1) return transfer();
+                soundSettings(title);
             }, { place: 'bottom', list: false });
         }
 
@@ -266,7 +267,8 @@
                     t().extraClear = { ...(t().extraClear || {}), [d.id]: true };
                     state.run = null;
                     save();
-                    return g.talk([...lines, ...(first ? d.story.clear : [])], () => menu());
+                    if (first) return storyCut([...lines, ...d.story.clear], d, 'clear', () => menu());
+                    return g.talk(lines, () => menu());
                 }
                 if (info.boss && d && DG.LIST.indexOf(d) === (t().cleared || 0)) return storyClear(d, lines);
             }
@@ -299,7 +301,7 @@
                 return cutscene([...withScenes([...lines, ...(st.clear || [])], ['asoDown', 'asoDown', 'asoSeal', 'townParty', 'stillDebt', 'stillDebt', 'clearCard']),
                     ...withScenes(rivals, ['rivalsQuest'])], () => menu());
             }
-            g.talk([...lines, ...(st.clear || []), ...((version().lines || {}).clear || []), ...rivals], () => menu());
+            storyCut([...lines, ...(st.clear || []), ...((version().lines || {}).clear || []), ...rivals], d, 'clear', () => menu());
         }
 
         // ドタバタ大迷宮を抜けた (段階 9): ほんとうの ほんとうの エンディング。何度でも 挑戦できる
@@ -328,6 +330,54 @@
         }
         // 行ごとに 場面をわりあてる (scenes の長さが足りなければ 最後の場面のまま)
         const withScenes = (lines, scenes) => lines.map((text, i) => ({ text, scene: scenes[Math.min(i, scenes.length - 1)] }));
+
+        // ----- ストーリーデモ (2026-10-22 ユーザー指定: 途中の ストーリーも オープニングのように 絵を付ける) -----
+        // ダンジョンに はじめて行くとき (intro) と、ボスを たおしたあと (clear) の 台詞に、1 行ずつ 場面の絵を 付ける。
+        // 場面は 台詞から 決める: だれが 話しているか・「仲間になった」・「新しいダンジョン」など。絵は drawStory
+        function storyCut(lines, d, phase, done) {
+            cutscene(storyScenes(lines, d, phase), done);
+        }
+        let speakerMap = null;
+        function speakerId(name, d) {
+            if (name === 'ふるカワ') return 'furukawa';
+            if (d && d.boss && U.ENEMIES[d.boss] && U.ENEMIES[d.boss].name === name) return d.boss;
+            if (!speakerMap) {
+                speakerMap = {};
+                Object.entries({ ...U.ENEMIES, ...U.HEROES }).forEach(([id, e]) => {
+                    if (e && e.name && !speakerMap[e.name] && (A.SPRITES[id] || KD.BigArt.has(id))) speakerMap[e.name] = id;
+                });
+            }
+            return speakerMap[name] || null;
+        }
+        const dungeonByName = name => [...DG.LIST, ...(DG.EXTRA || []), ...(DG.BONUS ? [DG.BONUS] : [])].find(x => x.name === name);
+        function storyScenes(lines, d, phase) {
+            const theme = d.theme || 'forest';
+            const who = line => { const m = /^(.+?)「/.exec(line); return m ? m[1] : null; };
+            return lines.map((text, i) => {
+                const base = { story: true, theme, d: d.id, boss: d.boss, name: d.name };
+                const nd = /新しいダンジョン「(.+?)」/.exec(text);
+                if (nd) {
+                    const next = dungeonByName(nd[1]);
+                    return { text, scene: { ...base, type: 'newDungeon', theme: next ? next.theme : theme, name: nd[1], boss: next && next.boss } };
+                }
+                const join = /^(.+?)（.+?）が 仲間になった/.exec(text) || /^(.+?)が 仲間になった/.exec(text);
+                if (join) return { text, scene: { ...base, type: 'join', who: speakerId(join[1], d) || (d.story && d.story.ally) } };
+                const party = /(\d) 人で冒険/.exec(text);
+                if (party) return { text, scene: { ...base, type: 'party', n: Number(party[1]) } };
+                if (/壺が ひび/.test(text)) return { text, scene: { ...base, type: 'crack', theme: 'aso' } };
+                const name = who(text);
+                if (name === '？？？') {
+                    // 名前を 明かす前: 次に 話す キャラの 影
+                    const later = lines.slice(i + 1).map(who).find(n => n && n !== '？？？');
+                    return { text, scene: { ...base, type: 'mystery', who: later && speakerId(later, d) } };
+                }
+                const id = name && speakerId(name, d);
+                if (id && id === d.boss && phase === 'clear') return { text, scene: { ...base, type: 'bossDown', who: id } };
+                if (id === 'furukawa' && phase === 'intro') return { text, scene: { ...base, type: 'gate', who: id } };
+                if (id) return { text, scene: { ...base, type: 'talk', who: id } };
+                return { text, scene: { ...base, type: phase === 'intro' ? 'gate' : 'cleared' } };
+            });
+        }
 
         // ライバル探検隊のクエストを 掲示板の いちばん上に (ストーリーをクリアしたあと。town.js の rivalQuests)
         function addRivalQuests() {
@@ -383,7 +433,9 @@
             const head = [`${TW.NAME}　${town.day}日目　借金 ${money(town.debt)}　お金 ${money(p().money)}　BP ${town.bp}`,
                 ...(vl ? [vl.town[town.day % vl.town.length]] : []),   // バージョンの ひとこと (日がわり)
                 ...news, ...(done ? [`達成したクエストが ${done} 件ある。ギルドで報告しよう。`] : [])];
-            ui.ask(head.join('\n'), PLACES.map(pl => (isOpen(pl.id) ? pl.name : `${pl.name}（あと ${money(paidNeed(pl.id))}）`)), i => {
+            // 建物の あとに 図鑑・設定 (町から すぐ 開ける。2026-10-22 ユーザー指定)
+            ui.ask(head.join('\n'), [...PLACES.map(pl => (isOpen(pl.id) ? pl.name : `${pl.name}（あと ${money(paidNeed(pl.id))}）`)), ...TOWN_EXTRA.map(x => x.name)], i => {
+                if (i >= PLACES.length) return TOWN_EXTRA[i - PLACES.length].fn();
                 const pl = PLACES[i];
                 if (!isOpen(pl.id)) {
                     return say(`おにおに「${pl.name}は、借金を あと ${money(paidNeed(pl.id))} 返したら 使わせてやる」`);
@@ -404,7 +456,7 @@
                     // はじめて行くときは ふるカワから ひとこと
                     const intro = !t().seen[d.id] && d.story && d.story.intro;
                     t().seen[d.id] = true;
-                    const go = floor => (intro ? g.talk(intro, () => g.startDungeon(d.id, floor)) : g.startDungeon(d.id, floor));
+                    const go = floor => (intro ? storyCut(intro, d, 'intro', () => g.startDungeon(d.id, floor)) : g.startDungeon(d.id, floor));
                     // ドタバタ大迷宮: 着いたことのある 休憩の階から 始められる
                     const floors = d.bonus ? DG.restFloors(t().bonusBest || 0) : [1];
                     if (floors.length < 2) return go(1);
@@ -660,17 +712,31 @@
                     const r = list[i];
                     const d = I.ITEMS[r.make];
                     if (!can(r)) {
-                        const have = Object.entries(r.need).map(([id, n]) => `${I.ITEMS[id].name} ${countHave(id)}/${n}`).join('・');
-                        return ask(`素材か お金が たりない。\n${d.name}：${d.note}\n持っている：${have}`, ['もどる'], smith, { list: false });
+                        const have = Object.entries(r.need).map(([id, n]) => `${I.ITEMS[id].name} ${countHave(id)}/${n}（${whereText(id)}）`).join('\n');
+                        return ask(`素材か お金が たりない。\n${d.name}：${d.note}\n持っている：\n${have}`, ['もどる'], smith, { list: false });
                     }
-                    takeItems(r.need);
-                    p().money -= r.cost;
-                    t().stats.crafted = (t().stats.crafted || 0) + 1;
-                    check();
-                    const where = giveItem({ id: r.make, n: r.n || 1 }, true);
-                    save();
-                    ask(`カン！ カン！ ……${d.name}${r.n > 1 ? ` ×${r.n}` : ''}が できた！${where === 'storage' ? '（倉庫へ）' : ''}\n${d.note}`, ['もどる'], smith, { list: false });
+                    // どこから 使うかを 見せてから 作る (2026-10-22 ユーザー指定: 倉庫の 素材も 使えるのが わかるように)
+                    const use = Object.entries(r.need).map(([id, n]) => {
+                        const fromBag = Math.min(n, countIn(p().bag, id));
+                        return `${I.ITEMS[id].name} ×${n}（${[fromBag && `持ち物から ${fromBag}`, n - fromBag && `倉庫から ${n - fromBag}`].filter(Boolean).join('・')}）`;
+                    }).join('\n');
+                    ask(`${d.name}${r.n > 1 ? ` ×${r.n}` : ''}を 作る？\n${d.note}\n使う素材：\n${use}${r.cost ? `\nお金：${money(r.cost)}（持っている ${money(p().money)}）` : ''}`, ['作る', 'やめる'], j => {
+                        if (j !== 0) return smith();
+                        craft(r);
+                    }, { list: false });
                 });
+        }
+        const countIn = (list, id) => list.filter(it => it.id === id && !it.eq).reduce((n, it) => n + (it.n || 1), 0);
+        const whereText = id => `持ち物 ${countIn(p().bag, id)}・倉庫 ${countIn(t().storage, id)}`;
+        function craft(r) {
+            const d = I.ITEMS[r.make];
+            takeItems(r.need);
+            p().money -= r.cost;
+            t().stats.crafted = (t().stats.crafted || 0) + 1;
+            check();
+            const where = giveItem({ id: r.make, n: r.n || 1 }, true);
+            save();
+            ask(`カン！ カン！ ……${d.name}${r.n > 1 ? ` ×${r.n}` : ''}が できた！${where === 'storage' ? '（倉庫へ）' : ''}\n${d.note}`, ['もどる'], smith, { list: false });
         }
 
         // ----- 交易所 (2026-10-22 追加: 珍しい道具・ほかのプレイヤーの出品) -----
@@ -1007,7 +1073,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
 
         // ----- 家 (仕様書 13章: セーブ・1 日がすすむ) -----
         function home() {
-            ask('家', ['セーブする', '1 日すすめる（クエスト・お店・交易所が入れかわる）', '図鑑', '実績', '音 オン・オフ', 'タイトルへ', 'やめる'], i => {
+            ask('家', ['セーブする', '1 日すすめる（クエスト・お店・交易所が入れかわる）', '図鑑', '実績', '音の設定（音量・オン・オフ）', 'タイトルへ', 'やめる'], i => {
                 if (i === 0) return ask(save() ? 'セーブした。' : 'セーブできなかった。（ブラウザの設定で 保存が止められているかも）', ['もどる'], menu, { list: false });
                 if (i === 1) {
                     t().day++;
@@ -1015,12 +1081,9 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                     save();
                     return menu();
                 }
-                if (i === 2) return dexMenu();
+                if (i === 2) return dexMenu(home);
                 if (i === 3) return achList();
-                if (i === 4) {
-                    const on = KD.Sound ? KD.Sound.toggle() : false;
-                    return ask(`音を ${on ? 'オン' : 'オフ'} にした。（ダンジョンでは S キー・「音」ボタン）`, ['もどる'], home, { list: false });
-                }
+                if (i === 4) return soundSettings(home);
                 if (i === 5) {
                     save();
                     return title();
@@ -1029,8 +1092,33 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             });
         }
 
-        // ----- 図鑑 (敵・道具) -----
-        function dexMenu() {
+        // ----- 音の設定 (2026-10-22 ユーザー指定: BGM が 小さい → 音量を 変えられるように) -----
+        // タイトル・町・家から 開く。音量は sound.js が localStorage に 取っておく (セーブとは べつ。どの バージョンでも 同じ)
+        function soundSettings(back, index = 0) {
+            const S = KD.Sound;
+            const v = S.volume(), max = S.VOL_MAX;
+            const bar = n => `${'■'.repeat(n)}${'□'.repeat(max - n)} ${n}`;
+            const rows = [
+                ['BGM を 大きく', () => S.setVolume('bgm', v.bgm + 1)],
+                ['BGM を 小さく', () => S.setVolume('bgm', v.bgm - 1)],
+                ['効果音を 大きく', () => { S.setVolume('se', v.se + 1); S.play('pickup'); }],
+                ['効果音を 小さく', () => { S.setVolume('se', v.se - 1); S.play('pickup'); }],
+                [`音を ${S.isOn() ? 'オフ' : 'オン'}にする`, () => S.toggle()],
+                ['もどる', null]
+            ];
+            ask(`音の設定\nBGM　　${bar(v.bgm)}\n効果音　${bar(v.se)}\n音　　　${S.isOn() ? 'オン' : 'オフ'}（ダンジョンでは S キー・「音」ボタンで オン・オフ）`,
+                rows.map(r => r[0]), i => {
+                    if (!rows[i][1]) return back();
+                    rows[i][1]();
+                    soundSettings(back, i);
+                }, { list: false, index });
+        }
+        const TOWN_EXTRA = [{ name: '図鑑', fn: () => dexMenu(menu) }, { name: '設定', fn: () => soundSettings(menu) }];
+
+        // ----- 図鑑 (敵・道具)。back: もどる先 (家 か 町) -----
+        let dexBack = home;
+        function dexMenu(back = dexBack) {
+            dexBack = back;
             const order = C.dexOrder(t().version);
             const nSeen = order.filter(k => t().dex.seen[k]).length, nBeat = order.filter(k => t().dex.beat[k]).length;
             const items = Object.keys(I.ITEMS);
@@ -1039,7 +1127,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             ask(`図鑑　敵：見た ${nSeen}・たおした ${nBeat} / ${order.length}${nTraded ? `（交換 ${nTraded}）` : ''}　道具：${nItems} / ${items.length}`, ['敵の図鑑', '道具の図鑑', 'もどる'], i => {
                 if (i === 0) return enemyDex();
                 if (i === 1) return itemDex();
-                home();
+                dexBack();
             }, { list: false });
         }
 
@@ -1307,6 +1395,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                     ctx.fill();
                 }
             };
+            if (scene && scene.story) return drawStory(ctx, now, W, H, scene, { t, bob, sky, rect, label, rays, fireworks });
             if (scene === 'asoDown' || scene === 'shinDown') {
                 // 魔王が くずれる (白く光って ゆれる・ひびが入る)
                 sky('#3a0a0a', '#120202');
@@ -1563,6 +1652,291 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             }
         }
 
+        // ----- ストーリーデモの 場面 (storyScenes) -----
+        // キャラの絵: やすさんたち・ボスは 大きい絵、ほかは ドット絵を 大きくする。(x, groundY) は 足元の まんなか。
+        // dark: 影だけ (名前を 明かす前)
+        function portrait(ctx, id, frame, x, groundY, h, { flip = false, alpha = 1, dark = false } = {}) {
+            if (!id) return;
+            const before = ctx.globalAlpha;
+            if (dark && 'filter' in ctx) ctx.filter = 'brightness(0)';
+            if (id === 'furukawa') {
+                const s = Math.max(1, Math.round(h / 22));
+                ctx.globalAlpha = before * alpha;
+                drawFurukawa(ctx, x - 6 * s, groundY - 22 * s - frame * s, s, 0);
+            } else if (KD.BigArt.has(id)) KD.BigArt.drawBig(ctx, id, frame, x, groundY, { height: h, flip, alpha });
+            else if (A.SPRITES[id]) {
+                const rows = A.SPRITES[id].frames[0];
+                const s = Math.max(1, Math.round(h / rows.length));
+                ctx.globalAlpha = before * alpha;
+                A.drawSprite(ctx, id, frame, Math.round(x - rows[0].length * s / 2), Math.round(groundY - rows.length * s), { scale: s, flip });
+            }
+            ctx.globalAlpha = before;
+            if (dark && 'filter' in ctx) ctx.filter = 'none';
+        }
+
+        // ダンジョンの 景色 (テーマごと)。地面は y = 186 から
+        const GROUND = 186;
+        function drawBackdrop(ctx, now, W, H, theme, h) {
+            const { t, sky, rect } = h;
+            const th = A.THEMES[theme] || A.THEMES.forest;
+            const tri = (x, y, w, hh, c) => {
+                ctx.fillStyle = c;
+                ctx.beginPath();
+                ctx.moveTo(x, y + hh);
+                ctx.lineTo(x + w / 2, y);
+                ctx.lineTo(x + w, y + hh);
+                ctx.fill();
+            };
+            const stars = (n, c = '#ffffff') => { for (let i = 0; i < n; i++) rect(hash(i) * W, hash(i + 99) * 120, 1, 1, Math.floor(now / 500 + i) % 5 ? c : '#a0a8ff'); };
+            const ground = (c, line) => {
+                rect(0, GROUND, W, H - GROUND, c);
+                rect(0, GROUND, W, 3, line || th.wall || '#000000');
+            };
+            if (theme === 'forest' || theme === 'kingdom') {
+                sky('#7ac8f0', '#d8f0ff');
+                for (let i = 0; i < 9; i++) {
+                    const x = i * 46 - 10 + hash(i) * 10, hh = 70 + hash(i + 3) * 40;
+                    rect(x + 18, GROUND - 24, 8, 24, '#6a4a2a');
+                    tri(x, GROUND - hh, 44, hh - 16, i % 2 ? '#2f6a2f' : '#3f8a3a');
+                }
+                if (theme === 'kingdom') {
+                    // ハリーの 王国の お城 (トゲトゲ)
+                    rect(W / 2 - 60, 70, 120, GROUND - 70, '#8a8070');
+                    for (let i = 0; i < 5; i++) tri(W / 2 - 64 + i * 26, 40, 24, 32, '#5a5040');
+                    rect(W / 2 - 14, GROUND - 40, 28, 40, '#3a2a1a');
+                }
+                ground(th.floor[0]);
+            } else if (theme === 'coast') {
+                sky('#5ab0e8', '#c8ecff');
+                rect(0, 120, W, GROUND - 120, '#2a7ac0');
+                for (let i = 0; i < 12; i++) rect(((i * 40 + t * 20) % (W + 40)) - 20, 130 + (i % 3) * 16, 18, 2, '#bfe8ff');
+                tri(250, 60, 160, GROUND - 60, '#7a6a5a');
+                ctx.fillStyle = '#1a1410';
+                ctx.beginPath();
+                ctx.ellipse(330, GROUND, 26, 36, 0, Math.PI, 0);
+                ctx.fill();
+                ground(th.floor[0], '#b8a870');
+            } else if (theme === 'temple' || theme === 'code') {
+                if (theme === 'code') {
+                    sky('#020a06', '#0a2014');
+                    ctx.font = `10px monospace`;
+                    for (let c = 0; c < 26; c++) {
+                        for (let r = 0; r < 6; r++) {
+                            const y = ((t * 40 * (1 + hash(c) ) + r * 34 + hash(c + 5) * 200) % 220);
+                            ctx.fillStyle = r === 5 ? '#c8ffd8' : 'rgba(58,255,138,.55)';
+                            ctx.fillText(hash(c * 7 + r + Math.floor(t * 4)) > 0.5 ? '1' : '0', c * 15 + 4, y);
+                        }
+                    }
+                    rect(W / 2 - 40, 30, 80, GROUND - 30, '#10241a');
+                    for (let y = 40; y < GROUND - 10; y += 14) rect(W / 2 - 30, y, 60, 4, hash(y) > 0.4 ? '#3aff8a' : '#ff4a6a');
+                } else {
+                    sky('#f0a060', '#ffe0b0');
+                    // お寺 (屋根を 3 段)
+                    [[0, 70], [16, 110], [30, 140]].forEach(([k, y]) => {
+                        rect(W / 2 - 50 + k, y, 100 - k * 2, 30, '#6a3a2a');
+                        tri(W / 2 - 70 + k, y - 18, 140 - k * 2, 22, '#3a2a2a');
+                    });
+                    rect(W / 2 - 12, GROUND - 30, 24, 30, '#2a1a10');
+                    // ネットの 線
+                    ctx.strokeStyle = 'rgba(80,160,255,.6)';
+                    ctx.beginPath();
+                    ctx.moveTo(0, 60);
+                    ctx.quadraticCurveTo(W / 2, 20 + Math.sin(t) * 6, W, 60);
+                    ctx.stroke();
+                }
+                ground(th.floor[0]);
+            } else if (theme === 'mansion' || theme === 'alley' || theme === 'onijo') {
+                const night = theme !== 'onijo';
+                sky(night ? '#0a0f2a' : '#3a0a0a', night ? '#2a2a50' : '#7a2a10');
+                if (night) stars(30);
+                const roof = theme === 'onijo' ? '#d8a830' : theme === 'alley' ? '#4a3a3a' : '#2a2a3a';
+                const wall = theme === 'onijo' ? '#f0d060' : theme === 'alley' ? '#5a4a4a' : '#e8dcc4';
+                const houses = theme === 'onijo' ? [[W / 2 - 70, 60, 140]] : [[20, 110, 100], [140, 96, 110], [270, 112, 100]];
+                houses.forEach(([x, y, w]) => {
+                    rect(x + 8, y + 16, w - 16, GROUND - y - 16, wall);
+                    tri(x - 6, y - 10, w + 12, 30, roof);
+                    if (theme === 'onijo') { tri(x + 20, y - 50, w - 40, 44, roof); rect(x + w / 2 - 8, y - 56, 16, 10, '#ffe680'); }
+                });
+                if (theme === 'alley') {
+                    // ちょうちん
+                    for (let i = 0; i < 8; i++) {
+                        const x = 24 + i * 48, y = 96 + Math.sin(t * 2 + i) * 2;
+                        rect(x, y, 14, 18, '#e04a3a');
+                        rect(x + 2, y + 4, 10, 10, Math.floor(now / 300 + i) % 4 ? '#ffb84a' : '#ffe680');
+                    }
+                }
+                if (theme === 'mansion') {
+                    // 手裏剣が 飛ぶ
+                    for (let i = 0; i < 3; i++) {
+                        const k = (t * 0.5 + i / 3) % 1;
+                        rect(-20 + k * (W + 40), 60 + i * 24, 6, 6, '#c8ccd8');
+                    }
+                }
+                ground(th.floor[0]);
+            } else if (theme === 'moon') {
+                sky('#0a0820', '#2a2050');
+                stars(50, '#e8e0ff');
+                ctx.fillStyle = '#fff4c0';
+                ctx.beginPath();
+                ctx.arc(300, 60, 34, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#e8d890';
+                ctx.beginPath();
+                ctx.arc(290, 52, 6, 0, Math.PI * 2);
+                ctx.arc(312, 70, 4, 0, Math.PI * 2);
+                ctx.fill();
+                for (let i = 0; i < 5; i++) rect(30 + i * 70, 120 - (i % 2) * 20, 40, GROUND - 120 + (i % 2) * 20, '#2a2448');
+                ground(th.floor[0], '#8a80c0');
+            } else if (theme === 'mountain' || theme === 'aso') {
+                const aso = theme === 'aso';
+                sky(aso ? '#1a0505' : '#f08a4a', aso ? '#4a0a0a' : '#ffd8a0');
+                if (!aso) {
+                    tri(-40, 50, 260, GROUND - 50, '#6a6a7a');
+                    tri(150, 30, 300, GROUND - 30, '#7a7a8a');
+                    tri(230, 30, 60, 30, '#ffffff');
+                } else {
+                    // 壺の 底: 赤い 光が のぼる
+                    for (let i = 0; i < 24; i++) {
+                        const y = GROUND - ((t * 30 + hash(i) * 200) % 200);
+                        rect(hash(i + 3) * W, y, 2, 2, i % 2 ? '#ff6a3a' : '#ffb84a');
+                    }
+                }
+                ground(th.floor[0]);
+                rect(0, GROUND + 18, W, 10, `rgba(255,${Math.round(90 + Math.sin(t * 3) * 30)},30,.8)`);
+            } else if (theme === 'glacier') {
+                sky('#a8d8f8', '#f0faff');
+                for (let i = 0; i < 7; i++) tri(i * 60 - 20, 70 + hash(i) * 40, 70, GROUND - 70, i % 2 ? '#c8e0f0' : '#e8f4ff');
+                for (let i = 0; i < 30; i++) rect((hash(i) * W + Math.sin(t + i) * 8) % W, (t * 25 + hash(i + 9) * 240) % 240, 2, 2, '#ffffff');
+                ground(th.floor[0], '#88a8c8');
+            } else {
+                sky(th.wall || '#1a1a2a', th.floor[0]);
+                ground(th.floor[1] || th.floor[0]);
+            }
+        }
+
+        // ストーリーデモの 1 場面
+        function drawStory(ctx, now, W, H, sc, h) {
+            const { t, bob, rect, label, rays, fireworks } = h;
+            const party = [p(), ...state.allies].map(u => u.kind);
+            const enemyName = id => (U.ENEMIES[id] || U.HEROES[id] || {}).name || (id === 'furukawa' ? 'ふるカワ' : '');
+            const bigH = id => (KD.BigArt.has(id) ? 96 : 80);
+            drawBackdrop(ctx, now, W, H, sc.theme, h);
+            // 主人公たち (左下に 小さく)
+            const drawParty = (y = GROUND + 2, jump = 0) => party.slice(0, 5).forEach((k, i) => {
+                const j = jump ? Math.abs(Math.sin(now / 180 + i)) * jump : 0;
+                portrait(ctx, k, (bob + i) % 2, 30 + i * 30, y - j, 36);
+            });
+            const dim = a => { ctx.fillStyle = `rgba(0,0,0,${a})`; ctx.fillRect(0, 0, W, H); };
+            if (sc.type === 'gate') {
+                // ダンジョンの 入り口と、奥で 待っている ボスの 影
+                const k = Math.min(1, t * 1.5);
+                const cx = W / 2 + 70;
+                ctx.fillStyle = '#4a3a30';
+                ctx.beginPath();
+                ctx.ellipse(cx, GROUND, 70 * k + 8, 90 * k + 8, 0, Math.PI, 0);
+                ctx.fill();
+                ctx.fillStyle = '#0a0610';
+                ctx.beginPath();
+                ctx.ellipse(cx, GROUND, 70 * k, 90 * k, 0, Math.PI, 0);
+                ctx.fill();
+                if (k >= 1) portrait(ctx, sc.boss, bob, cx, GROUND - 4 + Math.sin(now / 300) * 2, 70, { dark: true, alpha: 0.5 + 0.3 * Math.abs(Math.sin(now / 600)) });
+                for (let i = 0; i < 6; i++) {
+                    const a = i / 6 * Math.PI * 2 + t;
+                    rect(cx + Math.cos(a) * 80, GROUND - 50 + Math.sin(a) * 40, 3, 3, '#d8a8ff');
+                }
+                portrait(ctx, sc.who || 'furukawa', bob, 150, GROUND + 2, 88);
+                drawParty(GROUND + 2);
+                label(sc.name, W / 2, 22, 16, '#ffe680');
+            } else if (sc.type === 'talk' || sc.type === 'mystery') {
+                // 話している キャラを 大きく
+                const dark = sc.type === 'mystery';
+                const x = W / 2 + 40, y = GROUND + 4 - (dark ? 0 : bob * 2);
+                if (!dark && sc.who && !party.includes(sc.who)) drawParty();
+                rect(x - 70, y - 6, 140, 6, 'rgba(0,0,0,.25)');
+                portrait(ctx, sc.who, bob, x, y, bigH(sc.who), { dark, alpha: dark ? 0.85 : 1 });
+                if (dark) {
+                    for (let i = 0; i < 3; i++) label('？', x - 60 + i * 60, 60 + Math.sin(now / 200 + i) * 6, 22, '#ffe680');
+                } else {
+                    if (party.includes(sc.who)) party.filter(k => k !== sc.who).slice(0, 4).forEach((k, i) => portrait(ctx, k, (bob + i) % 2, 30 + i * 30, GROUND + 2, 36));
+                    label(enemyName(sc.who), x, 22, 14, '#ffffff');
+                }
+            } else if (sc.type === 'bossDown') {
+                // ボスが まいった (ゆれて、頭の上を 星が まわる)
+                const x = W / 2 + 40;
+                const shake = t < 1.2 ? Math.sin(now / 30) * 4 : 0;
+                if (Math.floor(now / 140) % 6 === 0 && t < 1.5) { ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.fillRect(0, 0, W, H); }
+                portrait(ctx, sc.who, 0, x + shake, GROUND + 4, bigH(sc.who), { alpha: 0.75 + 0.25 * Math.abs(Math.sin(now / 120)) });
+                for (let i = 0; i < 5; i++) {
+                    const a = i / 5 * Math.PI * 2 + t * 3;
+                    label('★', x + Math.cos(a) * 36, GROUND - bigH(sc.who) - 6 + Math.sin(a) * 8, 12, '#ffe680');
+                }
+                drawParty(GROUND + 2, 6);
+                label(`${enemyName(sc.who)}を たおした！`, W / 2, 22, 16, '#ffe680');
+            } else if (sc.type === 'join') {
+                // 仲間になった (光の中で とびはねる)
+                dim(0.35);
+                rays(W / 2, 120, 'rgba(255,230,128,.18)', 16);
+                const jump = Math.abs(Math.sin(now / 200)) * 14;
+                portrait(ctx, sc.who, bob, W / 2, GROUND - jump, bigH(sc.who));
+                for (let i = 0; i < 14; i++) {
+                    const k = (t * 0.7 + hash(i)) % 1;
+                    rect(W / 2 + (hash(i + 4) - 0.5) * 200, GROUND - k * 160, 3, 3, ['#ffe680', '#ffffff', '#7fd3f7'][i % 3]);
+                }
+                label(`${enemyName(sc.who)}が 仲間になった！`, W / 2, 24, Math.round(16 * Math.min(1, t * 3)) || 1, '#ffe680');
+            } else if (sc.type === 'newDungeon') {
+                // 新しい ダンジョンが ぽこっと 現れる
+                dim(0.25);
+                const k = Math.min(1, Math.max(0, t * 1.4 - 0.2));
+                const sh = k < 1 && k > 0 ? Math.sin(now / 25) * 3 : 0;
+                ctx.fillStyle = '#4a3a30';
+                ctx.beginPath();
+                ctx.ellipse(W / 2 + sh, GROUND, 74 * k + 8 * Math.min(1, k * 4), 80 * k + 8 * Math.min(1, k * 4), 0, Math.PI, 0);
+                ctx.fill();
+                ctx.fillStyle = '#0a0610';
+                ctx.beginPath();
+                ctx.ellipse(W / 2 + sh, GROUND, 74 * k, 80 * k, 0, Math.PI, 0);
+                ctx.fill();
+                for (let i = 0; i < 10; i++) {
+                    const a = i / 10 * Math.PI * 2 + t * 2;
+                    rect(W / 2 + Math.cos(a) * 100 * (1.3 - k * 0.3), GROUND - 50 + Math.sin(a) * 50, 3, 3, '#ffe680');
+                }
+                if (k >= 1) portrait(ctx, sc.boss, bob, W / 2, GROUND - 2, 60, { dark: true, alpha: 0.6 });
+                drawParty();
+                label('新しいダンジョン', W / 2, 24, 12, '#ffffff');
+                label(`「${sc.name}」`, W / 2, 46, Math.round(18 * Math.min(1, t * 2)) || 1, '#ffe680');
+            } else if (sc.type === 'party') {
+                // 探検隊が 大きくなった
+                dim(0.4);
+                rays(W / 2, 110, 'rgba(143,214,247,.16)', 14);
+                party.forEach((k, i) => portrait(ctx, k, (bob + i) % 2, W / 2 + (i - (party.length - 1) / 2) * 60, GROUND - Math.abs(Math.sin(now / 200 + i)) * 8, 56));
+                label(`${sc.n} 人で 冒険！`, W / 2, 30, Math.round(22 * Math.min(1, t * 2)) || 1, '#ffe680');
+            } else if (sc.type === 'crack') {
+                // ASO の 壺が ひび割れる
+                const sh = Math.sin(now / 25) * 3;
+                rect(W / 2 - 50 + sh, 100, 100, 86, '#6a4a2a');
+                rect(W / 2 - 36 + sh, 86, 72, 16, '#7a5a3a');
+                rect(W / 2 - 44 + sh, 130, 88, 8, '#c8a060');
+                ctx.strokeStyle = '#ff4a2a';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                const k = Math.min(1, t / 1.5);
+                ctx.moveTo(W / 2 + sh, 90);
+                ctx.lineTo(W / 2 - 12 + sh, 90 + 30 * k);
+                ctx.lineTo(W / 2 + 8 + sh, 90 + 60 * k);
+                ctx.lineTo(W / 2 - 6 + sh, 90 + 90 * k);
+                ctx.stroke();
+                ctx.lineWidth = 1;
+                if (Math.floor(now / 200) % 3 === 0) { ctx.fillStyle = 'rgba(255,60,30,.2)'; ctx.fillRect(0, 0, W, H); }
+                drawParty();
+                label('ASOの壺が……！', W / 2, 30, 18, '#ff9a8a');
+            } else {
+                // 突破した (みんなで よろこぶ)
+                fireworks();
+                drawParty(GROUND + 2, 10);
+                label(`${sc.name} 突破！`, W / 2, 30, Math.round(18 * Math.min(1, t * 2)) || 1, '#ffe680');
+            }
+        }
+
         function drawTown(ctx, now, W, H) {
             const grd = ctx.createLinearGradient(0, 0, 0, H);
             grd.addColorStop(0, '#7ac8f0');
@@ -1721,7 +2095,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
         // この階で待っている ライバルのリーダー (受けている duel のクエスト)
         const duelsHere = (n, id) => TW.duelsAt(t().quests, id, n);
 
-        return { title, enter, menu, draw, onKill, onFloor, onClear, duelsHere, bonusRest, save, load, newTown, giveItem, countHave, questDone, seen, beat, noteItem, stat, check, repay };
+        return { title, enter, menu, draw, storyScenes, onKill, onFloor, onClear, duelsHere, bonusRest, save, load, newTown, giveItem, countHave, questDone, seen, beat, noteItem, stat, check, repay };
     }
 
     KD.createTown = createTown;

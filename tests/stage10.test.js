@@ -46,7 +46,8 @@ function setup(opts = {}) {
     return { game, s, run, asks, choose };
 }
 // 話を つぎへ つぎへ と進める (ほかの画面が出たら止まる)
-const skipTalk = (asks, choose) => { while (asks[0] && asks[0].options.length === 1 && asks[0].options[0] === 'つぎへ') choose('つぎへ'); };
+//   (ストーリーデモは「つぎへ・スキップ」)
+const skipTalk = (asks, choose) => { while (asks[0] && asks[0].options[0] === 'つぎへ' && asks[0].options.length <= 2) choose('つぎへ'); };
 const DG10 = globalThis.KD.Dungeons;
 const NAMED = ['ジャーバン', 'C', 'Cプラス', 'Cシャープン', 'トリプルC', 'パイソン', 'PHPPP', 'HTMLモックン', 'CSSパックン', 'ダーツ・ノリノリコ', '蜜シロー', 'ウメハヤシ', 'ヨシブック', 'イコラブー',
     'ツモニャン', 'ロンニャン', 'キングハリー', 'メタルキングハリー', 'シーシャ・ナイテイ・ナイナイ', 'シーシャ・ナイテイ・アルアル', 'ナイテイ・ナナッシャ・ナディ'];

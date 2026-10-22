@@ -46,7 +46,8 @@ function setup(opts = {}) {
     return { game, s, run, asks, choose };
 }
 // 話を つぎへ つぎへ と進める (ほかの画面が出たら止まる)
-const skipTalk = (asks, choose) => { while (asks[0] && asks[0].options.length === 1 && asks[0].options[0] === 'つぎへ') choose('つぎへ'); };
+//   (ストーリーデモは「つぎへ・スキップ」)
+const skipTalk = (asks, choose) => { while (asks[0] && asks[0].options[0] === 'つぎへ' && asks[0].options.length <= 2) choose('つぎへ'); };
 
 test('敵 053〜092 は 40 体。絵と 仲間のデータがあり、属性は 敵キャラ表どおり', () => {
     const list = Object.entries(U.ENEMIES).filter(([, e]) => Number(e.no) >= 53 && Number(e.no) <= 92);

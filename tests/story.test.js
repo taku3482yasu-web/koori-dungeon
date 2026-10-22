@@ -143,8 +143,9 @@ test('ボスをたおして突破すると ストーリーが進む: 仲間が�
     game.confirm();
     choose('はい');
     run(1300);
-    assert.equal(s.phase, 'town');
-    // ストーリー: やすさんが仲間に
+    // ストーリー: やすさんが仲間に (絵つきの ストーリーデモ。2026-10-22)
+    assert.equal(s.phase, 'title');
+    assert.deepEqual(asks[0].options, ['つぎへ', 'スキップ']);
     assert.match(asks[0].message, /突破/);
     choose('つぎへ');
     assert.match(asks[0].message, /ハリー/);

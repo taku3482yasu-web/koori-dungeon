@@ -141,6 +141,9 @@ test('鍛冶屋: 素材とお金で 武器を作る。持ち物と倉庫の両�
     choose('鍛冶屋');
     assert.ok(asks[0].options.some(o => o.startsWith('○ ハリの剣')));
     choose('ハリの剣');
+    // 作る前に どこから 使うかを 見せる (2026-10-22)
+    assert.match(asks[0].message, /持ち物から 3・倉庫から 2/);
+    choose('作る');
     assert.match(asks[0].message, /できた/);
     assert.ok(p.bag.some(i => i.id === 'needle_sword'));
     assert.ok(!p.bag.some(i => i.id === 'soft_needle'));

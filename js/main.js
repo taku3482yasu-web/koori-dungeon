@@ -82,8 +82,10 @@
             // place: 'bottom' で画面の下に出す (主人公をえらぶとき、絵を見せるため)。onMove: えらんでいるものが変わった
             // list: 選ぶものを縦にならべる (わざを忘れるとき)
             // input: { placeholder, maxLength } で 文字を 入れる 欄を 出す。done(i, 入れた文字)
-            ask(message, options, done, { place = 'center', onMove = null, list = false, input: field = null } = {}) {
-                current = { options, index: 0, done, onMove };
+            // index: はじめに えらんでおく もの
+            ask(message, options, done, { place = 'center', onMove = null, list = false, input: field = null, index = 0 } = {}) {
+                const start = Math.max(0, Math.min(options.length - 1, index));   // 音の設定で 押したところに 残す
+                current = { options, index: start, done, onMove };
                 text.textContent = message;
                 input.hidden = !field;
                 if (field) {
@@ -95,7 +97,7 @@
                 box.className = `ask ${place}${list ? ' list' : ''}${long ? ' long' : ''}`;
                 box.hidden = false;
                 choices.scrollTop = 0;
-                moveTo(0);
+                moveTo(start);
             },
             asking: () => Boolean(current),
             key(k) {
