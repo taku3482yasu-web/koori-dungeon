@@ -62,7 +62,8 @@
     });
 
     // ----- 敵 053〜092 (Lv1 の能力。enemies.js と同じ割合で 小さくする) -----
-    const SCALE = { hp: 0.65, atk: 0.5, def: 0.55, exp: 0.75 };
+    // 2026-10-22 バランス調整: 深い階では Lv が高いので、もとの能力を enemies.js より 15% ほど小さくする (tools/balance.mjs で測った)
+    const SCALE = { hp: 0.55, atk: 0.42, def: 0.47, exp: 0.75 };
     const BOSS_SCALE = { hp: 0.7, atk: 0.65, def: 0.7, exp: 1 };
     const e = (no, name, element, ai, hp, atk, def, exp, role, line, more = {}) => {
         const k = more.boss ? BOSS_SCALE : SCALE;
@@ -238,7 +239,7 @@
     }));
     const REST_EVERY = 10, RIVAL_FLOOR = 50;
     const BONUS = {
-        id: 'bonus', name: 'ドタバタ大迷宮', floors: 99, lv: 30, lvStep: 0.66, theme: 'forest', boss: 'maoushin', bonus: true,
+        id: 'bonus', name: 'ドタバタ大迷宮', floors: 99, lv: 30, lvStep: 0.55, theme: 'forest', boss: 'maoushin', bonus: true,
         enemies: NEW, rare: ['makibikon', 'nakata', 'goldDog'], rareRate: 0.08, traps: [3, 5], money: 4,
         restEvery: REST_EVERY, rivalFloor: RIVAL_FLOOR, rivalTeams: ['チームバータス', 'チーム・ケモノミチ'],
         story: {

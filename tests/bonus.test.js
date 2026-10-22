@@ -63,7 +63,7 @@ test('敵 053〜092 は 40 体。絵と 仲間のデータがあり、属性は 
     assert.ok(U.ENEMIES.maoushin.boss && B.has('maoushin'));
 });
 
-test('ドタバタ大迷宮: 99 階。10 階ごとに 見た目と特徴が変わり、10・20・…・90 階が 休憩の階。敵の Lv は 30 から 95 くらい', () => {
+test('ドタバタ大迷宮: 99 階。10 階ごとに 見た目と特徴が変わり、10・20・…・90 階が 休憩の階。敵の Lv は 30 から 84 くらい', () => {
     const d = DG.BONUS;
     assert.equal(d.floors, 99);
     assert.equal(DG.atFloor(1).theme, 'forest');
@@ -75,7 +75,7 @@ test('ドタバタ大迷宮: 99 階。10 階ごとに 見た目と特徴が変�
     assert.equal(DG.atFloor(71).theme, 'forest', '7 つ回ったら また森');
     for (let f = 1; f <= 99; f++) assert.equal(DG.atFloor(f).rest, f % 10 === 0 && f < 99, `B${f}F`);
     assert.ok(DG.atFloor(50).rivalFloor);
-    assert.ok(Math.abs(DG.levelFor(d, 1) - 30) <= 1 && Math.abs(DG.levelFor(d, 99) - 95) <= 2);
+    assert.ok(Math.abs(DG.levelFor(d, 1) - 30) <= 1 && Math.abs(DG.levelFor(d, 99) - 84) <= 2);   // 2026-10-22 バランス調整で 95 → 84
     // 出る敵は 新しい敵が中心
     const table = DG.tableFor(DG.atFloor(60), 60);
     assert.ok(table.filter(k => Number(U.ENEMIES[k].no) >= 53).length >= 4);

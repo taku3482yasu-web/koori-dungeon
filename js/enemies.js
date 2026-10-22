@@ -60,7 +60,7 @@
         kori_punch: f('ひえひえパンチ', 'こおり', 'front', 1.3, { status: 'freeze', chance: 0.2 }),
         // ASOの壺の底
         fusaiyou: f('不採用通知', 'ふしぎ', 'line', 0.7, { status: 'weak', chance: 0.6 }),
-        mizu_breath: f('水のブレス', 'みず', 'line', 1.4),
+        mizu_breath: f('水のブレス', 'みず', 'line', 1.2),   // 2026-10-22 バランス調整 (1.4→1.2)
         beam: f('ビーム', 'ふつう', 'line', 1.2),
         // どこにでも
         kin: f('ばい菌', 'ふしぎ', 'front', 0.5, { status: 'colitis', chance: 0.6 }),
@@ -77,7 +77,7 @@
         katana: f('刀の一振り', 'ふつう', 'around', 1.6),
         kabuto_wari: f('兜割り', 'ふつう', 'front', 2.2),
         funka: f('噴火', 'ほのお', 'around', 1.4, { status: 'burn', chance: 0.4 }),
-        lava_beam: f('溶岩ビーム', 'ほのお', 'line', 1.8)
+        lava_beam: f('溶岩ビーム', 'ほのお', 'line', 1.5)   // 2026-10-22 バランス調整 (1.8→1.5。こおりくんが一撃で たおれないように)
     });
 
     // ----- ストーリーの仲間 (仕様書 6.3・8章。主人公にはえらべない) -----
@@ -153,7 +153,7 @@
         mirrormuscle: e('038', 'ミラーマッスル', 'ふしぎ', 'wait', 24, 12, 14, 27, 'defender', 'キレてるよ！', { traits: ['reflect'] }),
         yoroinukegara: e('039', 'ヨロイヌケガラ', 'ふつう', 'approach', 24, 13, 20, 28, 'defender', 'ガシャン、ガシャン'),
         asedakku: e('040', 'アセダック', 'みず', 'shoot', 22, 12, 10, 25, 'supporter', 'あせあせ！', { traits: ['swim'], moves: [['ase', 1]] }),
-        magmatcho: e('041', 'マグマッチョ', 'ほのお', 'approach', 28, 15, 12, 30, 'attacker', 'アツい筋肉！', { traits: ['lava'], moves: [['magma', 0.35]] }),
+        magmatcho: e('041', 'マグマッチョ', 'ほのお', 'approach', 28, 13, 12, 30, 'attacker', 'アツい筋肉！', { traits: ['lava'], moves: [['magma', 0.2]] }),   // 2026-10-22 バランス調整 (こうげき 15→13・マグマパンチ 35%→20%)
         yukidarumuscle: e('042', 'ユキダルマッスル', 'こおり', 'approach', 28, 14, 13, 30, 'attacker', '冷えた筋肉も最高だ', { moves: [['kori_punch', 0.3]] }),
         // 7. ASOの壺の底
         tsubomajin: e('043', 'ツボマジン', 'ふしぎ', 'wait', 28, 13, 14, 32, 'supporter', '出でよ！', { traits: ['summon'] }),
@@ -161,7 +161,7 @@
         takaramimic: e('045', 'タカラミミック', 'ふつう', 'wait', 34, 17, 16, 42, 'defender', 'あけたな？', { traits: ['mimic'] }),
         shakkinbourei: e('046', 'シャッキンボウレイ', 'ふしぎ', 'approach', 26, 13, 12, 32, 'supporter', '…かえせ…かえせ…', { traits: ['ghost', 'stealMoney'] }),
         fusaiyougaikotsu: e('047', 'フサイヨウガイコツ', 'ふしぎ', 'shoot', 26, 14, 12, 33, 'jammer', '今回はご縁がなかったということで', { moves: [['fusaiyou', 1]] }),
-        nakatadraco: e('048', 'ナカタドラコ', 'みず', 'shoot', 32, 16, 14, 40, 'attacker', 'ガオー（加減中）', { traits: ['swim'], moves: [['mizu_breath', 1]] }),
+        nakatadraco: e('048', 'ナカタドラコ', 'みず', 'shoot', 32, 14, 14, 40, 'attacker', 'ガオー（加減中）', { traits: ['swim'], moves: [['mizu_breath', 1]] }),
         makibikonmk3: e('049', 'マキビコンMk-3', 'ふつう', 'shoot', 30, 15, 15, 36, 'attacker', '計算中であります…エラーであります', { traits: ['malfunction'], moves: [['beam', 1]] }),
         koorimodoki: e('050', 'コオリモドキ', 'こおり', 'approach', 32, 16, 14, 42, 'attacker', 'ぼくがほんもののこおりくんだよ', { moves: [['koori_sword', 0.3], ['koori_hammer', 0.2]] }),
         // 8. どこにでも出る (まれ)
@@ -169,17 +169,17 @@
         kinmenkoinu: e('052', 'キンメンコイヌ', 'ふつう', 'flee', 14, 8, 8, 25, 'supporter', 'ワン！（得意げ）', { traits: ['rich'] }),
         // 強敵 (前作から。大きい絵)
         goldDog: e('', 'ゴールド金面犬', 'ふつう', 'flee', 40, 14, 18, 120, 'supporter', 'ワオーン！', { big: true, traits: ['rich'] }),
-        makibikon: e('', 'マキビコンMk-4', 'ふつう', 'shoot', 50, 17, 18, 90, 'attacker', '目標を補足したであります', { big: true, moves: [['beam', 1]] }),
+        makibikon: e('', 'マキビコンMk-4', 'ふつう', 'shoot', 50, 15, 18, 90, 'attacker', '目標を補足したであります', { big: true, moves: [['beam', 1]] }),
         nakata: e('', '奈架多ドラゴン', 'みず', 'approach', 56, 18, 15, 100, 'attacker', 'ガオオオー！', { big: true, traits: ['swim'], moves: [['mizu_breath', 0.4]] }),
 
         // ----- ボス (仕様書 12章。いちばん下の階。大きい絵) -----
         harry: e('', 'ハリー', 'ふつう', 'approach', 50, 11, 8, 80, 'attacker', 'ここはオレの森だハリ！', { boss: true, big: true, traits: ['summon'], summon: 'haribaby', moves: [['hari_needle', 0.4]] }),
         urashima: e('', '浦の島重蔵', 'みず', 'approach', 62, 12, 12, 120, 'defender', 'わしの家に 何の用じゃ…はて、何だったかのう', { boss: true, big: true, traits: ['swim', 'shell'], moves: [['tamatebako', 0.3], ['koura', 0.15]] }),
         daishi: e('', 'ダイシ', 'ふしぎ', 'approach', 72, 13, 11, 170, 'jammer', '迷える子羊よ、説法を聞いていきなさい', { boss: true, big: true, traits: ['berserk'], moves: [['seppou', 0.3], ['shakujou', 0.3]] }),
-        zumitani: e('', 'ズミタニ', 'かぜ', 'approach', 70, 14, 10, 220, 'attacker', '78代目の名にかけて！', { boss: true, big: true, speed: 2, moves: [['kunai_rain', 0.4], ['shinobi_kiri', 0.3]] }),
+        zumitani: e('', 'ズミタニ', 'かぜ', 'approach', 70, 12, 10, 220, 'attacker', '78代目の名にかけて！', { boss: true, big: true, speed: 2, moves: [['kunai_rain', 0.4], ['shinobi_kiri', 0.3]] }),
         runaya: e('', 'ルナヤ', 'ふしぎ', 'approach', 80, 14, 11, 280, 'jammer', '月の迷宮へようこそ。言ったっけ？', { boss: true, big: true, traits: ['warp'], moves: [['moon_beam', 0.4], ['moon_spell', 0.3]] }),
         nozoema: e('', 'ノゾエマ', 'ふつう', 'approach', 95, 16, 14, 350, 'defender', '筋肉と刀は うそをつかぬ', { boss: true, big: true, moves: [['katana', 0.4], ['kabuto_wari', 0.3]] }),
-        maou: e('', '大魔王ASO', 'ふしぎ', 'approach', 130, 17, 14, 600, 'attacker', 'よみがえったぞ……今度こそ すべてを 無に返してやる！', { boss: true, big: true, traits: ['summon', 'berserk'], summon: 'asohei', moves: [['funka', 0.3], ['lava_beam', 0.3]] })
+        maou: e('', '大魔王ASO', 'ふしぎ', 'approach', 130, 15, 14, 600, 'attacker', 'よみがえったぞ……今度こそ すべてを 無に返してやる！', { boss: true, big: true, traits: ['summon', 'berserk'], summon: 'asohei', moves: [['funka', 0.3], ['lava_beam', 0.3]] })
     });
     // 森の敵の わざ・とくちょう を同じ形に (move / rate → moves)
     Object.values(U.ENEMIES).forEach(d => {

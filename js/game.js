@@ -1103,7 +1103,8 @@
                     const n = Math.max(1, Math.floor(u.stats.hp / (u.status.id === 'poison' ? 16 : 20)));
                     if (seen(u)) say(`${u.name}は ${u.status.id === 'poison' ? 'どく' : 'やけど'}で ${n} のダメージ！`);
                     hurt(u, n, null);
-                    if (u.hp <= 0) continue;
+                    // たおれた・ふっかつのたねで 復活した (状態異常も 治っている) ときは ここまで
+                    if (u.hp <= 0 || !u.status) continue;
                 }
                 if (--u.status.turns <= 0) {
                     if (seen(u)) say(`${u.name}の ${U.STATUS[u.status.id].name}が 治った。`);
@@ -2489,7 +2490,7 @@
             });
         } else town.title();
         return {
-            state, town, draw, moveInput, wait, confirm, attack: attackFront, useSkill, itemMenu, tacticMenu, busy, makeEnemy, makeAlly, evolve, spawnBoss,
+            state, town, draw, moveInput, wait, confirm, attack: attackFront, useSkill, itemMenu, tacticMenu, busy, makeEnemy, makeAlly, evolve, startDungeon, spawnBoss,
             skills: () => (state.player && state.phase === 'play' ? state.player.skills.map(skillLabel) : []),
             toggleMinimap() { state.mini = !state.mini; },
             toggleSound() {

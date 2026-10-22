@@ -90,9 +90,9 @@
             }
         },
         {
-            id: 'mountain', name: '筋肉の山', floors: 18, lv: 21, lvStep: 0.3, theme: 'mountain', boss: 'nozoema',
+            id: 'mountain', name: '筋肉の山', floors: 18, lv: 20, lvStep: 0.2, theme: 'mountain', boss: 'nozoema',
             enemies: ['asedakku', 'yoroinukegara', 'dumbbellkong', 'mirrormuscle', 'magmatcho', 'yukidarumuscle', 'proteingolem'],
-            pool: { tile: D.LAVA, chance: 0.5 }, traps: [3, 5], strong: 1.1, money: 2.8,
+            pool: { tile: D.LAVA, chance: 0.5 }, traps: [3, 5], strong: 1.05, money: 2.8,
             story: {
                 intro: ['ふるカワ「ノゾエマが修行する山。敵が力持ちで、溶岩もあるよ。こおりくんは とくに気をつけて！」'],
                 boss: ['ノゾエマ「筋肉と刀は うそをつかぬ。いざ、尋常に勝負！」'],
@@ -101,7 +101,7 @@
             }
         },
         {
-            id: 'aso', name: 'ASOの壺の底', floors: 25, lv: 26, lvStep: 0.3, theme: 'aso', boss: 'maou',
+            id: 'aso', name: 'ASOの壺の底', floors: 25, lv: 25, lvStep: 0.15, theme: 'aso', boss: 'maou',
             enemies: ['asohei', 'tsubomajin', 'fusaiyougaikotsu', 'shakkinbourei', 'makibikonmk3', 'takaramimic', 'nakatadraco', 'koorimodoki'],
             pool: { tile: D.LAVA, chance: 0.4 }, traps: [4, 6], rare: ['nakata', 'makibikon'], money: 3.5,
             story: {
