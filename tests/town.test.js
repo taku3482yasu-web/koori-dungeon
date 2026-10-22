@@ -11,7 +11,7 @@ globalThis.performance = { now: () => fakeNow };
 const store = new Map();
 globalThis.localStorage = { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
 globalThis.KD = {};
-for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
+for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'enemies9.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'enemyart9.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
 const { Units: U, Items: I, Town: TW, Dungeon: D } = globalThis.KD;
 
 // タイトルから はじめて、はじまりの話を読み、町のメニューまで進める
@@ -74,8 +74,13 @@ test('借金を返し切ると エンディング。そのあとも遊べる', (
     choose('あるだけ');
     assert.equal(s.town.debt, 0);
     assert.equal(s.town.ended, true);
-    for (let i = 0; i < 4; i++) choose('つぎへ');
+    let talk = '';
+    while (!/日目/.test(asks[0].message)) { talk += asks[0].message; choose('つぎへ'); }
     assert.match(asks[0].message, /日目/, '町に戻った');
+    // おまけダンジョン「ドタバタ大迷宮」が 現れる (段階 9)
+    assert.match(talk, /ドタバタ大迷宮/);
+    choose('ダンジョンへ');
+    assert.ok(asks[0].options.some(o => o.includes('ドタバタ大迷宮（99 階）')));
 });
 
 test('バトルツリー: BP でマスを開放すると能力が上がり、役職を開放して切りかえられる。わざは その役職で覚える', () => {

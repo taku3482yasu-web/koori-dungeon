@@ -100,6 +100,7 @@
         { id: 'kills_100', name: '百戦錬磨', note: '敵を 100 体たおす', test: c => c.stats.kills >= 100 },
         { id: 'kills_500', name: '探検隊の伝説', note: '敵を 500 体たおす', test: c => c.stats.kills >= 500 },
         ...KD.Dungeons.LIST.map((d, i) => ({ id: `clear_${d.id}`, name: `${d.name} 突破`, note: `${d.name}の ボスをたおす`, test: c => (c.town.cleared || 0) > i })),
+        { id: 'dotabata', name: 'ドタバタ大道中', note: 'ドタバタ大迷宮（99 階）を 抜ける', test: c => Boolean(c.town.bonusClear) },
         { id: 'lv10', name: '一人前', note: '主人公の Lv を 10 にする', test: c => c.player.lv >= 10 },
         { id: 'lv30', name: 'ベテラン', note: '主人公の Lv を 30 にする', test: c => c.player.lv >= 30 },
         { id: 'pay_first', name: 'はじめての返済', note: '借金を 少しでも返す', test: c => c.town.paid > 0 },

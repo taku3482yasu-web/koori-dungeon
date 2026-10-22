@@ -178,12 +178,16 @@
     // リーダー (★5) はチームの いちばんはじめ以外のこともあるので、ここに書く
     const LEADERS = { '5DX': 'okagappa', 'ASK-3': 'asahara', 'お願いマッスル': 'shibata', 'チームバータス': 'yahami', 'チーム・ケモノミチ': 'ishii' };
 
-    // 'Lv:わざ ...' → [[Lv, わざ], ...]
-    Object.values(ALLIES).forEach(x => {
+    // 'Lv:わざ ...' → [[Lv, わざ], ...]。振り分けは 平均が 1 になるように
+    function prepare(x) {
         x.learn = x.learn.split(/\s+/).map(t => { const [lv, id] = t.split(':'); return [Number(lv), id]; });
         const mean = x.w.reduce((s, v) => s + v, 0) / x.w.length;
         x.mul = Object.fromEntries(['hp', 'atk', 'def', 'spa', 'spd'].map((k, i) => [k, x.w[i] / mean]));
-    });
+        return x;
+    }
+    Object.values(ALLIES).forEach(prepare);
+    // あとから足す (段階 9 の敵。enemies9.js)。list: { kind: [star, w, learn, role?] }
+    const add = list => Object.entries(list).forEach(([kind, [star, w, learn, role]]) => { ALLIES[kind] = prepare(a(star, w, learn, role)); });
 
     // ----- ★ -----
     const HERO_STARS = { koori: 5, onioni: 5, yasu: 4, tamu: 4, dake: 4 };
@@ -219,7 +223,7 @@
 
     U.enemyAllySkillsOld = U.enemyAllySkills;
     Object.assign(U, { allyStats, enemyAllySkills, learnedBetween });
-    KD.Allies = { ALLIES, GENERIC, LEADERS, HERO_STARS, STAR_K, star, roleOf, learnList, signature };
+    KD.Allies = { ALLIES, GENERIC, LEADERS, HERO_STARS, STAR_K, star, roleOf, learnList, signature, add };
 
     // ストーリーの仲間の わざを足す (役職の汎用わざ・固有わざ)
     U.HEROES.yasu.learn.push([6, 'shizuku'], [14, 'yasu_aid'], [24, 'tsubute'], [36, 'megumi']);

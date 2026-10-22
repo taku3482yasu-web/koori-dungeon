@@ -121,6 +121,7 @@
 
     // その階に出る敵。下の階ほど 強い敵がまざる (並びの前から 3〜4 体ぶんを ずらしていく)
     function tableFor(d, floor) {
+        if (d.tableAt) return d.tableAt(floor);   // ドタバタ大迷宮 (enemies9.js)
         if (d.table) return d.table[floor - 1];
         const n = d.enemies.length;
         const k = Math.round((floor - 1) / Math.max(1, d.floors - 1) * (n - 3));
@@ -139,7 +140,8 @@
         d.enemies.forEach((kind, i) => { if (!I.DROPS[kind]) I.DROPS[kind] = MATERIALS[d.id][i % 2]; });
     });
 
-    const byId = id => LIST.find(d => d.id === id);
+    // ドタバタ大迷宮 (KD.Dungeons.BONUS。enemies9.js で足す) も さがす
+    const byId = id => LIST.find(d => d.id === id) || (KD.Dungeons.BONUS && KD.Dungeons.BONUS.id === id ? KD.Dungeons.BONUS : undefined);
 
     // 一緒に行ける人数 (仕様書 8章: 3 人。ネット寺をクリアすると 4 人、月の迷宮で 5 人)
     const partyMax = cleared => 3 + (cleared >= 3 ? 1 : 0) + (cleared >= 5 ? 1 : 0);

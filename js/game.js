@@ -37,7 +37,8 @@
 
     // ダンジョン 7 つ (仕様書 12章。dungeons.js)。床の道具・ワナの種類は どこも同じ
     const DG = KD.Dungeons;
-    const DUNGEONS = DG.LIST.map(d => ({ items: I.FOREST_ITEMS, trapKinds: I.FOREST_TRAPS, ...d }));
+    // ドタバタ大迷宮 (段階 9。enemies9.js) は 階ごとに 見た目と特徴が変わる (enterFloor で DG.atFloor)
+    const DUNGEONS = [...DG.LIST, ...(DG.BONUS ? [DG.BONUS] : [])].map(d => ({ items: I.FOREST_ITEMS, trapKinds: I.FOREST_TRAPS, ...d }));
     const has = (u, trait) => Boolean(u.traits && u.traits.includes(trait));
     const C = KD.Collection;
     const sfx = name => KD.Sound && KD.Sound.play(name);
@@ -96,6 +97,9 @@
             over: false       // 主人公がたおれた
         };
         let rng = KD.createRng(state.seed);
+
+        // あとでする (いまの順番の処理が終わってから)
+        const later = fn => state.queue.push(() => { fn(); return 0; });
 
         function say(text) {
             state.messages.push({ text, at: performance.now() });
@@ -177,6 +181,7 @@
         // ----- 階 -----
         function enterFloor(n) {
             state.floor = n;
+            if ((state.dungeon.base || state.dungeon).bonus) state.dungeon = { ...DUNGEONS.find(d => d.bonus), ...DG.atFloor(n) };
             state.map = D.generate(KD.createRng(state.seed + n * 7919), { pool: state.dungeon.pool });
             rng = KD.createRng(state.seed + n * 104729);
             state.explored = new Uint8Array(state.map.w * state.map.h);
@@ -205,15 +210,18 @@
             placeThings(n);
             state.allies.forEach(a => placeNear(a, p.x, p.y));
             look();
-            if (opts.enemies !== false) {
+            if (opts.enemies !== false && state.dungeon.rivalFloor) spawnRivalTeams();
+            else if (opts.enemies !== false && !state.dungeon.rest) {
                 const startRoom = roomOf(p.x, p.y);
                 for (let i = 0; i < 3 + Math.min(4, Math.ceil(n / 2)); i++) spawnEnemy(startRoom);
                 if (last && state.dungeon.boss) spawnBoss();
                 else maybeHappen();
                 if (state.town && town.duelsHere) town.duelsHere(n, state.dungeon.id).forEach(spawnDuel);
             }
-            if (KD.Sound) KD.Sound.bgm(DUNGEON_BGM[state.dungeon.id] || 'forest');
+            if (KD.Sound) KD.Sound.bgm(DUNGEON_BGM[state.dungeon.bgm || state.dungeon.id] || 'forest');
             say(`${state.dungeon.name} B${n}F に着いた。`);
+            // ドタバタ大迷宮の 休憩の階 (50 階は ライバルを たおしてから)
+            if (state.dungeon.rest && !state.dungeon.rivalFloor) later(() => restStop(n));
             // 中断セーブ (各階に着いたとき。仕様書 16章)
             state.run = { dungeon: state.dungeon.id, floor: n, seed: state.seed };
             if (state.town) {
@@ -395,13 +403,14 @@
         }
 
         // ダンジョンへ出発する (町から)。HP・PP・満腹度は元に戻り、たおれた仲間も戻る
-        function startDungeon(id) {
+        // floor: はじめる階 (ドタバタ大迷宮の 休憩の階から)
+        function startDungeon(id, floor = 1) {
             state.dungeon = DUNGEONS.find(d => d.id === id) || DUNGEONS[0];
             refresh();
             state.seed = (Date.now() ^ (Math.random() * 1e9) ^ state.seed) >>> 0;
             if (opts.seed) state.seed = (opts.seed + (state.town ? state.town.day - 1 : 0)) >>> 0;
             state.phase = 'play';
-            changeFloor(1, `${state.dungeon.name}  B1F`);
+            changeFloor(floor, `${state.dungeon.name}  B${floor}F`);
         }
 
         // 中断セーブから、その階のはじめに戻る
@@ -492,7 +501,7 @@
                 if (x === map.stairs.x && y === map.stairs.y) continue;
                 let kind = rng.pick(DG.tableFor(d, state.floor));
                 for (const [k, chance] of DG.ANYWHERE) if (rng.chance(chance)) kind = k;
-                if (d.rare && rng.chance(0.04)) kind = rng.pick(d.rare);
+                if (d.rare && rng.chance(d.rareRate || 0.04)) kind = rng.pick(d.rare);
                 const lv = Math.max(1, DG.levelFor(d, state.floor) + rng.int(0, 1));
                 const e = makeEnemy(kind, lv, x, y);
                 state.enemies.push(e);
@@ -520,6 +529,46 @@
             if (!placeNear(e, stairs.x, stairs.y)) return;
             state.enemies.push(e);
             state.boss = e;
+        }
+
+        // ----- ドタバタ大迷宮 (段階 9) -----
+        // 休憩の階: ふるカワが待っていて、先へ進むか 町に帰るか えらぶ。いちばん深く着いた休憩の階を 町に覚えておく
+        function restStop(n) {
+            if (state.over || state.floor !== n) return;
+            if (state.town) town.bonusRest(n);
+            const lines = (state.dungeon.story.rest || {})[n] || ['ふるカワ「休憩の階だよ。ここで ひと休みしよう！」'];
+            talk(lines, () => ui.ask(`休憩の階（B${n}F）。次は ここから 始められる。どうする？`, ['先へ進む', '町に帰る'], i => {
+                if (i === 1) backToTown('rest', { floor: n });
+            }));
+        }
+        // 50 階: チームバータス・チーム・ケモノミチ と対決 (ほかの敵は出ない)
+        function spawnRivalTeams() {
+            const d = state.dungeon, lv = DG.levelFor(d, state.floor) + 2;
+            const p = state.player, startRoom = roomOf(p.x, p.y);
+            const rooms = state.map.rooms.map((r, i) => i).filter(i => i !== startRoom);
+            const room = state.map.rooms[rng.pick(rooms.length ? rooms : [startRoom])];
+            d.rivalTeams.forEach(team => C.RIVALS[team].forEach(kind => {
+                const e = makeEnemy(kind, lv, room.x + (room.w >> 1), room.y + (room.h >> 1));
+                if (!placeNear(e, e.x, e.y)) return;
+                e.team = team;
+                e.stats.hp *= 2;
+                e.hp = e.stats.hp;
+                state.enemies.push(e);
+            }));
+            say('この階に ライバル探検隊の 2 チームが 待ちかまえている……！');
+            later(() => talk(d.story.rivals));
+        }
+        // 大魔王ASO・真: HP が減るたびに 四天王を 1 人ずつ呼ぶ
+        const SHITENNO = ['daishi', 'zumitani', 'runaya', 'nozoema'];
+        function shinSummon(e) {
+            e.called = e.called || 0;
+            while (e.called < SHITENNO.length && e.hp > 0 && e.hp < e.stats.hp * (1 - 0.2 * (e.called + 1))) {
+                const c = addNear(SHITENNO[e.called], Math.max(1, e.lv - 4), e.x, e.y);
+                e.called++;
+                if (!c) continue;
+                say(`${e.name}「出でよ、四天王！」 ${c.name}が よみがえった！`);
+                state.rings.push({ x: c.x, y: c.y, at: performance.now(), color: '#d8a8ff' });
+            }
         }
 
         // ライバルのリーダーとの勝負 (クリア後のクエスト)。主人公のいない部屋で待っている。ボスほどではないが 強い
@@ -1247,8 +1296,9 @@
             if (has(e, 'berserk') && !e.berserk && e.hp < e.stats.hp / 2) {
                 e.berserk = true;
                 e.stats.atk = Math.round(e.stats.atk * 1.5);
-                say(e.kind === 'maou' ? `${e.name}は 本気を 出した！` : `${e.name}は 鬼の顔に なった！ こうげきが 上がった！`);
+                say(e.kind === 'maou' || e.kind === 'maoushin' ? `${e.name}は 本気を 出した！` : `${e.name}は 鬼の顔に なった！ こうげきが 上がった！`);
             }
+            if (e.kind === 'maoushin') shinSummon(e);
             if (has(e, 'split') && rng.chance(0.35) && addNear(e.kind, e.lv, e.x, e.y)) say(`${e.name}が 分裂した！`);
             if (has(e, 'explode') && e.hp < e.stats.hp * 0.3) state.queue.push(() => explode(e));
             if (has(e, 'warp') && rng.chance(0.3)) {
@@ -1269,7 +1319,7 @@
             if (e.money) dropItem(e.x, e.y, { id: 'money', n: e.money });
             // キンメンコイヌ・ゴールド金面犬: たくさんのお金 / タカラミミック: 良い道具
             if (has(e, 'rich') && dropItem(e.x, e.y, { id: 'money', n: Math.round(60 * e.lv * (e.big ? 6 : 1)) })) say(`${e.name}は お金を たくさん 落とした！`);
-            if (has(e, 'mimic')) {
+            if (has(e, 'mimic') || has(e, 'treasure')) {
                 const good = rng.pick(['gold_band', 'revive_seed', 'omamori', 'moon_drop', 'lucky_coin']);
                 if (dropItem(e.x, e.y, { id: good, n: 1 })) say(`${e.name}は ${I.ITEMS[good].name}を 落とした！`);
             }
@@ -1282,6 +1332,11 @@
             if (e.team && !state.enemies.some(o => o.team === e.team)) {
                 say(`${e.team}「覚えてろ～！」 ライバル探検隊を やっつけた！`);
                 if (state.town) town.stat('rivals');
+            }
+            // ドタバタ大迷宮の 50 階: 2 チームとも たおしたら 休憩の階に
+            if (e.team && state.dungeon.rivalFloor && !state.enemies.some(o => o.team)) {
+                const n = state.floor;
+                later(() => talk(state.dungeon.story.rivalsDown, () => restStop(n)));
             }
             if (from && from.side === 'party' && rng.chance(0.1)) bubble(from, C.lineFor(from.kind, 'win', rng));
             if (e.boss) {
@@ -2352,7 +2407,7 @@
 
         // 町 (townui.js) に渡す中身
         const town = KD.createTown({
-            state, opts, say, later: fn => state.queue.push(() => { fn(); return 0; }),
+            state, opts, say, later,
             selectHero, makeHero, makeAlly, recalc, learnNow, startDungeon, resume, backToTown, partyMax, talk, toast
         }, ui);
 

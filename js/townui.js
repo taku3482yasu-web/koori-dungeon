@@ -100,7 +100,7 @@
         function refreshDay() {
             const town = t();
             const kinds = [...state.allies, ...state.roster].map(a => a.kind);
-            town.board = TW.questBoard(dayRng(1), town.day, { owned: town.owned, allyKinds: [...new Set(kinds)], dungeons: openDungeons() });
+            town.board = TW.questBoard(dayRng(1), town.day, { owned: town.owned, allyKinds: [...new Set(kinds)], dungeons: openDungeons().filter(d => !d.bonus) });
             addRivalQuests();
             town.shop = TW.shopStock(dayRng(2));
             town.rare = TW.rareStock(dayRng(3));
@@ -169,9 +169,11 @@
                 lines.push(`${info.dungeon}を 突破して、町に戻った！`);
                 // はじめてボスをたおした: ストーリーが進む
                 const d = DG.byId(info.id);
+                if (info.boss && d && d.bonus) return bonusClear(d, lines);
                 if (info.boss && d && DG.LIST.indexOf(d) === (t().cleared || 0)) return storyClear(d, lines);
             }
             else if (reason === 'escape') lines.push(`${info.dungeon}から 脱出して、町に戻った。`);
+            else if (reason === 'rest') lines.push(`${info.dungeon}の 休憩の階（B${info.floor}F）から 町に戻った。次は ここから 始められる。`);
             else if (reason === 'quest') lines.push('クエストを達成して、町に戻った。ギルドで報告しよう。');
             state.run = null;
             save();
@@ -198,6 +200,15 @@
             g.talk([...lines, ...(st.clear || []), ...rivals], () => menu());
         }
 
+        // ドタバタ大迷宮を抜けた (段階 9): ほんとうの ほんとうの エンディング。何度でも 挑戦できる
+        function bonusClear(d, lines = []) {
+            const first = !t().bonusClear;
+            t().bonusClear = true;
+            state.run = null;
+            save();
+            g.talk([...lines, ...(first ? d.story.clear : ['ふるカワ「また 大魔王ASO・真を たおしたね！ すごい！」'])], () => menu());
+        }
+
         // ライバル探検隊のクエストを 掲示板の いちばん上に (ストーリーをクリアしたあと。town.js の rivalQuests)
         function addRivalQuests() {
             const town = t();
@@ -207,7 +218,8 @@
             town.board.unshift(...TW.rivalQuests({ have, accepted: town.quests.map(q => q.id) }));
         }
 
-        const openDungeons = () => DG.LIST.slice(0, Math.min(DG.LIST.length, (t().cleared || 0) + 1));
+        // ドタバタ大迷宮 (段階 9) は 借金を返し切って エンディングを見たあと
+        const openDungeons = () => [...DG.LIST.slice(0, Math.min(DG.LIST.length, (t().cleared || 0) + 1)), ...(t().ended && DG.BONUS ? [DG.BONUS] : [])];
         const paidNeed = id => Math.max(0, (TW.UNLOCK[id] || 0) - t().paid);
         const isOpen = id => g.opts.unlockAll || paidNeed(id) <= 0;
 
@@ -236,14 +248,17 @@
             const qs = t().quests.length ? `受けているクエスト ${t().quests.length} 件` : 'クエストを受けていない';
             const list = openDungeons();
             ask(`どこへ行く？（★ はボスをたおしたダンジョン）\nいっしょに行く：${party}\n${qs}`,
-                [...list.map((d, i) => `${i < (t().cleared || 0) ? '★' : '　'}${d.name}（${d.floors} 階）`), 'やめる'], i => {
+                [...list.map((d, i) => `${(d.bonus ? t().bonusClear : i < (t().cleared || 0)) ? '★' : '　'}${d.name}（${d.floors} 階）`), 'やめる'], i => {
                     if (i >= list.length) return menu();
                     const d = list[i];
                     // はじめて行くときは ふるカワから ひとこと
                     const intro = !t().seen[d.id] && d.story && d.story.intro;
                     t().seen[d.id] = true;
-                    if (intro) return g.talk(intro, () => g.startDungeon(d.id));
-                    g.startDungeon(d.id);
+                    const go = floor => (intro ? g.talk(intro, () => g.startDungeon(d.id, floor)) : g.startDungeon(d.id, floor));
+                    // ドタバタ大迷宮: 着いたことのある 休憩の階から 始められる
+                    const floors = d.bonus ? DG.restFloors(t().bonusBest || 0) : [1];
+                    if (floors.length < 2) return go(1);
+                    ask('どの階から 始める？（休憩の階）', [...floors.map(f => `B${f}F`), 'やめる'], j => (j >= floors.length ? goDungeon() : go(floors[j])));
                 });
         }
 
@@ -345,7 +360,8 @@
             t().ended = true;
             save();
             const lines = ['おにおに「……全部、返したな」', 'こおりくん「やったー！ これで こおり 生きていけるよ～～！！」',
-                'ふるカワ「探検隊『ばりきつよめ』、大活躍だったね！」', '～ おしまい ～\n（このあとも 遊べます。もっと深いダンジョンは、このあとの段階で）'];
+                'ふるカワ「探検隊『ばりきつよめ』、大活躍だったね！」', '～ おしまい ～\n（このあとも 遊べます）',
+                'ふるカワ「たいへん！ 町のはずれに、底の見えない 大きな穴が 開いたよ！」', '新しいダンジョン「ドタバタ大迷宮」（99 階）が 現れた！'];
             const next = k => (k >= lines.length ? menu() : ask(lines[k], ['つぎへ'], () => next(k + 1), { list: false }));
             next(0);
         }
@@ -1066,10 +1082,16 @@
             ctx.fillText(`BP ${t().bp}　役職：${U.ROLES[hero.role].name}`, 6, 10);
         }
 
+        // ドタバタ大迷宮の 休憩の階に着いた (いちばん深いところを 覚えておく)
+        function bonusRest(n) {
+            t().bonusBest = Math.max(t().bonusBest || 0, n);
+            save();
+        }
+
         // この階で待っている ライバルのリーダー (受けている duel のクエスト)
         const duelsHere = (n, id) => TW.duelsAt(t().quests, id, n);
 
-        return { title, enter, menu, draw, onKill, onFloor, onClear, duelsHere, save, load, newTown, giveItem, countHave, questDone, seen, beat, noteItem, stat, check, repay };
+        return { title, enter, menu, draw, onKill, onFloor, onClear, duelsHere, bonusRest, save, load, newTown, giveItem, countHave, questDone, seen, beat, noteItem, stat, check, repay };
     }
 
     KD.createTown = createTown;
