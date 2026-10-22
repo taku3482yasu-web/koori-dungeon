@@ -431,3 +431,39 @@ test('口ぐせ: ライバル探検隊・ボス・特別な キャラにも あ�
     }
     assert.ok(said, 'KING.ASAHARA が 敵の ときに しゃべった');
 });
+
+test('ボスの 必殺技: HP が 半分に なったら 1 回だけ、カットインの あと 探検隊に 放つ', () => {
+    const { s, game, choose, run, asks } = newGame();
+    choose('ダンジョンへ');
+    choose('ハリーの森');
+    choose('スキップ');
+    run(1300);
+    asks.length = 0;
+    const p = s.player;
+    p.hp = p.stats.hp = 9999;
+    const dx = [1, -1].find(d => globalThis.KD.Dungeon.canMove(s.map, p.x, p.y, d, 0));
+    const boss = game.makeEnemy('harry', 3, p.x + dx, p.y);
+    boss.boss = true;
+    boss.awake = boss.met = true;
+    boss.stats.hp = 2000;
+    boss.hp = 1100;
+    s.enemies.splice(0, s.enemies.length, boss);
+    s.visible[boss.y * s.map.w + boss.x] = 1;
+    p.dir = [dx, 0];
+    let cut = null;
+    for (let i = 0; i < 30 && !cut; i++) {
+        game.attack();
+        for (let j = 0; j < 40 && !cut; j++) {
+            run(50);
+            asks.length = 0;
+            if (s.cutin && s.cutin.special) cut = s.cutin;
+        }
+    }
+    assert.ok(cut, 'ボスの 必殺技の カットイン');
+    assert.equal(cut.name, 'メンキョナイ・ニードル');
+    assert.match(cut.sub, /ハリーの 必殺技/);
+    assert.ok(boss.specialUsed);
+    run(3000);
+    assert.ok(p.hp < 9999, '探検隊に 当たった');
+    assert.equal(s.specials.count, 0, 'チームの 回数は 減らない');
+});

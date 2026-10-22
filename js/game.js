@@ -24,6 +24,7 @@
     const FADE_MS = 1100;                         // 階が変わるときの暗転
     const ATTACK_MS = 240, SHOOT_MS = 300;        // 攻撃 1 回を見せる時間
     const SPECIAL_CUTIN_MS = 1400, SPECIAL_FX_MS = 1100;   // 必殺技: カットインと エフェクトを 見せる時間
+    const BOSS_SPECIAL_POWER = 0.6;                       // ボスの 必殺技の 強さ (仲間の 必殺技に くらべて)
     const PASS_MS = 380;                          // 動けないターン (ねむり・まひ など) を見せる時間
     const SPAWN_EVERY = 36, MAX_ENEMIES = 10;     // 敵が増える間かく (ターン)・1 つの階にいる敵の最大
     const SHOOT_RANGE = 6;                        // 「撃つ」敵の届くマス数
@@ -1474,6 +1475,11 @@
                 if (seen(t)) say(`${t.name}の こおりが とけた！`);
             }
             if (t.side === 'enemy' && !t.awake) wake(t);
+            // ボス・決闘の 相手: HP が 半分に なったら 1 回だけ 必殺技 (2026-10-22 ユーザー指定)
+            if (t.side === 'enemy' && (t.boss || t.duel) && !t.specialUsed && t.hp > 0 && t.hp <= t.stats.hp / 2 && KD.Specials) {
+                t.specialUsed = true;
+                state.queue.push(() => (t.hp > 0 && !state.over ? special(t) : 0));
+            }
             // 敵の ピンチ (口ぐせが ある ライバル・ボスなど)
             if (t.side === 'enemy' && t.hp > 0 && t.hp < t.stats.hp * 0.25 && !t.pinched && foeTalk(t, 1)) {
                 t.pinched = true;
@@ -2141,26 +2147,30 @@
         // 放つ: カットインを 見せてから (specialHit)
         function special(u) {
             const sp = specialFor(u);
-            state.specials.used[u.kind] = true;
-            state.specials.count++;
-            // 正面・直線の 技は いちばん 近い 見えている 敵の ほうを 向く
-            const foes = state.enemies.filter(e => e.hp > 0 && state.visible[idx(e.x, e.y)]).sort((a, b) => cheb(a, u) - cheb(b, u));
+            if (u.side === 'party') {
+                state.specials.used[u.kind] = true;
+                state.specials.count++;
+            }
+            // 正面・直線の 技は いちばん 近い 相手の ほうを 向く
+            const foes = foesOf(u).sort((a, b) => cheb(a, u) - cheb(b, u));
             if ((sp.range === 'front' || sp.range === 'pierce') && foes[0]) face(u, foes[0].x - u.x, foes[0].y - u.y);
             say(`${u.name}の 必殺技！「${sp.name}」！`);
             bubble(u, sp.shout);
             state.cutin = { kind: u.kind, name: sp.name, sub: `${u.name}の 必殺技！`, shout: sp.shout, color: sp.color, at: performance.now(), special: true };
             sfx('boss');
-            if (state.town) town.stat('specials');
+            if (state.town && u.side === 'party') town.stat('specials');
             state.queue.unshift(() => specialHit(u, sp));
             return SPECIAL_CUTIN_MS;
         }
+        // 必殺技の 相手: 仲間が 放つ ときは 見えている 敵、ボスが 放つ ときは 探検隊
+        const foesOf = u => (u.side === 'party' ? state.enemies.filter(e => e.hp > 0 && state.visible[idx(e.x, e.y)]) : party().filter(t => t.hp > 0));
         function specialTargets(u, sp) {
-            const foes = state.enemies.filter(e => e.hp > 0 && state.visible[idx(e.x, e.y)]);
+            const foes = foesOf(u);
             const [dx, dy] = u.dir;
             if (sp.range === 'room') return { targets: foes.filter(e => cheb(e, u) <= 7), to: [u.x, u.y] };
             if (sp.range === 'around2') return { targets: foes.filter(e => cheb(e, u) <= 2), to: [u.x, u.y] };
             if (sp.range === 'front') {
-                const t = enemyAt(u.x + dx, u.y + dy) || foes.find(e => cheb(e, u) === 1);
+                const t = foes.find(e => e.x === u.x + dx && e.y === u.y + dy) || foes.find(e => cheb(e, u) === 1);
                 return { targets: t ? [t] : [], to: t ? [t.x, t.y] : [u.x + dx, u.y + dy] };
             }
             // pierce: 壁まで まっすぐ (敵を つらぬく)
@@ -2169,8 +2179,8 @@
             for (let i = 0; i < 10 && D.canMove(state.map, x, y, dx, dy); i++) {
                 x += dx;
                 y += dy;
-                const e = enemyAt(x, y);
-                if (e && e.hp > 0) hit.push(e);
+                const e = foes.find(f => f.x === x && f.y === y);
+                if (e) hit.push(e);
             }
             return { targets: hit, to: [x, y] };
         }
@@ -2185,27 +2195,28 @@
             if (!targets.length && sp.power) say('しかし だれにも 当たらなかった。');
             for (const t of targets) {
                 if (t.hp <= 0) continue;
-                const { dmg, eff } = deal(u, t, { power: sp.power, element: sp.element, special: u.stats.spa >= u.stats.atk });
+                const { dmg, eff } = deal(u, t, { power: sp.power * (u.side === 'party' ? 1 : BOSS_SPECIAL_POWER), element: sp.element, special: u.stats.spa >= u.stats.atk });
                 say(`${t.name}に ${dmg} のダメージ！${effText(eff)}`);
                 hurt(t, dmg, u);
                 if (t.hp > 0 && sp.status && rng.chance(sp.chance)) inflict(t, sp.status, false);
             }
-            // おまけ: 仲間 みんなを 回復・まもりの かまえ・きあいため
-            const team = party().filter(t => t.hp > 0);
-            if (sp.heal) team.forEach(t => {
+            // おまけ: 仲間 みんなを 回復・まもりの かまえ・きあいため (ボスは 自分だけ。回復は しない)
+            const team = u.side === 'party' ? party().filter(t => t.hp > 0) : [u];
+            if (sp.heal && u.side === 'party') team.forEach(t => {
                 const n = Math.min(t.stats.hp - t.hp, Math.round(t.stats.hp * sp.heal));
                 t.hp += n;
                 t.status = null;
                 popup(t, `+${n}`, '#7ae07a');
             });
-            if (sp.heal) say('仲間 みんなの HP が 回復した！');
+            const who = u.side === 'party' ? '仲間 みんな' : u.name;
+            if (sp.heal && u.side === 'party') say('仲間 みんなの HP が 回復した！');
             if (sp.guard) {
                 team.forEach(t => { t.buffs.guard = sp.guard; });
-                say('仲間 みんなが まもりを かためた！');
+                say(`${who}が まもりを かためた！`);
             }
             if (sp.kiai) {
                 team.forEach(t => { t.buffs.kiai = true; });
-                say('仲間 みんなの つぎの 攻撃が 2 倍に なった！');
+                say(`${who}の つぎの 攻撃が 2 倍に なった！`);
             }
             return SPECIAL_FX_MS;
         }

@@ -620,11 +620,11 @@
 
 （Lv が 上がったとき）
 
-- 〔catch.okagappa.levelup.1〕 ノリが 上がってきたぜ イェア！
+- 〔catch.okagappa.levelup.1〕 あ～らあらあらLVあがるおかピポ！
 
 （敵を たおしたとき）
 
-- 〔catch.okagappa.win.1〕 お宝はいただきだぜ イェア！
+- 〔catch.okagappa.win.1〕 ま～だまだ勝ち取らねバ！
 
 **ひびきまくり**
 
@@ -745,7 +745,7 @@
 
 （攻撃したとき）
 
-- 〔catch.ueno.attack.1〕 妻への愛を受けてみよ！
+- 〔catch.ueno.attack.1〕 この愛を受けてみよ！
 - 〔catch.ueno.attack.2〕 我が筋肉の前にひれ伏すがよい！
 
 （ピンチ（HP が 少ない））
@@ -937,7 +937,7 @@
 （攻撃したとき）
 
 - 〔catch.daishi.attack.1〕 仏の顔も、ここまでです。
-- 〔catch.daishi.attack.2〕 よくぞ参られた。拙僧が相手いたそう。
+- 〔catch.daishi.attack.2〕 くらいなさい。
 
 （ピンチ（HP が 少ない））
 
@@ -956,7 +956,7 @@
 （攻撃したとき）
 
 - 〔catch.zumitani.attack.1〕 ついてこられるかな♪
-- 〔catch.zumitani.attack.2〕 やっほー、78代目だよ！
+- 〔catch.zumitani.attack.2〕 どーん！
 
 （ピンチ（HP が 少ない））
 
@@ -975,7 +975,7 @@
 （攻撃したとき）
 
 - 〔catch.runaya.attack.1〕 月の力よ…！
-- 〔catch.runaya.attack.2〕 よく来たわね。…よく来たわね。
+- 〔catch.runaya.attack.2〕 それ！…それ！
 
 （ピンチ（HP が 少ない））
 
@@ -994,7 +994,7 @@
 （攻撃したとき）
 
 - 〔catch.nozoema.attack.1〕 この刀を越えてみせよ！
-- 〔catch.nozoema.attack.2〕 その前に、この筋肉を見よ！
+- 〔catch.nozoema.attack.2〕 この筋肉を見よ！
 
 （ピンチ（HP が 少ない））
 
@@ -1013,7 +1013,7 @@
 （攻撃したとき）
 
 - 〔catch.maou.attack.1〕 消え去れ！
-- 〔catch.maou.attack.2〕 数百年、この時を待ちわびたぞ。
+- 〔catch.maou.attack.2〕 はじけろ！
 
 （ピンチ（HP が 少ない））
 
@@ -1021,7 +1021,7 @@
 
 （Lv が 上がったとき）
 
-- 〔catch.maou.levelup.1〕 力が あふれてくるぞ！
+- 〔catch.maou.levelup.1〕 最高に！ハイな気分だ！
 
 （敵を たおしたとき）
 
@@ -1059,7 +1059,7 @@
 
 （Lv が 上がったとき）
 
-- 〔catch.makibikon.levelup.1〕 性能が 向上したであります。
+- 〔catch.makibikon.levelup.1〕 なるほどな～。
 
 （敵を たおしたとき）
 
