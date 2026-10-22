@@ -724,18 +724,37 @@
                         save();
                         return menu();
                     }
-                    const a = all[i];
-                    if (state.allies.includes(a)) {
-                        state.allies.splice(state.allies.indexOf(a), 1);
-                        state.roster.unshift(a);
-                    } else if (state.allies.length >= max) {
-                        return ask(`いっしょに行けるのは 主人公のほかに ${max} 人まで。先に だれかを はずしてね。`, ['もどる'], plaza, { list: false });
-                    } else {
-                        state.roster.splice(state.roster.indexOf(a), 1);
-                        state.allies.push(a);
-                    }
-                    plaza();
+                    plazaUnit(all[i], max);
                 });
+        }
+
+        // 仲間 1 人: 連れていく・はずす、進化の アイテムを わたす (進化の条件も出す。enemies9.js の EVOLVE)
+        function plazaUnit(a, max) {
+            const v = KD.Allies.EVOLVE[a.kind];
+            const going = state.allies.includes(a);
+            const opts = [going ? 'はずす' : '連れていく'];
+            const giveable = v && v.how === 'item' && countHave(v.item) > 0;
+            if (giveable) opts.push(`「${I.ITEMS[v.item].name}」を わたす`);
+            opts.push('もどる');
+            const info = `${a.name}${KD.Allies.star(a.kind) ? ' ' + '★'.repeat(KD.Allies.star(a.kind)) : ''} Lv${a.lv}　${U.ROLES[a.role].name}`;
+            ask(`${info}\n${v ? '進化：' + KD.Allies.evolveText(a.kind) : '進化しない'}`, opts, j => {
+                const pick = opts[j];
+                if (pick === 'はずす') {
+                    state.allies.splice(state.allies.indexOf(a), 1);
+                    state.roster.unshift(a);
+                } else if (pick === '連れていく') {
+                    if (state.allies.length >= max) return ask(`いっしょに行けるのは 主人公のほかに ${max} 人まで。先に だれかを はずしてね。`, ['もどる'], plaza, { list: false });
+                    state.roster.splice(state.roster.indexOf(a), 1);
+                    state.allies.push(a);
+                } else if (giveable && j === 1) {
+                    if (!KD.Allies.canEvolve(a, { item: v.item })) return ask(`${a.name}「……まだ 早いみたい」\n（Lv${v.lv} から 進化できる）`, ['もどる'], () => plazaUnit(a, max), { list: false });
+                    takeItems({ [v.item]: 1 });
+                    g.evolve(a);
+                    save();
+                    return ask(state.messages.slice(-2).map(m => m.text).join('\n'), ['もどる'], () => plazaUnit(a, max), { list: false });
+                }
+                plaza();
+            });
         }
 
         // ----- 家 (仕様書 13章: セーブ・1 日がすすむ) -----

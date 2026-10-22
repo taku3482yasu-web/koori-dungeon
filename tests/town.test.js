@@ -209,13 +209,64 @@ test('仲間の広場: 連れていく仲間をえらぶ (主人公のほかに 
     s.roster.push(game.makeAlly('donguriko', 2), game.makeAlly('nemuridake', 2));
     choose('仲間の広場');
     choose('ドングリコ');
+    assert.match(asks[0].message, /進化：Lv20 で オオドングリコに 進化/);
+    choose('連れていく');
     assert.equal(s.allies.length, 2);
     choose('ネムリダケ');
+    choose('連れていく');
     assert.match(asks[0].message, /2 人まで/);
     choose('もどる');
     choose('おにおに');
+    choose('はずす');
     assert.equal(s.allies.length, 1);
     assert.equal(s.allies[0].kind, 'donguriko');
+});
+
+test('進化: 条件は キャラごと。Lv・道具を わたす・ダンジョンに 連れていく', () => {
+    const A = globalThis.KD.Allies;
+    // 27 体ぶん。条件の Lv は いろいろ、3 種類とも ある
+    const list = Object.entries(A.EVOLVE);
+    assert.equal(list.length, 27);
+    assert.deepEqual([...new Set(list.map(([, v]) => v.how))].sort(), ['dungeon', 'item', 'level']);
+    assert.ok(new Set(list.map(([, v]) => v.lv)).size >= 10);
+    for (const [kind, v] of list) {
+        assert.ok(U.ENEMIES[kind] && U.ENEMIES[v.to] && A.ALLIES[v.to], kind);
+        if (v.how === 'item') assert.ok(globalThis.KD.Items.ITEMS[v.item], `${kind} の道具`);
+    }
+    // 道具を わたす: 広場で Lv が足りないと まだ、足りると 進化 (看板のわざを覚える)
+    const { s, game, choose, asks } = newGame();
+    const nemu = game.makeAlly('nemuridake', 10);
+    s.roster.push(nemu);
+    game.town.giveItem({ id: 'moon_dust', n: 2 }, true);
+    choose('仲間の広場');
+    choose('ネムリダケ');
+    choose('月の砂');
+    assert.match(asks[0].message, /まだ 早い/);
+    choose('もどる');
+    nemu.lv = 18;
+    choose('月の砂');
+    assert.equal(nemu.kind, 'nemuridakeou');
+    assert.equal(nemu.name, 'ネムリダケオウ');
+    assert.ok(nemu.skills.some(k => k.id === A.signature('nemuridakeou')));
+    assert.match(asks[0].message, /進化した/);
+    assert.equal(s.town.stats.evolved, 1);
+    // Lv で進化: ドングリコは Lv20
+    const don = game.makeAlly('donguriko', 19);
+    assert.ok(!A.canEvolve(don));
+    don.lv = 20;
+    assert.ok(A.canEvolve(don));
+    assert.ok(!A.canEvolve(don, { item: 'kelp' }));
+    // ダンジョン: ヨフカシフクロウは 月の迷宮 B10F (Lv26 から)
+    const owl = game.makeAlly('yofukashi', 26);
+    assert.ok(!A.canEvolve(owl, { dungeon: 'moon', floor: 9 }));
+    assert.ok(A.canEvolve(owl, { dungeon: 'moon', floor: 10 }));
+    assert.ok(!A.canEvolve(owl));
+    // 名前を変えていた仲間 (ハリ坊) は 名前そのまま
+    const hari = game.makeAlly('haribaby', 22);
+    hari.name = 'ハリ坊';
+    game.evolve(hari);
+    assert.equal(hari.kind, 'harigeneral');
+    assert.equal(hari.name, 'ハリ坊');
 });
 
 test('クエスト: 受けて、ダンジョンで敵をたおすと達成。ギルドで報告すると ごほうび', () => {

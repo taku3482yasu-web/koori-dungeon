@@ -303,3 +303,19 @@ test('ライバルのリーダーとの勝負: クエストを受けていると
     assert.ok(e.stats.hp >= U.enemyStats('okagappa', e.lv).hp * 3);
     assert.ok(s.messages.some(m => /待っている/.test(m.text)));
 });
+
+test('進化: コガメは 海岸どうくつの B8F に いっしょに着くと ヒョウガメに 進化する (Lv24 から)', () => {
+    const t = setup({ dungeon: 'coast' });
+    const { s, game, run } = t;
+    assert.equal(s.dungeon.id, 'coast');
+    const kame = game.makeAlly('kogame', 24);
+    const young = game.makeAlly('kogame', 10);
+    s.allies.push(kame, young);
+    s.floor = 7;
+    down(t);
+    run(500);
+    assert.equal(s.floor, 8);
+    assert.equal(kame.kind, 'hyougame');
+    assert.equal(young.kind, 'kogame', 'Lv が足りないのに 進化した');
+    assert.ok(s.messages.some(m => /進化した/.test(m.text)) || kame.name === 'ヒョウガメ');
+});

@@ -224,6 +224,8 @@
             if (state.dungeon.rest && !state.dungeon.rivalFloor) later(() => restStop(n));
             // 中断セーブ (各階に着いたとき。仕様書 16章)
             state.run = { dungeon: state.dungeon.id, floor: n, seed: state.seed };
+            // そのダンジョンの その階に いっしょに着いて 進化する仲間
+            state.allies.filter(a => KD.Allies.canEvolve(a, { dungeon: state.dungeon.id, floor: n })).forEach(a => later(() => evolve(a)));
             if (state.town) {
                 town.save();
                 town.onFloor(n, state.dungeon.id);
@@ -1372,6 +1374,36 @@
             bubble(u, C.lineFor(u.kind, 'levelup', rng));
             if (u.hero) flash('rgba(255,240,160,.45)');
             U.learnedBetween(u.kind, lvBefore, u.lv).forEach(id => (u.hero ? learn(u, id) : allyLearn(u, id)));
+            // Lv で進化する仲間
+            if (!u.hero && KD.Allies.canEvolve(u)) later(() => evolve(u));
+        }
+
+        // 仲間の進化 (2026-10-22 ユーザー指定。条件は enemies9.js の EVOLVE)。
+        //   種類・役職・能力が 進化形になり、進化形の 看板のわざを覚える。名前を変えていた仲間 (ハリ坊など) は 名前はそのまま
+        function evolve(a) {
+            const v = KD.Allies.EVOLVE[a.kind];
+            if (!v) return false;
+            const before = a.name;
+            const ratio = a.hp / a.stats.hp;
+            if (a.name === U.ENEMIES[a.kind].name) a.name = U.ENEMIES[v.to].name;
+            a.kind = v.to;
+            a.element = U.ENEMIES[v.to].element;
+            a.immune = U.ENEMIES[v.to].immune || [];
+            a.role = KD.Allies.roleOf(v.to);
+            a.stats = U.allyStats(a.kind, a.lv, a.role);
+            a.hp = Math.max(1, Math.round(a.stats.hp * ratio));
+            if (!a.skills.some(k => k.id === U.ROLES[a.role].skill)) a.skills[0] = U.newSkill(U.ROLES[a.role].skill);
+            say(`おや……！？ ${before}の ようすが……！`);
+            say(`${before}は ${U.ENEMIES[v.to].name}に 進化した！`);
+            if (a.x >= 0 && state.map) popup(a, '進化！', '#ffe680');
+            flash('rgba(255,255,255,.6)');
+            sfx('levelup');
+            allyLearn(a, KD.Allies.signature(v.to));
+            if (state.town) {
+                town.seen(v.to);
+                town.stat('evolved');
+            }
+            return true;
         }
 
         // 仲間がわざを覚える。4 つ持っていたら、役職のわざ・看板のわざ (allies.js) 以外でいちばん古いものを忘れる
@@ -2408,7 +2440,7 @@
         // 町 (townui.js) に渡す中身
         const town = KD.createTown({
             state, opts, say, later,
-            selectHero, makeHero, makeAlly, recalc, learnNow, startDungeon, resume, backToTown, partyMax, talk, toast
+            selectHero, makeHero, makeAlly, recalc, learnNow, startDungeon, resume, backToTown, partyMax, talk, toast, evolve
         }, ui);
 
         if (opts.start === 'dungeon') {
@@ -2418,7 +2450,7 @@
             });
         } else town.title();
         return {
-            state, town, draw, moveInput, wait, confirm, attack: attackFront, useSkill, itemMenu, tacticMenu, busy, makeEnemy, makeAlly, spawnBoss,
+            state, town, draw, moveInput, wait, confirm, attack: attackFront, useSkill, itemMenu, tacticMenu, busy, makeEnemy, makeAlly, evolve, spawnBoss,
             skills: () => (state.player && state.phase === 'play' ? state.player.skills.map(skillLabel) : []),
             toggleMinimap() { state.mini = !state.mini; },
             toggleSound() {

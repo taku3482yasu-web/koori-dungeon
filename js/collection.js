@@ -100,6 +100,7 @@
         { id: 'kills_100', name: '百戦錬磨', note: '敵を 100 体たおす', test: c => c.stats.kills >= 100 },
         { id: 'kills_500', name: '探検隊の伝説', note: '敵を 500 体たおす', test: c => c.stats.kills >= 500 },
         ...KD.Dungeons.LIST.map((d, i) => ({ id: `clear_${d.id}`, name: `${d.name} 突破`, note: `${d.name}の ボスをたおす`, test: c => (c.town.cleared || 0) > i })),
+        { id: 'evolve', name: '進化！', note: '仲間を 進化させる', test: c => (c.stats.evolved || 0) >= 1 },
         { id: 'dotabata', name: 'ドタバタ大道中', note: 'ドタバタ大迷宮（99 階）を 抜ける', test: c => Boolean(c.town.bonusClear) },
         { id: 'lv10', name: '一人前', note: '主人公の Lv を 10 にする', test: c => c.player.lv >= 10 },
         { id: 'lv30', name: 'ベテラン', note: '主人公の Lv を 30 にする', test: c => c.player.lv >= 30 },
@@ -122,7 +123,7 @@
         { id: 'dex_all', name: '図鑑 完成', note: '図鑑の敵を 全部 たおす', test: c => dexOrder().every(k => c.town.dex.beat[k]) }
     ];
 
-    const newStats = () => ({ kills: 0, quests: 0, crafted: 0, recruited: 0, sold: 0, colitis: 0, clutch: 0, rivals: 0, houses: 0 });
+    const newStats = () => ({ kills: 0, quests: 0, crafted: 0, recruited: 0, sold: 0, colitis: 0, clutch: 0, rivals: 0, houses: 0, evolved: 0 });
 
     KD.Collection = { LINES, lineFor, RIVALS, RIVAL_FROM, HAPPEN_RATE, HAPPENINGS, dexOrder, TRAIT_NAMES, ACHIEVEMENTS, newStats };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);

@@ -174,6 +174,59 @@
         watageboushi: [3, [90, 85, 90, 110, 115], '1:watage_fuwari 40:tankenkan 55:shizuku 70:tsubute 85:megumi']
     });
 
+    // ----- 進化 (2026-10-22 ユーザー指定。条件と Lv は キャラごとに ちがう。中身は案) -----
+    // 仲間になった 元の敵 (001〜050 など) は、条件を満たすと 進化形 (053〜079) に進化する。
+    //   level: その Lv になったら / item: その道具を わたしたら (lv から。町の 仲間の広場で) /
+    //   dungeon: そのダンジョンの その階に いっしょに着いたら (lv から)
+    const EVOLVE = {
+        haribaby: { to: 'harigeneral', how: 'level', lv: 22 },
+        mumenbachi: { to: 'joubachi', how: 'level', lv: 25 },
+        donguriko: { to: 'oodonguriko', how: 'level', lv: 20 },
+        nemuridake: { to: 'nemuridakeou', how: 'item', item: 'moon_dust', lv: 18 },
+        pekorisu: { to: 'pekorisuking', how: 'item', item: 'lucky_coin', lv: 20 },
+        tsutankobu: { to: 'tsutankobuju', how: 'item', item: 'kelp', lv: 25 },
+        yofukashi: { to: 'yoakefukurou', how: 'dungeon', dungeon: 'moon', floor: 10, lv: 26 },
+        kogame: { to: 'hyougame', how: 'dungeon', dungeon: 'coast', floor: 8, lv: 24 },
+        otohimedai: { to: 'ryuuguudai', how: 'dungeon', dungeon: 'coast', floor: 8, lv: 30 },
+        umibozun: { to: 'umibozuou', how: 'dungeon', dungeon: 'bonus', floor: 20, lv: 40 },
+        enjoubouzu: { to: 'daienjou', how: 'dungeon', dungeon: 'mountain', floor: 10, lv: 30 },
+        spamdama: { to: 'spamking', how: 'item', item: 'broken_cable', lv: 24 },
+        rousokubi: { to: 'hitodamaou', how: 'item', item: 'temple_incense', lv: 28 },
+        geninman: { to: 'jouninman', how: 'level', lv: 35 },
+        kawarimidanuki: { to: 'kagebunshin', how: 'level', lv: 38 },
+        bakudanjirou: { to: 'daibakudanjirou', how: 'item', item: 'magma_stone', lv: 34 },
+        tsukiusagi: { to: 'kaguyausagi', how: 'item', item: 'moon_drop', lv: 36 },
+        mangetsuwolf: { to: 'shingetsuwolf', how: 'level', lv: 40 },
+        yukimidango: { to: 'yukimidaifuku', how: 'item', item: 'star_piece', lv: 30 },
+        proteingolem: { to: 'muscletitan', how: 'level', lv: 48 },
+        magmatcho: { to: 'kazanmatcho', how: 'dungeon', dungeon: 'aso', floor: 10, lv: 44 },
+        yukidarumuscle: { to: 'hyouzanmuscle', how: 'dungeon', dungeon: 'moon', floor: 15, lv: 42 },
+        asohei: { to: 'asoshougun', how: 'level', lv: 50 },
+        takaramimic: { to: 'kinkomimic', how: 'item', item: 'gold_band', lv: 45 },
+        koorimodoki: { to: 'koorimodokishin', how: 'item', item: 'koori_crown', lv: 50 },
+        shakkinbourei: { to: 'rishitoribourei', how: 'item', item: 'cursed_coin', lv: 42 },
+        daichouenkin: { to: 'daichouenou', how: 'level', lv: 30 }
+    };
+    // 進化の条件を 短い文に (仲間の広場・キャラ図鑑で出す)
+    function evolveText(kind) {
+        const v = EVOLVE[kind];
+        if (!v) return null;
+        const to = U.ENEMIES[v.to].name;
+        if (v.how === 'level') return `Lv${v.lv} で ${to}に 進化`;
+        if (v.how === 'item') return `Lv${v.lv} から「${I.ITEMS[v.item].name}」を わたすと ${to}に 進化`;
+        const d = DG.byId(v.dungeon) || (v.dungeon === 'bonus' ? { name: 'ドタバタ大迷宮' } : { name: v.dungeon });
+        return `Lv${v.lv} から ${d.name}の B${v.floor}F に いっしょに行くと ${to}に 進化`;
+    }
+    // いま進化できるか。ctx: { dungeon, floor } (ダンジョンの階に着いたとき) / { item } (道具を わたすとき) / なし (Lv が上がったとき)
+    function canEvolve(unit, ctx = {}) {
+        const v = EVOLVE[unit.kind];
+        if (!v || unit.lv < v.lv) return false;
+        if (v.how === 'level') return !ctx.item && !ctx.dungeon;
+        if (v.how === 'item') return ctx.item === v.item;
+        return ctx.dungeon === v.dungeon && ctx.floor >= v.floor;
+    }
+    Object.assign(KD.Allies, { EVOLVE, evolveText, canEvolve });
+
     // ----- ドタバタ大迷宮 -----
     const NEW = Object.keys(ENEMIES).filter(k => !ENEMIES[k].boss);
     // 弱い順 (★ → 番号)

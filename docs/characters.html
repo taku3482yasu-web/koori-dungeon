@@ -43,6 +43,7 @@
     .desc { font-size: 12px; color: var(--sub); line-height: 1.5; }
     .line { font-size: 12px; margin-top: 4px; }
     .tag.star { background: #ffe9a0; }
+    .evo { font-size: 12px; color: #ffe680; margin-top: 4px; }
     .ally { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
     .ally-title { font-size: 11px; color: var(--sub); margin-bottom: 4px; }
     .bars { display: grid; grid-template-columns: 52px 1fr 26px; gap: 2px 6px; align-items: center; font-size: 11px; color: var(--sub); }
@@ -125,8 +126,11 @@
         if (d.steal) traits.push('道具をぬすんで逃げる');
         const tags = [AI[d.ai] || d.ai];
         if (AL.star(id)) tags.push(`仲間: ${U.ROLES[AL.roleOf(id)].name}`);
+        // 進化 (enemies9.js の EVOLVE): 元の敵には 進化の条件、進化形には どうやって進化するか
+        const from = Object.keys(AL.EVOLVE || {}).find(k => AL.EVOLVE[k].to === id);
+        const evo = AL.EVOLVE && AL.EVOLVE[id] ? `進化：${AL.evolveText(id)}` : from ? `${U.ENEMIES[from].name}から 進化：${AL.evolveText(from).replace(/ \S+に 進化$/, '')}` : '';
         return {
-            id, no: d.no, name: d.name, element: d.element, tags, boss: d.boss,
+            id, no: d.no, name: d.name, element: d.element, tags, boss: d.boss, evo,
             desc: [moves.length ? `わざ: ${moves.join('・')}` : '', traits.join('。')].filter(Boolean).join('　'),
             line: d.line, ...extra
         };
@@ -225,6 +229,7 @@
                 ${c.tags.filter(t => t !== 'ボス').map(t => `<span class="tag plain">${t}</span>`).join('')}
                 ${baseName ? `<span class="tag plain">元: ${baseName}</span>` : ''}</div>
             <div class="desc">${c.desc || ''}</div>
+            ${c.evo ? `<div class="evo">${c.evo}</div>` : ''}
             ${c.line ? `<div class="line">「${c.line}」</div>` : ''}
             ${allyHtml(info)}`);
         parent.append(el);
