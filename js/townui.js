@@ -141,10 +141,70 @@
             // セーブが 1 つなら その バージョン、2 つなら 両方を タイトルに 出す
             titleVersion = slots.length === 1 ? DG.VERSIONS[slots[0]] : slots.length ? { name: slots.map(v => DG.VERSIONS[v].name).join(' ／ '), color: '#ffe680' } : null;
             const label = v => (slots.length > 1 ? `つづきから（${DG.VERSIONS[v].name}）` : 'つづきから');
-            ask(titleVersion ? `${GAME_TITLE}\n${titleVersion.name}` : GAME_TITLE, [...slots.map(label), 'はじめから'], i => {
+            ask(titleVersion ? `${GAME_TITLE}\n${titleVersion.name}` : GAME_TITLE, [...slots.map(label), 'はじめから', '引き継ぎ'], i => {
                 if (i < slots.length) return load(false, slots[i]);
-                newGame();
+                if (i === slots.length) return newGame();
+                transfer();
             }, { place: 'bottom', list: false });
+        }
+
+        // ----- 引き継ぎ (スマホと PC で セーブを 移す。2026-10-22 ユーザー指定) -----
+        // この端末の セーブ (バージョンごと) と 交易所の プレイヤー ID を Supabase に 預けて、8 文字の コードを 出す。
+        // もう片方の 端末で コードを 入れると 受け取る。コードは 1 回 使うか 24 時間で 消える (supabase/schema.sql)
+        const TRANSFER_CODE = /^[A-HJ-NP-Z2-9]{8}$/;
+        const plain = { list: false };
+        function transfer() {
+            if (!net.online) return ask('引き継ぎは インターネットに つながっていないと 使えません。', ['もどる'], title, plain);
+            ask('引き継ぎ（スマホと PC で セーブを 移す）', ['コードを出す（この端末から 送る）', 'コードを入れる（この端末で 受け取る）', 'もどる'], i => {
+                if (i === 0) return sendSave();
+                if (i === 1) return takeSave();
+                title();
+            });
+        }
+        const netFailed = () => ask('つながらなかった……。時間を おいて もう一度 ためしてください。', ['もどる'], transfer, plain);
+        // つないでいる あいだは 「つないでいます」 (えらぶものは ない)
+        function waitNet(promise, ok) {
+            ask('つないでいます…', [], () => {}, plain);
+            promise.then(ok, netFailed);
+        }
+        function sendSave() {
+            const saves = {};
+            SLOTS.forEach(v => {
+                const d = readSlot(v);
+                if (d) saves[v] = d;
+            });
+            if (!Object.keys(saves).length) return ask('送る セーブが ありません。', ['もどる'], transfer, plain);
+            waitNet(net.putTransfer({ v: 1, saves, player: net.player() }), code => {
+                if (typeof code !== 'string' || !TRANSFER_CODE.test(code)) return netFailed();
+                ask(`引き継ぎコード：${code.slice(0, 4)}-${code.slice(4)}
+（${Object.keys(saves).map(v => DG.VERSIONS[v].name).join('・')}の セーブ）
+
+もう片方の 端末で タイトル →「引き継ぎ」→「コードを入れる」に 入れてください。
+・1 回 使うか、24 時間 たつと 消えます
+・この端末の セーブも そのまま 残ります`, ['もどる'], title, plain);
+            });
+        }
+        function takeSave(message = 'もう片方の 端末で 出した 引き継ぎコード（8 文字）を 入れてください。') {
+            ask(message, ['受け取る', 'もどる'], (i, value) => {
+                if (i !== 0) return transfer();
+                const code = String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+                if (!TRANSFER_CODE.test(code)) return takeSave('コードは 8 文字です（例 ABCD-EFGH）。もう一度 入れてください。');
+                const go = () => waitNet(net.takeTransfer(code), data => received(data));
+                if (!SLOTS.some(readSlot)) return go();
+                ask('受け取った セーブで、この端末の セーブを 上書きします。よいですか？\n（受け取った セーブに ない バージョンは そのまま）', ['上書きする', 'やめる'], j => (j === 0 ? go() : transfer()), plain);
+            }, { ...plain, input: { placeholder: 'ABCD-EFGH', maxLength: 12 } });
+        }
+        function received(data) {
+            const saves = (data && data.v === 1 && data.saves) || {};
+            const got = SLOTS.filter(v => saves[v] && saves[v].v === 1);
+            if (!got.length) return ask('コードが ちがうか、期限が 切れています。（コードは 1 回 使うと 消えます）', ['もどる'], transfer, plain);
+            try {
+                got.forEach(v => localStorage.setItem(slotKey(v), JSON.stringify(saves[v])));
+            } catch (e) {
+                return ask('この端末に 保存できなかった……（ブラウザの設定で 保存が止められているかも）', ['もどる'], title, plain);
+            }
+            if (typeof data.player === 'string' && data.player) net.adopt(data.player);   // 交易所の 出品・売上も 引き継ぐ
+            ask(`${got.map(v => DG.VERSIONS[v].name).join('・')}の セーブを 受け取った！\n「つづきから」で 遊べます。`, ['タイトルへ'], title, plain);
         }
 
         // はじめから: 主人公を えらぶと バージョンが 決まる。その バージョンの セーブが あれば 消してよいか 聞く

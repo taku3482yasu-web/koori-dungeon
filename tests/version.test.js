@@ -144,7 +144,7 @@ test('セーブは バージョンごとに 2 つ。タイトルで えらべる
     b.game.town.title();
     while (b.asks.length > 1) b.asks.shift();
     assert.match(b.asks[0].message, /氷隊 ／ 鬼鬼団/);
-    assert.deepEqual(b.asks[0].options, ['つづきから（氷隊）', 'つづきから（鬼鬼団）', 'はじめから']);
+    assert.deepEqual(b.asks[0].options, ['つづきから（氷隊）', 'つづきから（鬼鬼団）', 'はじめから', '引き継ぎ']);
     b.choose('つづきから（鬼鬼団）');
     assert.equal(b.s.town.version, 'onioni');
     assert.equal(b.s.player.kind, 'onioni');
@@ -163,7 +163,7 @@ test('セーブは バージョンごとに 2 つ。タイトルで えらべる
     localStorage.setItem('koori-dungeon-save', JSON.stringify(old));
     b.game.town.title();
     while (b.asks.length > 1) b.asks.shift();
-    assert.deepEqual(b.asks[0].options, ['つづきから', 'はじめから']);
+    assert.deepEqual(b.asks[0].options, ['つづきから', 'はじめから', '引き継ぎ']);
     assert.equal(localStorage.getItem('koori-dungeon-save'), null);
     b.choose('つづきから');
     assert.equal(b.s.town.version, 'onioni');

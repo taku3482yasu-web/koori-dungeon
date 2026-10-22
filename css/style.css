@@ -121,6 +121,24 @@ h1 .howto:hover { border-color: var(--hot); }
 .skills .inf { grid-column: 2; font-size: 11px; color: #a8c0d8; }
 .skills .pp { grid-row: 1 / span 2; grid-column: 3; font-size: 12px; color: #c8d8e8; }
 .ask-text { margin: 0 0 12px; white-space: pre-line; font-size: 15px; }
+/* 文字を 入れる 欄 (引き継ぎコード)。16px より 小さいと iPhone で 画面が 大きくなる */
+.ask-input {
+    box-sizing: border-box;
+    width: 100%;
+    margin: 0 0 12px;
+    padding: 8px 10px;
+    font: inherit;
+    font-size: 20px;
+    letter-spacing: .12em;
+    text-align: center;
+    text-transform: uppercase;
+    color: var(--text);
+    background: var(--panel);
+    border: 2px solid var(--line);
+    border-radius: 6px;
+}
+.ask-input:focus { outline: none; border-color: var(--hot); }
+.ask-input[hidden] { display: none; }
 .ask-choices { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
 .ask-choices button {
     min-width: 96px;

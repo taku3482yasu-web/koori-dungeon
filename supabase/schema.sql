@@ -82,3 +82,61 @@ grant execute on function public.buy_listing(bigint, uuid, text) to anon;
 grant execute on function public.my_listings(uuid) to anon;
 grant execute on function public.cancel_listing(bigint, uuid) to anon;
 grant execute on function public.claim_sales(uuid) to anon;
+
+-- =====================================================================
+-- 引き継ぎ (スマホと PC で セーブを 移す。2026-10-22 ユーザー指定)。ここから下だけ 足して Run しても よい
+-- ---------------------------------------------------------------------
+-- セーブを 預けると 8 文字の コードを 返す。コードを 入れると セーブを 返して 消す (1 回だけ)。24 時間で 消える。
+-- テーブルは 直接 読めない (コードを 知らないと 取り出せない)
+-- =====================================================================
+
+create table if not exists public.transfers (
+    code text primary key,
+    data jsonb not null,
+    created_at timestamptz not null default now()
+);
+alter table public.transfers enable row level security;
+revoke all on public.transfers from anon, authenticated;
+
+-- 預ける。コードは まちがえやすい字 (I・O・0・1) を 使わない 32 文字から 8 文字
+create or replace function public.put_transfer(p_data jsonb)
+returns text language plpgsql security definer set search_path = public as $$
+declare
+    abc constant text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    b bytea;
+    c text;
+begin
+    if octet_length(p_data::text) > 2000000 then
+        raise exception 'too large';
+    end if;
+    delete from transfers where created_at < now() - interval '24 hours';
+    if (select count(*) from transfers) >= 2000 then
+        raise exception 'too many transfers';
+    end if;
+    loop
+        -- gen_random_uuid の でたらめな バイト (版の 印が 入る 6・8 バイト目は 使わない)
+        b := uuid_send(gen_random_uuid());
+        c := '';
+        for i in 0..7 loop
+            c := c || substr(abc, get_byte(b, case when i < 6 then i else i + 3 end) % 32 + 1, 1);
+        end loop;
+        begin
+            insert into transfers (code, data) values (c, p_data);
+            return c;
+        exception when unique_violation then
+            -- まれに 同じ コード。作りなおす
+        end;
+    end loop;
+end $$;
+
+-- 受け取る (1 回だけ。なければ null)
+create or replace function public.take_transfer(p_code text)
+returns jsonb language sql security definer set search_path = public as $$
+    delete from transfers where code = upper(p_code) and created_at >= now() - interval '24 hours'
+        returning data;
+$$;
+
+revoke all on function public.put_transfer(jsonb) from public;
+revoke all on function public.take_transfer(text) from public;
+grant execute on function public.put_transfer(jsonb) to anon;
+grant execute on function public.take_transfer(text) to anon;

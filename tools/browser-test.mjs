@@ -4,7 +4,7 @@
 // Chrome を DevTools Protocol で動かし、本物のマウス操作・タッチで ゲームを遊んで、エラーが出ないか・ボタンが効くかを確かめる。
 // (tests/*.test.js は 画面を使わないので、「1 歩動くと画面が止まる」ような不具合を見つけられなかった)
 // 流れ: はじめから → キャラ選択 → オープニング → 町 → ダンジョン → 十字ボタン・ゲーム画面・攻撃・道具・作戦・わざ・交代・キーボード
-//   → 開きなおして 続き → (スマホの幅) バージョンごとの セーブ 2 つ → 鬼鬼団の 続き → 交易所の キャラ交換
+//   → 開きなおして 続き → (スマホの幅) バージョンごとの セーブ 2 つ → 鬼鬼団の 続き → 交易所の キャラ交換 → 引き継ぎコードを 入れる
 // 使い方 (koori-dungeon フォルダで): node tools/browser-test.mjs
 // 失敗したら 終了コード 1。Chrome が見つからないときは 飛ばす (終了コード 0)。.githooks/pre-commit が走らせる。
 // =====================================================================
@@ -242,6 +242,25 @@ try {
     await press('.ask-choices button', { text: 'ユキウサポン' });
     await sleep(500);
     check(/買った/.test(await asking()) && await evaluate('window.kdGame.state.roster.some(a => a.kind === "yukiusapon")'), '交易所で もう片方の バージョンの キャラを 買える');
+
+    // ----- 引き継ぎ: コードを 入れる 欄 (スマホの幅。つながらない ことにしてある) -----
+    await send('Page.reload');
+    await sleep(2500);
+    await press('.ask-choices button', { text: '引き継ぎ' });
+    await press('.ask-choices button', { text: 'コードを入れる' });
+    await sleep(300);
+    const field = () => evaluate('(() => { const i = document.querySelector(".ask-input"); return i && !i.hidden && document.activeElement === i ? i.value : null; })()');
+    check(await field() === '', '引き継ぎ: コードを 入れる 欄が 出て、すぐ 打てる');
+    await send('Input.insertText', { text: 'abcd-efg' });
+    await send('Input.dispatchKeyEvent', { type: 'keyDown', code: 'KeyZ', key: 'z', text: 'z', windowsVirtualKeyCode: 90 });
+    await send('Input.dispatchKeyEvent', { type: 'keyUp', code: 'KeyZ', key: 'z', windowsVirtualKeyCode: 90 });
+    await sleep(200);
+    check(await field() === 'abcd-efgz' && await fits(), `引き継ぎ: Z を 打っても 決定に ならず 字が 入る・はみ出さない（${await field()}）`);
+    await press('.ask-choices button', { text: '受け取る' });
+    await press('.ask-choices button', { text: '上書きする' });
+    await sleep(1500);
+    check(/つながらなかった/.test(await asking()) && await evaluate('Boolean(localStorage.getItem("koori-dungeon-save-onioni"))'),
+        '引き継ぎ: つながらないときは そう 言って、セーブは そのまま');
 } catch (e) {
     check(false, `止まった: ${e.message}`);
 } finally {

@@ -20,6 +20,11 @@
     function createAsk(box) {
         const text = box.querySelector('.ask-text');
         const choices = box.querySelector('.ask-choices');
+        // 文字を 入れる 欄 (引き継ぎコード)。ask の input を わたしたときだけ 出す
+        const input = document.createElement('input');
+        Object.assign(input, { className: 'ask-input', type: 'text', autocomplete: 'off', spellcheck: false, hidden: true });
+        input.setAttribute('autocapitalize', 'characters');
+        box.insertBefore(input, choices);
         let current = null;   // { options, index, done, onMove }
         function render() {
             choices.innerHTML = '';
@@ -48,18 +53,27 @@
             if (current.onMove) current.onMove(i);
         }
         function choose(i) {
+            if (!current.options.length) return;   // 「つないでいます」など えらぶものが ない
             if (KD.Sound) KD.Sound.play('ok');
             const c = current;
             current = null;
             box.hidden = true;
-            c.done(i);
+            const value = input.hidden ? undefined : input.value;
+            input.blur();
+            c.done(i, value);
         }
         return {
             // place: 'bottom' で画面の下に出す (主人公をえらぶとき、絵を見せるため)。onMove: えらんでいるものが変わった
             // list: 選ぶものを縦にならべる (わざを忘れるとき)
-            ask(message, options, done, { place = 'center', onMove = null, list = false } = {}) {
+            // input: { placeholder, maxLength } で 文字を 入れる 欄を 出す。done(i, 入れた文字)
+            ask(message, options, done, { place = 'center', onMove = null, list = false, input: field = null } = {}) {
                 current = { options, index: 0, done, onMove };
                 text.textContent = message;
+                input.hidden = !field;
+                if (field) {
+                    Object.assign(input, { value: '', placeholder: field.placeholder || '', maxLength: field.maxLength || 40 });
+                    setTimeout(() => input.focus(), 0);
+                }
                 box.className = `ask ${place}${list ? ' list' : ''}`;
                 box.hidden = false;
                 choices.scrollTop = 0;
@@ -109,6 +123,15 @@
         window.addEventListener('keydown', e => {
             unlock();
             const k = e.code;
+            // 文字を 入れているときは 打った字を そのまま 入れる (Enter で 決定・Esc で もどる)
+            if (e.target && e.target.tagName === 'INPUT') {
+                if (e.isComposing) return;
+                if (e.key === 'Enter' || e.key === 'Escape') {
+                    e.preventDefault();
+                    ask.key(e.key === 'Enter' ? 'ok' : 'back');
+                }
+                return;
+            }
             if (ask.asking()) {
                 const map = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'up', ArrowRight: 'down', KeyZ: 'ok', Enter: 'ok', Space: 'ok', KeyX: 'back', Escape: 'back' };
                 if (map[k] && !e.repeat) {

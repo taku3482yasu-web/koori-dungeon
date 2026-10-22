@@ -56,6 +56,19 @@
 
         return {
             online,
+            // このブラウザの プレイヤー ID (引き継ぎで 送る) / 受け取った ID に 変える (出品・売上も 引き継ぐ)
+            player: () => me,
+            adopt(id) {
+                me = id;
+                try {
+                    storage.setItem(ID_KEY, id);
+                } catch (e) {
+                    // 保存できなくても この あいだは 使う
+                }
+            },
+            // 引き継ぎ: セーブを 預けて コード (8 文字) を もらう / コードで 受け取る (1 回だけ。なければ null)
+            putTransfer: data => call('rpc/put_transfer', { p_data: data }),
+            takeTransfer: code => call('rpc/take_transfer', { p_code: code }),
             // 売れていない出品 (新しい順に 30 件)。[{ id, seller_name, item_id, n, price }]
             list: () => call('market?select=id,seller_name,item_id,n,price&order=created_at.desc&limit=30'),
             // 出品する。item: { id, n, price }
