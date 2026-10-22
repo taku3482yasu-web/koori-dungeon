@@ -34,6 +34,10 @@ h1 {
     letter-spacing: .04em;
 }
 h1 small { display: block; font-size: 13px; color: var(--text); font-weight: normal; }
+/* 遊び方のリンク (見出しの右) */
+h1 { position: relative; }
+h1 .howto { position: absolute; right: 0; top: 2px; font-size: 13px; font-weight: normal; color: var(--text); text-decoration: none; padding: 3px 12px; border: 1px solid var(--line); border-radius: 99px; background: var(--panel); }
+h1 .howto:hover { border-color: var(--hot); }
 
 .stage {
     position: relative;

@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>遊び方</title>
+<!--
+  遊び方のページ (2026-10-22 ユーザー指定)。ゲームの画面の上の「遊び方」から開く。
+  数字 (ダンジョンの階数・施設が開く額・仲間になる確率・進化の条件など) は ゲームと同じ js/ のファイルから読んで出す
+-->
+<style>
+    :root { --bg: #0a1420; --panel: #142436; --line: #3a6a8a; --text: #e8f4ff; --sub: #a8c0d8; --accent: #8fd6f7; --hot: #ffe680; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: "BIZ UDPGothic", "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif; line-height: 1.7; }
+    main { max-width: 860px; margin: 0 auto; padding: 16px 16px 48px; }
+    h1 { font-size: 22px; color: var(--accent); margin: 0 0 4px; }
+    h2 { font-size: 18px; margin: 32px 0 8px; padding-left: 8px; border-left: 4px solid var(--hot); scroll-margin-top: 52px; }
+    h3 { font-size: 15px; margin: 18px 0 4px; color: var(--accent); }
+    p, li { font-size: 14px; }
+    ul { padding-left: 20px; margin: 6px 0; }
+    nav { position: sticky; top: 0; background: rgba(10, 20, 32, .95); padding: 8px 0; display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid var(--line); z-index: 1; }
+    nav a, .back { color: var(--text); text-decoration: none; font-size: 13px; padding: 3px 10px; border: 1px solid var(--line); border-radius: 99px; background: var(--panel); }
+    .back { display: inline-block; margin: 6px 0 4px; border-color: var(--hot); }
+    .table-wrap { overflow-x: auto; }
+    table { border-collapse: collapse; margin: 8px 0; font-size: 13px; min-width: 100%; }
+    th, td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; vertical-align: top; }
+    th { background: var(--panel); color: var(--hot); white-space: nowrap; }
+    kbd { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-size: 12px; }
+    .note { color: var(--sub); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+    <h1>遊び方 ― こおりくんの大冒険～ダンジョンドタバタ大道中～</h1>
+    <a class="back" href="index.html">← ゲームにもどる</a>
+    <a class="back" href="docs/characters.html">キャラ図鑑（絵で見る）</a>
+    <nav>
+        <a href="#start">はじめに</a><a href="#control">操作</a><a href="#town">町</a><a href="#dungeon">ダンジョン</a><a href="#battle">戦い</a>
+        <a href="#ally">仲間</a><a href="#evolve">進化</a><a href="#rival">ライバル</a><a href="#trade">交易所</a><a href="#bonus">ドタバタ大迷宮</a>
+    </nav>
+
+    <h2 id="start">はじめに</h2>
+    <p>摩天楼の財宝で借金を返したはずが、打ち上げで散財して また借金……。こおりくんと おにおには 探検隊「ばりきつよめ」を作り、<b id="town-name"></b>の近くに現れたダンジョンで クエストをこなして 借金 <b id="debt"></b> を返していきます。</p>
+    <ul>
+        <li>「はじめから」で 主人公を <b>こおりくん</b>（オールラウンダー）か <b>おにおに</b>（攻撃と守り）から えらびます。えらばなかったほうが 最初の仲間になります</li>
+        <li>オープニングのあと 町へ。セーブは自動で、タイトルの「つづきから」で続けられます（ダンジョンの中なら その階のはじめから）</li>
+        <li>大魔王ASO をたおすと ストーリー クリア。借金を返し切ると エンディング。そのあとも 遊べます</li>
+    </ul>
+
+    <h2 id="control">操作</h2>
+    <div class="table-wrap"><table>
+        <tr><th>すること</th><th>キーボード</th><th>マウス・スマホ</th></tr>
+        <tr><td>移動</td><td><kbd>矢印</kbd>・テンキー（斜めは 矢印 2 つ同時か Shift を押しながら）</td><td>十字ボタン／ゲーム画面の 行きたい方向を押す（押しっぱなしで 歩きつづける）</td></tr>
+        <tr><td>ダッシュ</td><td><kbd>B</kbd> を押しながら移動</td><td>十字ボタンを 長押し</td></tr>
+        <tr><td>攻撃・決定</td><td><kbd>Z</kbd>・<kbd>Enter</kbd>（階段の上なら「降りますか？」）</td><td>「攻撃・決定」／ゲーム画面の 主人公を押す</td></tr>
+        <tr><td>わざ</td><td><kbd>1</kbd>〜<kbd>4</kbd></td><td>わざのボタン</td></tr>
+        <tr><td>道具</td><td><kbd>X</kbd></td><td>「道具」</td></tr>
+        <tr><td>仲間の作戦</td><td><kbd>T</kbd></td><td>「作戦」（みんなで戦う・ついてきて・にげて）</td></tr>
+        <tr><td>足ぶみ</td><td><kbd>Space</kbd></td><td>「足ぶみ」</td></tr>
+        <tr><td>向きだけ変える</td><td><kbd>R</kbd> を押しながら方向</td><td>敵のほうの 十字ボタン</td></tr>
+        <tr><td>地図・音</td><td><kbd>M</kbd>・<kbd>S</kbd></td><td>「地図」・「音」</td></tr>
+        <tr><td>戻る</td><td><kbd>X</kbd>・<kbd>Esc</kbd></td><td>いちばん下の選択肢</td></tr>
+    </table></div>
+
+    <h2 id="town">町（<span class="town-name"></span>）</h2>
+    <div class="table-wrap"><table id="places"></table></div>
+    <p class="note">施設は 借金を返した合計で 開きます。開いたときは おにおにが 教えてくれます。家で 1 日すすめると、掲示板・お店・交易所が 入れかわります。</p>
+    <h3>借金と バトルポイント（BP）</h3>
+    <p><span id="bp-per"></span> 返すごとに 1 BP、合わせて <span id="bonus-every"></span> ごとに おまけの BP。BP は バトルツリーで 能力アップ・役職の開放に使います（主人公だけ）。倒れると 借金に 利子が 足されます。</p>
+    <h3>役職</h3>
+    <div class="table-wrap"><table id="roles"></table></div>
+
+    <h2 id="dungeon">ダンジョン</h2>
+    <p>ダンジョンは 入るたびに形が変わります。階段を降りて いちばん下の階の ボスをたおすと 突破。ストーリーが進んで、次のダンジョンが 現れます。</p>
+    <div class="table-wrap"><table id="dungeons"></table></div>
+    <ul>
+        <li><b>満腹度</b>：歩くと減り、0 になると HP が減っていく。おにぎりで 戻る</li>
+        <li><b>ワナ</b>：踏むまで見えない。トゲ・ワープ・大腸炎・ねむり・落とし穴・借金取り</li>
+        <li><b>ハプニング</b>：階に着いたとき まれに起こる（ライバル探検隊と鉢合わせ・宝の部屋・ふるカワから通信・おにおにの取り立て・モンスターハウス）</li>
+        <li><b>倒れたら</b>：町に戻される。お金は全部・道具は半分なくす（倉庫の物は 残る）。Lv と わざは そのまま</li>
+    </ul>
+
+    <h2 id="battle">戦い</h2>
+    <ul>
+        <li>ターン制：主人公が 1 回動くと、仲間と敵も 動く。すばやい敵は 2 回動く</li>
+        <li><b>わざ</b>は 4 つまで。PP（使える回数）がある。正面・直線・周り 8 マス・自分 に使う わざがある</li>
+        <li><b>属性</b>：わざの属性と 相手の属性で ダメージが 1.5 倍（ばつぐん）や 0.67 倍（いまひとつ）に。自分と同じ属性の わざは 1.2 倍</li>
+        <li><b>状態異常</b>：ねむり・まひ・こんらん・どく・しばり・ひるみ・大腸炎・目つぶし・こおり・やけど・よわき</li>
+    </ul>
+    <div class="table-wrap"><table id="chart"></table></div>
+
+    <h2 id="ally">仲間</h2>
+    <ul>
+        <li>たおした敵が ときどき「仲間になりたそうに こちらを見ている」。★が高いほど なりにくい（下の表）</li>
+        <li>いっしょに行ける人数は 主人公をふくめて 3 人（ストーリーで 4 人・5 人）。いっぱいのときに 仲間になったら、だれかと 入れかえるか 聞かれる（ダンジョンで 入れかえられるのは このときだけ）</li>
+        <li>仲間は キャラごとに ★・能力の振り分け・覚えるわざ が ちがう。わざは 役職の汎用わざ・そのキャラだけの わざ・敵のときの わざ</li>
+        <li>仲間の広場：連れていく仲間をえらぶ・並べかえ（★順・役職順・Lv順）・進化の道具をわたす・お別れ（こおりくん・おにおに・やすさんたち・ライバル・クエストの仲間とは お別れできない）</li>
+    </ul>
+    <div class="table-wrap"><table id="recruit"></table></div>
+
+    <h2 id="evolve">進化</h2>
+    <p>仲間になった 元の敵は、条件を満たすと 進化形に進化します。条件の種類も、何 Lv からかも キャラごとに ちがいます。</p>
+    <div class="table-wrap"><table id="evolves"></table></div>
+
+    <h2 id="rival">ライバル探検隊</h2>
+    <p>ダンジョンで 鉢合わせして 戦うライバルです（チームバータス・チーム・ケモノミチ は 月の迷宮から）。ストーリーをクリアすると、ギルドに 専用クエストが 届きます。メンバーの 頼みごとを かなえると 仲間に。メンバーが そろうと リーダーとの勝負のクエストが出て、たおすと リーダーも 仲間になります（リーダー ★5・ほか ★4）。</p>
+    <div class="table-wrap"><table id="rivals"></table></div>
+
+    <h2 id="trade">交易所</h2>
+    <ul>
+        <li>珍しい道具（日がわり）と、ほかの探検隊の出品（ほかのプレイヤーと コンピューターの探検隊）を 買える</li>
+        <li>道具を 出品できる。値段は 道具ごとに 決まっている。ほかのプレイヤーか コンピューターの探検隊が 買うと、つぎに 交易所に来たとき お金を受け取れる（日がたつと 売れる）</li>
+        <li>出品は 「自分の出品」から 取り下げられる</li>
+    </ul>
+
+    <h2 id="bonus">ドタバタ大迷宮（おまけ）</h2>
+    <p>借金を返し切って エンディングを見たあとに 行ける <b id="bonus-floors"></b> 階の おまけダンジョンです。</p>
+    <ul>
+        <li>10 階ごとに、7 つのダンジョンの 見た目と特徴が 順に変わる</li>
+        <li>10・20・…・90 階は 敵が出ない 休憩の階。町に帰っても、次は いちばん深く着いた 休憩の階から 始められる</li>
+        <li>50 階で チームバータス・チーム・ケモノミチ と対決。99 階に 大魔王ASO・真（HP が減ると 四天王を 1 人ずつ呼ぶ）</li>
+    </ul>
+</main>
+
+<script src="js/rng.js"></script>
+<script src="js/dungeon.js"></script>
+<script src="js/units.js"></script>
+<script src="js/enemies.js"></script>
+<script src="js/items.js"></script>
+<script src="js/dungeons.js"></script>
+<script src="js/collection.js"></script>
+<script src="js/allies.js"></script>
+<script src="js/enemies9.js"></script>
+<script src="js/town.js"></script>
+<script>
+(function () {
+    'use strict';
+    const { Units: U, Dungeons: DG, Collection: C, Allies: A, Town: TW, Items: I } = KD;
+    const $ = id => document.getElementById(id);
+    const money = n => `${n.toLocaleString()}えん`;
+    const table = (id, head, rows) => { $(id).innerHTML = `<tr>${head.map(h => `<th>${h}</th>`).join('')}</tr>` + rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join(''); };
+
+    $('town-name').textContent = TW.NAME;
+    document.querySelectorAll('.town-name').forEach(e => { e.textContent = TW.NAME; });
+    $('debt').textContent = money(TW.DEBT_START);
+    $('bp-per').textContent = money(TW.BP_PER);
+    $('bonus-every').textContent = money(TW.BONUS_EVERY);
+    $('bonus-floors').textContent = DG.BONUS.floors;
+
+    const PLACE_NOTES = {
+        dungeon: ['ダンジョンへ', 'ダンジョンをえらんで 出発'], guild: ['探検隊ギルド', 'クエストを受ける・報告する（ふるカワ）'],
+        debt: ['借金返済所', '借金を返す。返すと BP（おにおに）'], tree: ['バトルツリー', 'BP で 能力アップ・役職の開放と切りかえ'],
+        shop: ['お店', '道具を 買う・売る（ともいし）'], smith: ['鍛冶屋', '敵が落とした素材で 武器や道具を作る'],
+        trade: ['交易所', '珍しい道具・ほかの探検隊の出品・自分の出品'], storage: ['倉庫', '道具とお金を あずける（倒れても なくならない）'],
+        plaza: ['仲間の広場', '連れていく仲間をえらぶ・並べかえ・進化・お別れ'], home: ['家', 'セーブ・1 日すすめる・図鑑と実績']
+    };
+    table('places', ['施設', 'できること', '開く'], Object.entries(PLACE_NOTES).map(([id, [name, note]]) =>
+        [name, note, TW.UNLOCK[id] ? `借金を ${money(TW.UNLOCK[id])} 返すと` : 'はじめから']));
+
+    const label = { hp: 'HP', atk: 'こうげき', def: 'ぼうぎょ', spa: 'とくこう', spd: 'とくぼう' };
+    table('roles', ['役職', 'とくい', '能力の変わり方', '役職のわざ'], U.ROLE_IDS.map(id => {
+        const r = U.ROLES[id];
+        return [r.name, r.good, U.roleText(id), U.SKILLS[r.skill].name];
+    }));
+    void label;
+
+    table('dungeons', ['ダンジョン', '階', 'ボス', '特徴'], [...DG.LIST, DG.BONUS].map(d => {
+        const f = [];
+        if (d.pool) f.push(d.pool.tile === KD.Dungeon.WATER ? '水たまり' : '溶岩');
+        if (d.traps && d.traps[0] >= 6) f.push('ワナが多い');
+        if (d.fast) f.push('すばやい敵');
+        if (d.shift) f.push('階の形が変わる');
+        if (d.strong) f.push('力持ちの敵');
+        if (d.bonus) f.push('10 階ごとに 特徴が変わる・休憩の階');
+        return [d.name, d.floors, U.ENEMIES[d.boss].name, f.join('・') || (d.id === 'forest' ? 'チュートリアル' : '')];
+    }));
+
+    // 属性の相性
+    const E = U.ELEMENTS;
+    table('chart', ['わざ ＼ 受ける', ...E], E.map(m => [m, ...E.map(tg => { const k = U.effect(m, tg); return k > 1 ? '◎' : k < 1 ? '△' : ''; })]));
+
+    table('recruit', ['★', '仲間になる確率'], [1, 2, 3, 4, 5].map(s => ['★'.repeat(s), `${Math.round(A.RECRUIT_RATE[s] * 1000) / 10}%`]));
+
+    table('evolves', ['仲間', '進化形', '条件'], Object.entries(A.EVOLVE).map(([k, v]) => [U.ENEMIES[k].name, U.ENEMIES[v.to].name, A.evolveText(k).replace(/ \S+に 進化$/, '')]));
+
+    table('rivals', ['チーム', 'メンバー（太字は リーダー）'], Object.entries(C.RIVALS).map(([team, ids]) =>
+        [team, ids.map(id => (id === A.LEADERS[team] ? `<b>${U.ENEMIES[id].name}</b>` : U.ENEMIES[id].name)).join('・')]));
+    void I;
+})();
+</script>
+</body>
+</html>
