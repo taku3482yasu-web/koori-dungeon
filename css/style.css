@@ -49,6 +49,8 @@ h1 small { display: block; font-size: 13px; color: var(--text); font-weight: nor
 }
 
 #screen {
+    touch-action: none;   /* 押しっぱなしで歩くとき、ページが動かないように */
+    cursor: pointer;
     width: 100%;
     height: auto;
     image-rendering: pixelated;

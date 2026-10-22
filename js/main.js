@@ -6,6 +6,8 @@
 //   ダッシュ: B を押しながら移動 / 向きだけ変える: R を押しながら方向 / 足踏み: Space
 //   攻撃・決定: Z・Enter (階段の上なら「降りますか？」) / わざ: 1〜4 / 道具: X (えらぶ画面では戻る) / 作戦: T / 戻る: Esc / ミニマップ: M / 音: S
 //   スマホ: 十字ボタン (斜めあり。長押しでダッシュ)・攻撃・道具・作戦・足踏み・ミニマップ・音・わざのボタン
+//   クリック・タップ (2026-10-22 ユーザー指定): ボタンは 押した瞬間に反応する (すぐ離しても 1 歩動く)。
+//     ゲーム画面を押すと、主人公 (画面のまんなか) から見た その方向へ 1 歩。押しっぱなしで 歩きつづける。主人公を押すと 攻撃・決定
 // 音はブラウザの決まりで、最初にキーかボタンを押したときから鳴る
 // =====================================================================
 (function (KD) {
@@ -148,12 +150,21 @@
         });
 
         // ----- 画面のボタン -----
+        // 押した瞬間に 1 歩 (次の画面の更新を待つと、すぐ離したときに 動かないことがある)
+        const pressDir = (dir, extra = {}) => {
+            touch = { dir, at: performance.now(), ...extra };
+            if (!game.busy() && !needRelease) {
+                touch.stepped = true;
+                touch.last = touch.at;
+                game.moveInput(dir[0], dir[1]);
+            }
+        };
         document.querySelectorAll('[data-dir]').forEach(b => {
             const dir = b.dataset.dir.split(',').map(Number);
             b.addEventListener('pointerdown', e => {
                 e.preventDefault();
                 if (ask.asking()) return ask.key(dir[1] < 0 ? 'up' : 'down');
-                touch = { dir, at: performance.now() };
+                pressDir(dir);
             });
             const up = () => {
                 if (touch && touch.dir === dir) touch = null;
@@ -163,6 +174,37 @@
             b.addEventListener('pointerleave', up);
             b.addEventListener('pointercancel', up);
         });
+        // ゲーム画面を クリック・タップ: 主人公から見た方向へ歩く。主人公を押すと 攻撃・決定
+        const screen = document.getElementById('screen');
+        const screenDir = e => {
+            const r = screen.getBoundingClientRect();
+            const x = (e.clientX - r.left) / r.width * screen.width - screen.width / 2;
+            const y = (e.clientY - r.top) / r.height * screen.height - screen.height / 2;
+            const tile = screen.width / 24;
+            if (Math.abs(x) < tile * 0.7 && Math.abs(y) < tile * 0.7) return null;   // 主人公の上
+            const a = Math.round(Math.atan2(y, x) / (Math.PI / 4));
+            return [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]][(a + 8) % 8];
+        };
+        screen.addEventListener('pointerdown', e => {
+            if (ask.asking() || !game.state || game.state.phase !== 'play') return;
+            e.preventDefault();
+            const dir = screenDir(e);
+            if (!dir) return game.confirm();
+            try { screen.setPointerCapture(e.pointerId); } catch (err) { /* できなくても よい */ }
+            pressDir(dir, { screen: true });
+        });
+        screen.addEventListener('pointermove', e => {
+            if (!touch || !touch.screen) return;
+            const dir = screenDir(e);
+            if (dir) touch.dir = dir;
+        });
+        const screenUp = () => {
+            if (touch && touch.screen) touch = null;
+            if (!held.size && !touch) needRelease = false;
+        };
+        screen.addEventListener('pointerup', screenUp);
+        screen.addEventListener('pointercancel', screenUp);
+
         const tap = (id, fn) => document.getElementById(id).addEventListener('pointerdown', e => {
             e.preventDefault();
             fn();
@@ -205,9 +247,12 @@
             if (!game.busy() && !needRelease) {
                 if (touch) {
                     // 画面の十字ボタン: 押したら 1 マス。そのまま長押しするとダッシュ
+                    // ゲーム画面を押しっぱなし: 歩きつづける (ダッシュはしない)
                     if (!touch.stepped) {
                         touch.stepped = true;
                         game.moveInput(touch.dir[0], touch.dir[1]);
+                    } else if (touch.screen) {
+                        if (now - touch.at > LONG_PRESS_MS) game.moveInput(touch.dir[0], touch.dir[1]);
                     } else if (now - touch.at > LONG_PRESS_MS) {
                         game.moveInput(touch.dir[0], touch.dir[1], { dashing: true });
                         needRelease = true;
