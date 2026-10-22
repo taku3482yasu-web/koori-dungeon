@@ -88,10 +88,10 @@
     const r = (name, element, hp, atk, def, line) => ({ no: '', name, element, ai: 'approach', speed: 1, hp, atk, def, exp: 40, role: 'attacker', line, big: true, rival: true, traits: ['rich'], moves: [] });
     Object.assign(U.ENEMIES, {
         okagappa: r('おかがっぱ', 'みず', 16, 7, 5, 'ま～だまだ戦わねバ！ イェア！'),
-        hibikimakuri: r('ひびきまくり', 'かぜ', 14, 8, 4, '響きです。'),
+        hibikimakuri: r('ひびきまくり', 'ふしぎ', 14, 8, 4, '響きです。'),
         yamamou: r('やまもぅ', 'ふつう', 18, 6, 6, '牛の力を見せてやる！ モォー！'),
         sasaki: r('Mr.SASAKI', 'ふつう', 16, 7, 6, 'どうも、しご出来です。'),
-        kotani: r('Mr.KOTANI', 'ふしぎ', 14, 6, 6, '勝率は計算済みです。'),
+        kotani: r('Mr.KOTANI', 'かぜ', 14, 6, 6, '勝率は計算済みです。'),
         asahara: r('KING.ASAHARA', 'ほのお', 20, 8, 6, 'CS城の主の力、見せてやろう！ ひれ伏せ！'),
         shibata: r('シバター', 'ふつう', 18, 8, 5, 'ぶんぶん！ 撮れ高いただき！ んなああ～'),
         ueno: r('マッスルウエノーブル', 'ふつう', 20, 9, 6, '我が筋肉の前にひれ伏すがよい！'),

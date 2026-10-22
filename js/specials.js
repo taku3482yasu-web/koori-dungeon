@@ -24,10 +24,10 @@
         dake: { name: 'だけチョップ・極', element: 'ふつう', range: 'front', power: 4, guard: 5, fx: 'chop', color: '#ffb030', shout: 'この鍛え上げたこぶしで…だけチョップ・極！' },
         // ----- ライバル探検隊 (前作) -----
         okagappa: { name: 'おかピポっと光線', element: 'みず', range: 'pierce', power: 2.6, fx: 'beam', color: '#4fb0ff', shout: 'おかピポ！ イェア！' },
-        hibikimakuri: { name: '大音響4DX', element: 'かぜ', range: 'room', power: 1.8, status: 'flinch', chance: 1, fx: 'sound', color: '#e8c8ff', shout: 'これが４DXだ！' },
+        hibikimakuri: { name: '大音響4DX', element: 'ふしぎ', range: 'room', power: 1.8, status: 'flinch', chance: 1, fx: 'sound', color: '#e8c8ff', shout: 'これが４DXだ！' },
         yamamou: { name: 'おちょくりボーンフィーバー', element: 'ふつう', range: 'around2', power: 2.4, status: 'confuse', chance: 0.6, fx: 'bone', color: '#f4f0e0', shout: 'おちょくるなー！ モォー！' },
         sasaki: { name: 'ASAスラッシュ', element: 'ふつう', range: 'pierce', power: 2.8, fx: 'slash', color: '#ffffff', shout: '締め切り厳守です。' },
-        kotani: { name: 'NABIテンポ', element: 'ふしぎ', range: 'room', power: 1.6, kiai: true, fx: 'tempo', color: '#ffe680', shout: '数字は うそを つきません。' },
+        kotani: { name: 'NABIテンポ', element: 'かぜ', range: 'room', power: 1.6, kiai: true, fx: 'tempo', color: '#ffe680', shout: '数字は うそを つきません。' },
         asahara: { name: 'DOPAPANCHI', element: 'ほのお', range: 'front', power: 5, fx: 'punch', color: '#ff4a2a', shout: 'ひれ伏せ！ DOPAPANCHI！' },
         shibata: { name: 'シバタードライバー', element: 'ふつう', range: 'front', power: 4.2, status: 'flinch', chance: 1, fx: 'drop', color: '#ffd84a', shout: 'バーイ！ んなああ～' },
         ikekimu: { name: 'イケキムドライブ', element: 'かぜ', range: 'pierce', power: 3, fx: 'dash', color: '#c8a8ff', shout: 'すきだらけだ。' },
