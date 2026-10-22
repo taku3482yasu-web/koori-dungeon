@@ -9,7 +9,7 @@ globalThis.performance = { now: () => fakeNow };
 const store = new Map();
 globalThis.localStorage = { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
 globalThis.KD = {};
-for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) {
+for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) {
     vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
 }
 const { Units: U, Dungeon: D, Collection: C, Town: TW } = globalThis.KD;
@@ -260,4 +260,33 @@ test('ライバル探検隊: チームバータス・チーム・ケモノミチ
     const intro = DG.byId('moon').story.intro.join('\n');
     assert.match(intro, /チームバータス/);
     assert.match(intro, /チーム・ケモノミチ/);
+});
+
+test('仲間のちがい: 仲間になれるキャラは全員 ★・能力の振り分け・覚えるわざがあり、看板のわざは そのキャラだけ。汎用わざも覚える', () => {
+    const A = globalThis.KD.Allies;
+    const kinds = Object.entries(U.ENEMIES).filter(([, e]) => !e.boss && (!e.big || e.rival)).map(([k]) => k);
+    const generic = new Set(Object.values(A.GENERIC).flat());
+    const sigs = new Map();
+    for (const kind of kinds) {
+        const x = A.ALLIES[kind];
+        assert.ok(x, `${kind} の仲間のデータ`);
+        assert.ok(x.star >= 1 && x.star <= 5, `${kind} の★`);
+        assert.ok(x.learn.every(([, id]) => U.SKILLS[id]), `${kind} の わざ`);
+        assert.ok(x.learn.some(([, id]) => generic.has(id)), `${kind} が 汎用わざを覚えない`);
+        const sig = A.signature(kind);
+        assert.ok(!generic.has(sig), `${kind} の看板のわざが 汎用わざ`);
+        sigs.set(sig, [...(sigs.get(sig) || []), kind]);
+        // 仲間になったときの能力・わざ (看板のわざは 高い Lv でも持っている)
+        const st = U.allyStats(kind, 30, A.roleOf(kind));
+        assert.ok(Object.values(st).every(v => v > 0));
+        const sk = U.enemyAllySkills(kind, 50).map(k => k.id);
+        assert.ok(sk.length <= U.MAX_SKILLS && sk.includes(sig), `${kind} の Lv50 のわざ: ${sk.join(',')}`);
+    }
+    for (const [sig, who] of sigs) assert.equal(who.length, 1, `${U.SKILLS[sig].name} を ${who.join('・')} が使う`);
+    // ★が高いほど 強い (振り分けが同じなら)
+    const total = (kind, lv) => Object.values(U.allyStats(kind, lv, A.roleOf(kind))).reduce((a, b) => a + b, 0);
+    assert.ok(total('asahara', 30) > total('maechokkin', 30));
+    // 同じ役職でも 振り分けがちがう: 攻撃もできるヒーラー (ツキウサギ) と とくこうのヒーラー (ヤーハミー)
+    const r = U.allyStats('tsukiusagi', 30, 'healer'), y = U.allyStats('yahami', 30, 'healer');
+    assert.ok(r.atk > r.spa * 0.95 && y.spa > y.atk * 1.3);
 });

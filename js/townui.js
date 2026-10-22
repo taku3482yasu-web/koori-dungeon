@@ -189,9 +189,28 @@
                 else state.roster.push(a);
             }
             if (st.last) town.storyEnd = true;
+            const rivals = st.last ? joinRivals() : [];
             refreshDay();
             save();
-            g.talk([...lines, ...(st.clear || [])], () => menu());
+            g.talk([...lines, ...(st.clear || []), ...rivals], () => menu());
+        }
+
+        // ストーリーをクリアすると、ライバル探検隊の 15 人が 町に来て仲間になる (2026-10-22 ユーザー指定)。
+        // 仲間の広場で待っている。台詞を返す (もう来ていたら 何もしない)
+        function joinRivals() {
+            const town = t();
+            if (town.rivalsJoined) return [];
+            town.rivalsJoined = true;
+            const have = new Set([...state.allies, ...state.roster].map(a => a.kind));
+            const lv = Math.max(1, p().lv - 2);
+            Object.values(C.RIVALS).flat().forEach(kind => { if (!have.has(kind)) state.roster.push(g.makeAlly(kind, lv)); });
+            return ['そのころ、町の広場に ライバル探検隊のみんなが 集まっていた。',
+                'おかがっぱ「大魔王をたおすなんて、ノリが ちがうぜ！ 5DX も 力を貸してやる！」',
+                'KING.ASAHARA「ふん……おにおにの 探検隊に 手を貸すのは 今回だけだぞ」',
+                'シバター「撮れ高の においがする！ お願いマッスル、参戦！」',
+                'ヤーハミー「お宝の あるところには、わたしたち チームバータスも いるわ♪」',
+                'イシイー「ブヒッ！ 迷宮のことなら チーム・ケモノミチに まかせろ！」',
+                'ライバル探検隊の 15 人が 仲間になった！ 仲間の広場で 待っている。'];
         }
 
         const openDungeons = () => DG.LIST.slice(0, Math.min(DG.LIST.length, (t().cleared || 0) + 1));
@@ -685,7 +704,7 @@
             const all = [...state.allies, ...state.roster];
             if (!all.length) return ask('広場には だれも いない。', ['もどる'], menu, { list: false });
             ask(`連れていく仲間をえらぶ（主人公のほかに ${max} 人まで。えらぶと 入れかわる）`,
-                [...all.map(a => `${state.allies.includes(a) ? '【いっしょ】' : '　　　　　'}${a.name} Lv${a.lv}　${U.ROLES[a.role].name}`), 'もどる'], i => {
+                [...all.map(a => `${state.allies.includes(a) ? '【いっしょ】' : '　　　　　'}${a.name}${KD.Allies.star(a.kind) ? ' ' + '★'.repeat(KD.Allies.star(a.kind)) : ''} Lv${a.lv}　${U.ROLES[a.role].name}`), 'もどる'], i => {
                     if (i >= all.length) {
                         save();
                         return menu();
@@ -844,6 +863,8 @@
             state.tactic = data.tactic || 'fight';
             state.town = { cleared: 0, seen: {}, storyEnd: false, ...collectionData(), ...data.town };
             state.town.stats = { ...C.newStats(), ...state.town.stats };
+            // この しくみより前に ストーリーをクリアしていたら、ライバル探検隊が いまから仲間になる
+            if (state.town.storyEnd && !state.town.rivalsJoined) joinRivals();
             // ダンジョンの中でやめていたら、その階の はじめから (中断セーブ。仕様書 16章)
             if (data.run) return g.resume(data.run);
             menu();

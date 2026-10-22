@@ -42,12 +42,26 @@
     .tag.boss { background: var(--gold); }
     .desc { font-size: 12px; color: var(--sub); line-height: 1.5; }
     .line { font-size: 12px; margin-top: 4px; }
+    .tag.star { background: #ffe9a0; }
+    .ally { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
+    .ally-title { font-size: 11px; color: var(--sub); margin-bottom: 4px; }
+    .bars { display: grid; grid-template-columns: 52px 1fr 26px; gap: 2px 6px; align-items: center; font-size: 11px; color: var(--sub); }
+    .bar { height: 6px; background: #0b1020; border-radius: 3px; overflow: hidden; }
+    .bar i { display: block; height: 100%; background: #7fd3f7; border-radius: 3px; }
+    .bar i.hi { background: #ffd84a; }
+    .learn { margin-top: 6px; font-size: 11px; line-height: 1.7; }
+    .learn span { display: inline-block; margin-right: 6px; white-space: nowrap; }
+    .learn .lv { color: var(--sub); }
+    .learn .own { color: #ffb0c8; font-weight: bold; }
+    .learn .gen { color: #9ad8ff; }
 </style>
 </head>
 <body>
 <main>
     <h1>キャラ図鑑</h1>
     <p>ゲームに出るキャラの絵です。ゲームと同じ絵を大きくして描いています（動いているのは待機のアニメーション）。</p>
+    <p>仲間になれるキャラには、仲間のときの ★・役職・能力の振り分け（Lv30 のとき。<span style="color:#ffd84a">黄色</span>は とくに高い能力）・覚えるわざ を出しています。
+        わざは <span style="color:#ffb0c8;font-weight:bold">ピンク＝そのキャラだけの わざ</span>・<span style="color:#9ad8ff">水色＝役職の汎用わざ</span>（かっこの中は その役職）・白＝敵のときの わざ。</p>
     <p><span class="tag plan">案</span> の章は 段階 9（おまけダンジョン「ドタバタ大迷宮」）の案で、まだゲームには出ません。進化形は「元の敵 ▶ 進化形」の順に並べています。</p>
     <nav id="nav"></nav>
     <div id="sections"></div>
@@ -60,6 +74,7 @@
 <script src="../js/items.js"></script>
 <script src="../js/dungeons.js"></script>
 <script src="../js/collection.js"></script>
+<script src="../js/allies.js"></script>
 <script src="../js/art.js"></script>
 <script src="../js/bigart.js"></script>
 <script src="../js/enemyart.js"></script>
@@ -82,6 +97,23 @@
         rich: 'たおすと たくさんのお金', warp: '攻撃されると どこかへ飛ぶ'
     };
     const skillName = id => (U.SKILLS[id] ? U.SKILLS[id].name : id);
+    const AL = KD.Allies;
+    const GENERIC_ROLE = Object.fromEntries(Object.entries(AL.GENERIC).flatMap(([role, ids]) => ids.map(id => [id, role])));
+    // 敵のときに使う わざ (白で出す)
+    const ENEMY_MOVES = new Set(Object.values(U.ENEMIES).flatMap(e => (e.moves || []).map(([m]) => m)).concat(Object.values(U.ENEMIES).map(e => e.move).filter(Boolean)));
+    // 仲間のときの ★・役職・能力 (Lv30)・覚えるわざ
+    function allyInfo(kind) {
+        const star = AL.star(kind);
+        if (!star) return null;
+        const role = AL.roleOf(kind);
+        const st = U.allyStats(kind, 30, role);
+        const learn = AL.learnList(kind).map(([lv, id]) => {
+            const g = GENERIC_ROLE[id];
+            const cls = g ? 'gen' : ENEMY_MOVES.has(id) && !U.HEROES[kind] ? '' : 'own';
+            return { lv, name: skillName(id) + (g && g !== role ? `（${U.ROLES[g].name}）` : ''), cls };
+        });
+        return { star, role, st, learn };
+    }
 
     // ----- 敵のデータ → カードの中身 -----
     function enemyCard(id, extra = {}) {
@@ -92,7 +124,7 @@
         if (d.speed === 2) traits.unshift('1 ターンに 2 回動く');
         if (d.steal) traits.push('道具をぬすんで逃げる');
         const tags = [AI[d.ai] || d.ai];
-        if (d.role && U.ROLES[d.role] && !d.boss && !d.rival && !d.big) tags.push(`仲間: ${U.ROLES[d.role].name}`);
+        if (AL.star(id)) tags.push(`仲間: ${U.ROLES[AL.roleOf(id)].name}`);
         return {
             id, no: d.no, name: d.name, element: d.element, tags, boss: d.boss,
             desc: [moves.length ? `わざ: ${moves.join('・')}` : '', traits.join('。')].filter(Boolean).join('　'),
@@ -105,6 +137,7 @@
         const learn = (h.learn || []).map(([, s]) => skillName(s));
         return {
             id, no: '', name: h.name, element: h.element, tags: [h.type || (U.ROLES[h.role] && U.ROLES[h.role].name) || ''].filter(Boolean),
+            leader: false,
             desc: [h.note || '', learn.length ? `わざ: ${learn.join('・')}` : ''].filter(Boolean).join('　'),
             line: lines ? lines.attack[0] : ''
         };
@@ -170,8 +203,8 @@
         section(d.id, `${i + 1}. ${d.name}`, `${d.floors} 階`, groups);
     });
     section('anywhere', 'どこにでも出る（まれ）', 'どのダンジョンにも まれに出る', [{ cards: DG.ANYWHERE.map(([id]) => enemyCard(id)) }]);
-    section('rivals', 'ライバル探検隊', 'ハプニングで鉢合わせする。たおすと お金を落とす',
-        Object.entries(C.RIVALS).map(([team, ids]) => ({ title: team, cards: ids.map(id => enemyCard(id)) })));
+    section('rivals', 'ライバル探検隊', 'ハプニングで鉢合わせする。たおすと お金を落とす。ストーリーをクリアすると 15 人とも仲間になる（リーダーは ★5、ほかは ★4）',
+        Object.entries(C.RIVALS).map(([team, ids]) => ({ title: team, cards: ids.map(id => enemyCard(id, id === AL.LEADERS[team] ? { tags: [...enemyCard(id).tags, 'リーダー'] } : {})) })));
     section('plan', '段階 9：ドタバタ大迷宮', '借金を返し切ったあとの おまけダンジョン（99 階）の案', [
         { title: 'ボス（99 階）', cards: [PLAN_BOSS] },
         { title: '進化形（053〜079）', cards: PLAN.filter(r => Number(r[0]) <= 79).map(planCard) },
@@ -198,7 +231,22 @@
     }
     const hasArt = id => Boolean(A.SPRITES[id] || B.BIG[id]);
 
+    const STAT_LABELS = [['hp', 'HP'], ['atk', 'こうげき'], ['def', 'ぼうぎょ'], ['spa', 'とくこう'], ['spd', 'とくぼう']];
+    function allyHtml(info) {
+        if (!info) return '';
+        const max = { hp: 260, atk: 130, def: 130, spa: 130, spd: 130 };   // 棒の長さの目安 (Lv30。HP 以外は同じ基準)
+        const top = Math.max(...STAT_LABELS.slice(1).map(([k]) => info.st[k] / max[k]));
+        const bars = STAT_LABELS.map(([k, label]) => {
+            const r = Math.min(1, info.st[k] / max[k]);
+            const hi = k !== 'hp' && info.st[k] / max[k] >= top * 0.999;
+            return `<span>${label}</span><span class="bar"><i class="${hi ? 'hi' : ''}" style="width:${Math.round(r * 100)}%"></i></span><span>${info.st[k]}</span>`;
+        }).join('');
+        const learn = info.learn.map(l => `<span><span class="lv">Lv${l.lv}</span> <span class="${l.cls}">${l.name}</span></span>`).join('');
+        return `<div class="ally"><div class="ally-title">仲間のとき（Lv30）</div><div class="bars">${bars}</div><div class="learn">${learn}</div></div>`;
+    }
+
     function renderCard(c, parent) {
+        const info = c.plan ? null : allyInfo(c.id);
         const el = document.createElement('div');
         const big = !A.SPRITES[c.id] && B.BIG[c.id] && B.BIG[c.id].h > 20;
         el.className = 'card' + (c.plan ? ' plan' : '') + (big ? ' big' : '');
@@ -218,11 +266,13 @@
         el.insertAdjacentHTML('beforeend', `
             <div class="head"><span class="no">${c.no ? 'No.' + c.no : ''}</span><span class="name">${c.name}</span></div>
             <div class="tags"><span class="tag" style="background:${ELEMENT_COLORS[c.element] || '#ffffff'}">${c.element}</span>
+                ${info ? `<span class="tag star">${'★'.repeat(info.star)}</span>` : ''}
                 ${c.boss ? '<span class="tag boss">ボス</span>' : ''}
                 ${c.tags.filter(t => t !== 'ボス').map(t => `<span class="tag plain">${t}</span>`).join('')}
                 ${baseName ? `<span class="tag plain">元: ${baseName}</span>` : ''}</div>
             <div class="desc">${c.desc || ''}</div>
-            ${c.line ? `<div class="line">「${c.line}」</div>` : ''}`);
+            ${c.line ? `<div class="line">「${c.line}」</div>` : ''}
+            ${allyHtml(info)}`);
         parent.append(el);
     }
 

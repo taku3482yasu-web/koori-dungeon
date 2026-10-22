@@ -130,12 +130,12 @@
             };
         }
 
-        // 仲間を作る。こおりくん・おにおにはアタッカー、やすさんたちと 仲間になった敵は それぞれの役職 (仕様書 6.3)
+        // 仲間を作る。こおりくん・おにおにはアタッカー、やすさんたちと 仲間になった敵は それぞれの役職 (仕様書 6.3・allies.js)
         function makeAlly(kind, lv = 1, x = 0, y = 0) {
             const isHero = Boolean(U.HEROES[kind]);
-            const role = isHero ? U.HEROES[kind].role || 'attacker' : U.ENEMIES[kind].role;
+            const role = KD.Allies.roleOf(kind);
             const stats = U.allyStats(kind, lv, role);
-            const skills = isHero ? U.startSkills(kind, role, true) : U.enemyAllySkills(kind);
+            const skills = isHero ? U.startSkills(kind, role, true) : U.enemyAllySkills(kind, lv);
             if (isHero) U.learnedBetween(kind, 1, lv).forEach(id => { if (skills.length < U.MAX_SKILLS) skills.push(U.newSkill(id)); });
             return {
                 kind, name: isHero ? U.HEROES[kind].name : U.ENEMIES[kind].name, ally: true, side: 'party',
@@ -855,19 +855,27 @@
         }
 
         // 役職ごとの動き (仕様書 6.3): ヒーラーは回復、ディフェンダーは守る、ジャマーはねむらせる、
-        //   アタッカーは きあいため、サポーターは階段をさがす
+        //   アタッカーは きあいため、サポーターは階段をさがす。
+        //   わざの id ではなく 中身で選ぶ (汎用わざ・固有わざも同じように使う。allies.js)
         function roleMove(a, foes, adj) {
-            const own = id => a.skills.find(k => k.id === id && k.pp > 0);
+            const has = ok => usable(a, ok);
             const use = k => {
                 state.queue.push(() => allySkill(a, k, null));
                 return true;
             };
-            if (own('heal') && party().some(u => cheb(u, a) <= 1 && u.hp > 0 && u.hp < u.stats.hp * 0.5)) return use(own('heal'));
-            if (own('guard') && adj.length && !a.buffs.guard && a.hp < a.stats.hp * 0.7) return use(own('guard'));
-            if (own('lullaby') && adj.some(e => !e.status) && rng.chance(0.35)) return use(own('lullaby'));
-            if (own('kiai') && adj.length && !a.buffs.kiai && rng.chance(0.2)) return use(own('kiai'));
+            // 回復: いちばん たくさん回復するわざから
+            const heals = a.skills.filter(k => k.pp > 0 && U.SKILLS[k.id].heal).sort((x, y) => U.SKILLS[y.id].heal - U.SKILLS[x.id].heal);
+            const hurt = party().filter(u => cheb(u, a) <= 1 && u.hp > 0 && u.hp < u.stats.hp * 0.5);
+            if (heals.length && hurt.length) return use(hurt.some(u => u.hp < u.stats.hp * 0.25) ? heals[0] : heals[heals.length - 1]);
+            const guard = has(m => m.buff === 'guard');
+            if (guard && adj.length && !a.buffs.guard && a.hp < a.stats.hp * 0.7) return use(guard);
+            const jam = has(m => m.range === 'around' && m.status && !m.power);
+            if (jam && adj.some(e => !e.status) && rng.chance(0.35)) return use(jam);
+            const kiai = has(m => m.buff === 'kiai');
+            if (kiai && adj.length && !a.buffs.kiai && rng.chance(0.2)) return use(kiai);
             const { stairs } = state.map;
-            if (own('scout') && !state.explored[idx(stairs.x, stairs.y)] && rng.chance(0.1)) return use(own('scout'));
+            const scout = has(m => m.reveal === 'stairs') || (!state.explored[idx(stairs.x, stairs.y)] && has(m => m.reveal === 'map'));
+            if (scout && !state.explored[idx(stairs.x, stairs.y)] && rng.chance(0.1)) return use(scout);
             return false;
         }
 
@@ -1292,15 +1300,15 @@
             sfx('levelup');
             bubble(u, C.lineFor(u.kind, 'levelup', rng));
             if (u.hero) flash('rgba(255,240,160,.45)');
-            if (U.HEROES[u.kind]) U.learnedBetween(u.kind, lvBefore, u.lv).forEach(id => (u.hero ? learn(u, id) : allyLearn(u, id)));
+            U.learnedBetween(u.kind, lvBefore, u.lv).forEach(id => (u.hero ? learn(u, id) : allyLearn(u, id)));
         }
 
-        // 仲間がわざを覚える。4 つ持っていたら、役職のわざ以外でいちばん古いものを忘れる
+        // 仲間がわざを覚える。4 つ持っていたら、役職のわざ・看板のわざ (allies.js) 以外でいちばん古いものを忘れる
         function allyLearn(a, id) {
             const name = U.SKILLS[id].name;
             if (a.skills.some(k => k.id === id)) return;
             if (a.skills.length >= U.MAX_SKILLS) {
-                const i = a.skills.findIndex(k => k.id !== U.ROLES[a.role].skill);
+                const i = a.skills.findIndex(k => k.id !== U.ROLES[a.role].skill && k.id !== KD.Allies.signature(a.kind));
                 say(`${a.name}は ${U.SKILLS[a.skills[i].id].name}を 忘れて、${name}を 覚えた！`);
                 a.skills[i] = U.newSkill(id);
             } else {
@@ -2042,7 +2050,8 @@
                 ctx.globalAlpha = 1;
                 return;
             }
-            const height = u.boss ? 30 : u.big ? 26 : U.HEROES[u.kind] ? 22 : 16;
+            const rivalAlly = u.side === 'party' && U.ENEMIES[u.kind] && U.ENEMIES[u.kind].rival;
+            const height = u.boss ? 30 : u.big ? 26 : U.HEROES[u.kind] || rivalAlly ? 22 : 16;
             KD.BigArt.drawBig(ctx, u.kind, frame, sx + 8, sy + 14, { height, flip, alpha });
         }
 

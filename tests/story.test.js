@@ -9,7 +9,7 @@ globalThis.performance = { now: () => fakeNow };
 const store = new Map();
 globalThis.localStorage = { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
 globalThis.KD = {};
-for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) {
+for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) {
     vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
 }
 const { Units: U, Items: I, Town: TW, Dungeon: D, Dungeons: DG, createRng } = globalThis.KD;
@@ -425,4 +425,36 @@ test('交易所オンライン: つながらないときは コンピュータ�
     globalThis.KD.CONFIG.supabase = { url: '', key: '' };
     // 設定がなければ オフライン
     assert.equal(globalThis.KD.createMarket({}).online, false);
+});
+
+test('ストーリーをクリアすると ライバル探検隊の 15 人が 仲間の広場に来る。リーダーは ★5、ほかは ★4', () => {
+    const { s, game, run, asks, choose } = setup({}, { town: true });
+    const C = globalThis.KD.Collection, A = globalThis.KD.Allies;
+    s.town.cleared = 6;
+    choose('ダンジョンへ');
+    choose('ASOの壺の底');
+    if (/ふるカワ/.test(asks[0] && asks[0].message)) choose('つぎへ');
+    run(1300);
+    s.bossDown = true;
+    s.floor = 25;
+    game.state.boss = null;
+    s.player.x = s.player.fx = s.map.stairs.x;
+    s.player.y = s.player.fy = s.map.stairs.y;
+    game.confirm();
+    choose('はい');
+    run(1300);
+    let talk = '';
+    while (!/日目/.test(asks[0].message)) { talk += asks[0].message; choose('つぎへ'); }
+    assert.equal(s.town.storyEnd, true);
+    assert.match(talk, /ライバル探検隊の 15 人が 仲間になった/);
+    const rivals = Object.values(C.RIVALS).flat();
+    assert.equal(rivals.length, 15);
+    for (const kind of rivals) assert.ok([...s.allies, ...s.roster].some(a => a.kind === kind), kind);
+    for (const [team, kinds] of Object.entries(C.RIVALS)) {
+        for (const kind of kinds) assert.equal(A.star(kind), kind === A.LEADERS[team] ? 5 : 4, `${team} の ${kind}`);
+    }
+    // 2 回目は 来ない (増えない)
+    const n = s.roster.length;
+    assert.equal(s.roster.filter(a => a.kind === 'asahara').length, 1);
+    assert.ok(n >= 15);
 });
