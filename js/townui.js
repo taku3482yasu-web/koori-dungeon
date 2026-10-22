@@ -628,12 +628,15 @@
         //   bought: ほかの探検隊から 買った。キャラの Lv は 主人公の Lv＋5 まで (オンラインの出品は 中身を 信じきれないので)。
         //   もう片方の バージョンの キャラは 図鑑の「交換で 手に入れた」に のる
         const ALLY_LV_OVER = 5;
+        const TRADE_MARK = '（交易）';
         function receive(l, bought = false) {
             const k = tradeAlly(l.id);
             if (!k) return giveItem({ id: l.id, n: l.n }, true);
             const lv = Math.max(1, bought ? Math.min(l.n, p().lv + ALLY_LV_OVER) : l.n);
-            state.roster.push(g.makeAlly(k, lv));
+            const a = g.makeAlly(k, lv);
+            state.roster.push(a);
             if (!bought) return;
+            a.name += TRADE_MARK;   // 交易所で 買った キャラは「（交易）」と 付ける (2026-10-22 ユーザー指定)
             stat('allyTrades');
             if (U.ENEMIES[k].version !== version().id) t().dex.traded = { ...(t().dex.traded || {}), [k]: true };
         }
@@ -723,7 +726,8 @@
                         rivals.splice(rivals.indexOf(l.src), 1);
                         receive(l, true);
                         save();
-                        return ask(`${l.seller}から ${rowLabel(l)}を 買った！${tradeAlly(l.id) ? '（仲間の広場で待っている）' : ''}`, ['もどる'], market, { list: false });
+                        return ask(`${l.seller}から ${rowLabel(l)}を 買った！${tradeAlly(l.id) ? `
+${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っている` : ''}`, ['もどる'], market, { list: false });
                     }
                     connect(net.buy(l.remote, myName()), res => {
                         const r = res && res[0];
@@ -731,7 +735,8 @@
                         p().money -= r.price;
                         receive({ id: r.item_id, n: r.n }, true);
                         save();
-                        ask(`${l.seller}から ${rowLabel({ ...l, n: Math.min(l.n, tradeAlly(l.id) ? p().lv + ALLY_LV_OVER : l.n) })}を 買った！${tradeAlly(l.id) ? '（仲間の広場で待っている）' : ''}`, ['もどる'], market, { list: false });
+                        ask(`${l.seller}から ${rowLabel({ ...l, n: Math.min(l.n, tradeAlly(l.id) ? p().lv + ALLY_LV_OVER : l.n) })}を 買った！${tradeAlly(l.id) ? `
+${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っている` : ''}`, ['もどる'], market, { list: false });
                     }, () => offline(market));
                 });
             };

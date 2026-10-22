@@ -198,10 +198,10 @@ test('キャラ交換: 交易所で もう片方の バージョンの 限定キ
     assert.ok(!s.roster.some(a => a.kind === 'yukiusapon'));
     assert.deepEqual(s.town.listings.map(l => [l.id, l.n]), [['ally_yukiusapon', 12]]);
     choose('もどる');
-    // 取り下げると もどってくる
+    // 取り下げると もどってくる (自分の キャラなので「（交易）」は 付かない)
     choose('自分の出品');
     choose('ユキウサポン');
-    assert.ok(s.roster.some(a => a.kind === 'yukiusapon' && a.lv === 12));
+    assert.ok(s.roster.some(a => a.kind === 'yukiusapon' && a.lv === 12 && a.name === 'ユキウサポン'));
     // 再戦の すがた・ふつうの キャラは 出せない
     assert.ok(!DGv.tradableAlly('harukirin_q') && !DGv.tradableAlly('harry') && DGv.tradableAlly('goukioni'));
 });
@@ -261,6 +261,8 @@ test('キャラ交換: 買った キャラの Lv は 主人公の Lv＋5 まで�
     assert.match(asks[0].message, /買った/);
     const a = s.roster.find(x => x.kind === 'goukioni');
     assert.equal(a.lv, s.player.lv + 5, 'Lv99 の 出品でも 主人公の Lv＋5 まで');
+    assert.equal(a.name, 'ゴウキオニ（交易）', '交易所で 買った キャラは「（交易）」');
+    assert.match(asks[0].message, /ゴウキオニ（交易）として 仲間の広場で 待っている/);
     assert.ok(s.town.dex.traded.goukioni);
     assert.equal(s.town.stats.allyTrades, 1);
     assert.ok(s.town.ach.ver_trade, '実績 キャラ交換');
@@ -294,4 +296,13 @@ test('バージョンの 実績: 専用ダンジョン突破・限定ボスが�
     assert.ok(!ach('ver_all'));
     s.roster.push(game.makeAlly(kinds[9], 5));
     assert.ok(ach('ver_all'));
+});
+
+test('交易所で 買った キャラの「（交易）」は 進化しても 残る', () => {
+    const { game } = setup({});
+    const from = Object.keys(A.EVOLVE)[0];
+    const a = game.makeAlly(from, 60);
+    a.name = `${U.ENEMIES[from].name}（交易）`;
+    game.evolve(a);
+    assert.equal(a.name, `${U.ENEMIES[A.EVOLVE[from].to].name}（交易）`);
 });

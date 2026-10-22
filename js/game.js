@@ -108,6 +108,7 @@
         // ----- 主人公をえらぶ (仕様書 6.2) -----
         // 役職はアタッカーから始まり、バトルツリーで開放して町で切りかえる (仕様書 6.3・6.4)
         const HERO_IDS = ['koori', 'onioni'];
+        const TRADE_MARK = '（交易）';   // 交易所で 買った キャラの 名前に 付ける (2026-10-22 ユーザー指定。townui.js も 同じ)
         function selectHero(done) {
             state.phase = 'select';
             ui.ask('主人公をえらんでください。\n（えらばなかったほうは、最初の仲間になります）', HERO_IDS.map(id => U.HEROES[id].name), i => {
@@ -1579,7 +1580,9 @@
             if (!v) return false;
             const before = a.name;
             const ratio = a.hp / a.stats.hp;
-            if (a.name === U.ENEMIES[a.kind].name) a.name = U.ENEMIES[v.to].name;
+            // 名前が 元の 種類の 名前なら 進化形の 名前に (交易所で 買った キャラの「（交易）」は 残す)
+            const mark = a.name.endsWith(TRADE_MARK) ? TRADE_MARK : '';
+            if (a.name === U.ENEMIES[a.kind].name + mark) a.name = U.ENEMIES[v.to].name + mark;
             a.kind = v.to;
             a.element = U.ENEMIES[v.to].element;
             a.immune = U.ENEMIES[v.to].immune || [];
