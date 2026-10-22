@@ -221,20 +221,20 @@
     // メンバー (リーダー以外) は それぞれの頼みごと (納品・たおす・行く) をかなえると仲間になる。
     // チームのメンバーが そろうと、リーダーとの勝負 (duel: その階に行くと リーダーが待っている。たおすと仲間になる)
     const RIVAL_QUESTS = {
-        hibikimakuri: { type: 'reach', dungeon: 'moon', floor: 12, money: 4000, text: 'ひびきまくり「月の迷宮の B12F まで、いっしょに 響かせに行こうぜ！」' },
-        yamamou: { type: 'deliver', want: 'protein_powder', count: 5, money: 3500, text: 'やまもぅ「牛みたいに 強くなりたい！ プロテインの粉を 5 個 持ってきて」' },
-        kotani: { type: 'kill', dungeon: 'mansion', kind: 'shurikenbo', count: 3, money: 4000, text: 'Mr.KOTANI「忍びの屋敷で シュリケンボーを 3 体。成功率は 87% と出ています」' },
+        hibikimakuri: { type: 'reach', dungeon: 'moon', floor: 12, money: 4000, text: 'ひびきまくり「月の迷宮の B12F まで、いっしょに 響かせに行こうよ～」' },
+        yamamou: { type: 'deliver', want: 'protein_powder', count: 5, money: 3500, text: 'やまもぅ「おちょくられないように強くなりたい！ プロテインの粉を 5 個 持ってきて」' },
+        kotani: { type: 'kill', dungeon: 'mansion', kind: 'shurikenbo', count: 3, money: 4000, text: 'Mr.KOTANI「忍びの屋敷で シュリケンボーを 3 体。成功率は 87.4% です。記録しておきます」' },
         sasaki: { type: 'reach', dungeon: 'mountain', floor: 15, money: 4500, text: 'Mr.SASAKI「筋肉の山の B15F まで。締め切り厳守です。」' },
-        shibata: { type: 'kill', dungeon: 'mountain', kind: 'magmatcho', count: 3, money: 4500, text: 'シバター「撮れ高のために、筋肉の山の マグマッチョを 3 体！ お願い マッスル！」' },
-        ikekimu: { type: 'kill', dungeon: 'aso', kind: 'takaramimic', count: 2, money: 6000, text: 'イケキム「ASOの壺の底の タカラミミックを 2 体。…お宝は 山分けな？」' },
+        shibata: { type: 'kill', dungeon: 'mountain', kind: 'magmatcho', count: 3, money: 4500, text: 'シバター「撮れ高のために、筋肉の山の マグマッチョを 3 体！ お願い マッスル！ んなああ～」' },
+        ikekimu: { type: 'kill', dungeon: 'aso', kind: 'takaramimic', count: 2, money: 6000, text: 'イケキム「チッ…ASOの壺の底の タカラミミックを 2 体だ。…お宝は 山分けな？」' },
         maechokkin: { type: 'deliver', want: 'star_piece', count: 4, money: 4000, text: 'マエチョッキン「美しさに 磨きをかけたいの。星のかけらを 4 個 ちょうだい♪」' },
         norahan: { type: 'kill', dungeon: 'moon', kind: 'mikazukibat', count: 3, money: 4000, text: 'ノラハン「月の迷宮の ミカヅキバットを 3 体。お宝の 見張りがじゃまなの」' },
         mazuda: { type: 'kill', dungeon: 'mountain', kind: 'dumbbellkong', count: 3, money: 5000, text: 'マズダ「筋肉の山の ダンベルコングを 3 体。縄張りあらそいだ」' },
         naitoon: { type: 'reach', dungeon: 'moon', floor: 15, money: 4500, text: 'NAITOON「月の迷宮の B15F まで、夜の散歩に つきあえ」' },
         // リーダーとの勝負
-        okagappa: { type: 'duel', dungeon: 'coast', floor: 6, money: 8000, text: 'おかがっぱ「5DX の リーダーとして、勝負だ！ 海岸どうくつの B6F で 待ってるぜ！」' },
-        asahara: { type: 'duel', dungeon: 'mansion', floor: 10, money: 9000, text: 'KING.ASAHARA「ひれ伏すのは どちらか……忍びの屋敷の B10F で 決めようではないか」' },
-        ueno: { type: 'duel', dungeon: 'mountain', floor: 12, money: 9000, text: 'マッスルウエノーブル「お願いマッスルの 主として、筋肉の勝負を 申しこむ！ 筋肉の山の B12F で 待つ」' },
+        okagappa: { type: 'duel', dungeon: 'coast', floor: 6, money: 8000, text: 'おかがっぱ「5DX の リーダーとして、勝負だ！ 海岸どうくつの B6F で 待ってるyo！」' },
+        asahara: { type: 'duel', dungeon: 'mansion', floor: 10, money: 9000, text: 'KING.ASAHARA「フハハハ！ ひれ伏すのは どちらか……忍びの屋敷の B10F で 決めようではないか」' },
+        ueno: { type: 'duel', dungeon: 'mountain', floor: 12, money: 9000, text: 'マッスルウエノーブル「お願いマッスルの 主として、筋肉の勝負を 申しこむ！ 我が筋肉の前に ひれ伏すがよい！ 筋肉の山の B12F で 待つ」' },
         yahami: { type: 'duel', dungeon: 'moon', floor: 10, money: 9000, text: 'ヤーハミー「チームバータスの リーダーとして、あなたを いただくわ。月の迷宮の B10F でね♪」' },
         ishii: { type: 'duel', dungeon: 'aso', floor: 15, money: 10000, text: 'イシイー「ブヒッ！ ケモノミチの 頭として 勝負だ！ ASOの壺の底の B15F だ！」' }
     };

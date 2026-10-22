@@ -38,7 +38,7 @@
         hyouga_breath: f('ひょうがブレス', 'こおり', 'line', 1.6, { status: 'freeze', chance: 0.2 }),
         kirin_spring: f('春をよぶ角', 'しぜん', 'around', 1.3, { status: 'weak', chance: 0.4 }),
         kirin_thunder: f('麒麟のいかずち', 'かぜ', 'line', 1.5, { status: 'para', chance: 0.3 }),
-        // 鬼鬼団 (金色の鬼ヶ城)
+        // 鬼鬼団 (金色のSE城)
         koni_punch: f('こおにパンチ', 'ほのお', 'front', 1.2),
         aooni_splash: f('あおおにしぶき', 'みず', 'line', 1.2),
         kanabou: f('かなぼう', 'ふつう', 'front', 1.6),
@@ -144,18 +144,18 @@
             id: 'glacier', version: 'koori', name: '雪どけの氷河', theme: 'glacier', boss: 'harukirin', bgm: 'cave',
             enemies: ['yukiusapon', 'tsurarabo', 'kakigoora', 'penguinknight', 'shirokumatcho', 'yukionnan', 'sakurarisu', 'harukazedori', 'fukinoton'],
             story: {
-                intro: ['ふるカワ「月の迷宮の むこうに、氷河が 見つかったんだって！ でも 奥から 春の においが するらしいよ」', 'こおりくん「氷河が とけちゃう！？ 氷隊の 出番だね！」'],
-                boss: ['ハル麒麟「氷は とけ、春が 来る。それが さだめ。こおりの子よ、そなたも とかしてくれよう！」', 'こおりくん「こおりは とけないよ！ 氷隊の 意地を 見せてやる！」'],
+                intro: ['ふるカワ「月の迷宮の むこうに、氷河が 見つかったんだって！ でも 奥から 春の においが するらしいよ」', 'こおりくん「よーし！ばりきつよめ改め、氷隊！出動だ！」'],
+                boss: ['ハル麒麟「氷は とけ、春が 来る。それが さだめ。こおりの子よ、そなたも 溶けて賢者となりなさい」', 'こおりくん「こおりは とけないよ！ 氷隊の 意地を 見せてやる！」'],
                 clear: ['ハル麒麟「……春を はねかえす 氷か。見事だ」', 'ふるカワ「氷河が 元に もどっていくよ！」', '雪どけの氷河を 突破した！']
             }
         }),
         ex({
-            id: 'onijo', version: 'onioni', name: '金色の鬼ヶ城', theme: 'onijo', boss: 'kinmetsuki', bgm: 'deep',
+            id: 'onijo', version: 'onioni', name: '金色のSE城', theme: 'onijo', boss: 'kinmetsuki', bgm: 'deep',
             enemies: ['konin', 'aoonibo', 'kanabone', 'tsunodaruma', 'onibin', 'hyoutanoni', 'taikooni', 'onigirin', 'setsubunmame'],
             story: {
-                intro: ['ふるカワ「月の迷宮の むこうに、金ピカの お城が 建ったんだって！ 鬼が いっぱい いるらしいよ」', 'おにおに「鬼の 城だと？ 鬼鬼団の 名に かけて、だまって いられるか！」'],
-                boss: ['金滅鬼「金色の 鬼に ひれ伏せ！ 鬼を 名のる 小僧よ、ここで 滅びるがいい！」', 'おにおに「鬼鬼団の 鬼は 負けねえ！ 金返せ……じゃなくて、城を 返せ！」'],
-                clear: ['金滅鬼「……ぐぬぬ……その 鬼の 心、本物か……」', 'ふるカワ「お城の 金ピカが 消えていくよ！」', '金色の鬼ヶ城を 突破した！']
+                intro: ['ふるカワ「月の迷宮の むこうに、金ピカの お城が 建ったんだって！ 鬼が いっぱい いるらしいよ」', 'おにおに「鬼の 城だと？ それ俺の城じゃね？　だまってられん！ばりきつよめ改め、鬼鬼団！出陣だ！」'],
+                boss: ['金滅鬼「金色の 鬼に ひれ伏せ！ 鬼を 名のる 小僧よ、ここで 滅びるがいい！」', 'おにおに「鬼鬼団の 鬼は 負けん！ 金返せ……じゃなくて、城を 返せ！」'],
+                clear: ['金滅鬼「……ぐぬぬ……その 鬼の 心、本物か……」', 'ふるカワ「お城の 金ピカが 消えていくよ！」', '金色のSE城を 突破した！']
             }
         })
     ];
@@ -169,7 +169,7 @@
     const VERSION_QUESTS = {
         koori: [
             { id: 'vq:kakigoori', type: 'kill', dungeon: 'glacier', kind: 'kakigoora', count: 3, money: 5000, need: opened('glacier'),
-                text: 'たむさん「氷隊の みんな、かき氷 食べたくない？ 雪どけの氷河の カキゴーラを 3 体 たのむよ」' },
+                text: 'たむさん「氷隊の　みんなで　かき氷 食べたくない？ 雪どけの氷河の カキゴーラを 3 体 たのむよ」' },
             { id: 'vq:hyougaryu', type: 'duel', dungeon: 'glacier', floor: 10, money: 8000, ally: 'hyougaryu', need: opened('glacier'),
                 text: '？？？「氷河の B10F で、とけない 氷を 持つ者を 待つ……」（ヒョウガリュウ）' },
             { id: 'vq:harukirin', type: 'duel', dungeon: 'glacier', floor: 12, money: 15000, ally: 'harukirin_q', need: cleared('glacier'),
@@ -177,11 +177,11 @@
         ],
         onioni: [
             { id: 'vq:mamemaki', type: 'kill', dungeon: 'onijo', kind: 'setsubunmame', count: 3, money: 5000, need: opened('onijo'),
-                text: 'だけさん「鬼鬼団に 豆を まくなんて ゆるせん！ 金色の鬼ヶ城の セツブンマメを 3 体 たのむ」' },
+                text: 'だけさん「鬼鬼団に 豆を まくなんて ゆるせん！ 金色のSE城の セツブンマメを 3 体 たのむ」' },
             { id: 'vq:goukioni', type: 'duel', dungeon: 'onijo', floor: 10, money: 8000, ally: 'goukioni', need: opened('onijo'),
-                text: 'ゴウキオニ「鬼鬼団に 入りたけりゃ、おれに 勝ってみな！ 鬼ヶ城の B10F で 待つ」' },
+                text: 'ゴウキオニ「鬼鬼団に 入りたけりゃ、おれに 勝ってみな！ SE城の B10F で 待つ」' },
             { id: 'vq:kinmetsuki', type: 'duel', dungeon: 'onijo', floor: 12, money: 15000, ally: 'kinmetsuki_q', need: cleared('onijo'),
-                text: '金滅鬼「鬼鬼団の おにおに、次は 本気だ！ 金色の鬼ヶ城の B12F で 待つ」' }
+                text: '金滅鬼「鬼鬼団の おにおに、次は 本気だ！ 金色のSE城の B12F で 待つ」' }
         ]
     };
     // いま掲示板に出す 専用クエスト。done: 達成した クエストの id (town.owned) / accepted: 受けている id

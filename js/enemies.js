@@ -168,17 +168,17 @@
         daichouenkin: e('051', 'ダイチョウエンキン', 'ふしぎ', 'approach', 10, 7, 5, 10, 'jammer', 'おなか、ぐるぐる～', { traits: ['split'], moves: [['kin', 0.5]] }),
         kinmenkoinu: e('052', 'キンメンコイヌ', 'ふつう', 'flee', 14, 8, 8, 25, 'supporter', 'ワン！（得意げ）', { traits: ['rich'] }),
         // 強敵 (前作から。大きい絵)
-        goldDog: e('', 'ゴールド金面犬', 'ふつう', 'flee', 40, 14, 18, 120, 'supporter', 'ワオーン！', { big: true, traits: ['rich'] }),
-        makibikon: e('', 'マキビコンMk-4', 'ふつう', 'shoot', 50, 15, 18, 90, 'attacker', '目標を補足したであります', { big: true, moves: [['beam', 1]] }),
-        nakata: e('', '奈架多ドラゴン', 'みず', 'approach', 56, 18, 15, 100, 'attacker', 'ガオオオー！', { big: true, traits: ['swim'], moves: [['mizu_breath', 0.4]] }),
+        goldDog: e('', 'ゴールド金面犬', 'ふつう', 'flee', 40, 14, 18, 120, 'supporter', 'ワン！（自信ありげ）', { big: true, traits: ['rich'] }),
+        makibikon: e('', 'マキビコンMk-4', 'ふつう', 'shoot', 50, 15, 18, 90, 'attacker', '挑戦者を確認したであります。', { big: true, moves: [['beam', 1]] }),
+        nakata: e('', '奈架多ドラゴン', 'みず', 'approach', 56, 18, 15, 100, 'attacker', 'グオオオ…（力加減…力加減…）', { big: true, traits: ['swim'], moves: [['mizu_breath', 0.4]] }),
 
         // ----- ボス (仕様書 12章。いちばん下の階。大きい絵) -----
-        harry: e('', 'ハリー', 'ふつう', 'approach', 50, 11, 8, 80, 'attacker', 'ここはオレの森だハリ！', { boss: true, big: true, traits: ['summon'], summon: 'haribaby', moves: [['hari_needle', 0.4]] }),
+        harry: e('', 'ハリー', 'ふつう', 'approach', 50, 11, 8, 80, 'attacker', 'ハリー！メンキョナイー！', { boss: true, big: true, traits: ['summon'], summon: 'haribaby', moves: [['hari_needle', 0.4]] }),
         urashima: e('', '浦の島重蔵', 'みず', 'approach', 62, 12, 12, 120, 'defender', 'わしの家に 何の用じゃ…はて、何だったかのう', { boss: true, big: true, traits: ['swim', 'shell'], moves: [['tamatebako', 0.3], ['koura', 0.15]] }),
-        daishi: e('', 'ダイシ', 'ふしぎ', 'approach', 72, 13, 11, 170, 'jammer', '迷える子羊よ、説法を聞いていきなさい', { boss: true, big: true, traits: ['berserk'], moves: [['seppou', 0.3], ['shakujou', 0.3]] }),
-        zumitani: e('', 'ズミタニ', 'かぜ', 'approach', 70, 12, 10, 220, 'attacker', '78代目の名にかけて！', { boss: true, big: true, speed: 2, moves: [['kunai_rain', 0.4], ['shinobi_kiri', 0.3]] }),
-        runaya: e('', 'ルナヤ', 'ふしぎ', 'approach', 80, 14, 11, 280, 'jammer', '月の迷宮へようこそ。言ったっけ？', { boss: true, big: true, traits: ['warp'], moves: [['moon_beam', 0.4], ['moon_spell', 0.3]] }),
-        nozoema: e('', 'ノゾエマ', 'ふつう', 'approach', 95, 16, 14, 350, 'defender', '筋肉と刀は うそをつかぬ', { boss: true, big: true, moves: [['katana', 0.4], ['kabuto_wari', 0.3]] }),
+        daishi: e('', 'ダイシ', 'ふしぎ', 'approach', 72, 13, 11, 170, 'jammer', 'よくぞ参られた。拙僧が相手いたそう。', { boss: true, big: true, traits: ['berserk'], moves: [['seppou', 0.3], ['shakujou', 0.3]] }),
+        zumitani: e('', 'ズミタニ', 'かぜ', 'approach', 70, 12, 10, 220, 'attacker', 'やっほー、78代目だよ！ ついてこられるかな♪', { boss: true, big: true, speed: 2, moves: [['kunai_rain', 0.4], ['shinobi_kiri', 0.3]] }),
+        runaya: e('', 'ルナヤ', 'ふしぎ', 'approach', 80, 14, 11, 280, 'jammer', 'よく来たわね。…よく来たわね。あら、もう言ったかしら？', { boss: true, big: true, traits: ['warp'], moves: [['moon_beam', 0.4], ['moon_spell', 0.3]] }),
+        nozoema: e('', 'ノゾエマ', 'ふつう', 'approach', 95, 16, 14, 350, 'defender', 'その前に、この筋肉を見よ！', { boss: true, big: true, moves: [['katana', 0.4], ['kabuto_wari', 0.3]] }),
         maou: e('', '大魔王ASO', 'ふしぎ', 'approach', 130, 15, 14, 600, 'attacker', 'よみがえったぞ……今度こそ すべてを 無に返してやる！', { boss: true, big: true, traits: ['summon', 'berserk'], summon: 'asohei', moves: [['funka', 0.3], ['lava_beam', 0.3]] })
     });
     // 森の敵の わざ・とくちょう を同じ形に (move / rate → moves)

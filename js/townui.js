@@ -289,7 +289,9 @@
             // ストーリーをクリアすると、ライバル探検隊から クエストが届く (2026-10-22 ユーザー指定)
             const rivals = st.last ? storyLines(DG.STORY.rivalsQuest) : [];
             if (st.last) {
-                return cutscene([...withScenes([...lines, ...(st.clear || [])], ['asoDown', 'asoDown', 'asoSeal', 'townParty', 'stillDebt', 'stillDebt', 'clearCard']),
+                const scenes = p().kind === 'onioni' ? ['asoDown', 'asoDown', 'asoSeal', 'townParty', 'townParty', 'stillDebt', 'stillDebt', 'clearCard']
+                    : ['asoDown', 'asoDown', 'asoSeal', 'townParty', 'stillDebt', 'stillDebt', 'stillDebt', 'clearCard'];
+                return cutscene([...withScenes([...lines, ...(st.clear || [])], scenes),
                     ...withScenes(rivals, ['rivalsQuest'])], () => menu(), { song: 'ending' });
             }
             storyCut([...lines, ...(st.clear || []), ...((version().lines || {}).clear || []), ...rivals], d, 'clear', () => menu());
@@ -302,7 +304,8 @@
             state.run = null;
             save();
             if (!first) return g.talk([...lines, ...storyLines(DG.STORY.bonusAgain)], () => menu());
-            cutscene(withScenes([...lines, ...d.story.clear], ['shinDown', 'shinDown', 'shinFade', 'rivalsCheer', 'rivalsCheer', 'rivalsCheer', 'oniPraise', 'allParade', 'trueEnd']), () => menu(), { song: 'ending' });
+            cutscene(withScenes([...lines, ...d.story.clear], ['shinDown', 'shinDown', 'shinFade', 'rivalsCheer', 'rivalsCheer', 'rivalsCheer',
+                p().kind === 'onioni' ? 'allParade' : 'oniPraise', 'allParade', 'trueEnd']), () => menu(), { song: 'ending' });
         }
 
         // 場面の絵つきの話 (エンディング。2026-10-22 ユーザー指定)。items: [{ text, scene }]。「スキップ」で 最後まで飛ばす
@@ -324,17 +327,20 @@
             go(0);
         }
         // 行ごとに 場面をわりあてる (scenes の長さが足りなければ 最後の場面のまま)
-        const withScenes = (lines, scenes) => lines.map((text, i) => ({ text, scene: scenes[Math.min(i, scenes.length - 1)] }));
+        const withScenes = (lines, scenes) => storyLines(lines).map((text, i) => ({ text, scene: scenes[Math.min(i, scenes.length - 1)] }));
 
-        // dungeons.js の STORY の 台詞を 今の ゲームに 合わせる ({title} などを うめる・主人公ごとの 台詞を えらぶ)
-        const storyLines = list => list.map(l => (typeof l === 'string' ? l : l[p().kind] || l.koori))
-            .map(l => l.replace(/\{title\}/g, GAME_TITLE).replace(/\{version\}/g, version().name).replace(/\{debt\}/g, money(t().debt)).replace(/\{town\}/g, TW.NAME));
+        // ストーリーの 台詞を 今の ゲームに 合わせる: 主人公ごとの 台詞 ({ koori, onioni }) を えらび、{title} などを うめる。
+        //   dungeons.js の STORY と、ダンジョンの story (intro・boss・clear など) の どちらにも 使う (2026-10-22 ユーザー指定)
+        const storyLines = list => (list || []).map(l => (typeof l === 'string' ? l : l[p().kind] || l.koori))
+            .map(l => l.replace(/\{title\}/g, GAME_TITLE).replace(/\{version\}/g, version().name).replace(/\{debt\}/g, t() ? money(t().debt) : '')
+                .replace(/\{town\}/g, TW.NAME).replace(/\{hero\}/g, p().name));
 
         // ----- ストーリーデモ (2026-10-22 ユーザー指定: 途中の ストーリーも オープニングのように 絵を付ける) -----
         // ダンジョンに はじめて行くとき (intro) と、ボスを たおしたあと (clear) の 台詞に、1 行ずつ 場面の絵を 付ける。
         // 場面は 台詞から 決める: だれが 話しているか・「仲間になった」・「新しいダンジョン」など。絵は drawStory
         //   phase: intro / clear / boss (ボスに 会ったとき。ダンジョンの中で 出す。曲は ボスの 曲の まま)
         function storyCut(lines, d, phase, done) {
+            lines = storyLines(lines);
             if (phase === 'boss') return cutscene(storyScenes(lines, d, phase), done, { overlay: true });
             cutscene(storyScenes(lines, d, phase), done, { song: 'story' });
         }
@@ -352,6 +358,7 @@
         }
         const dungeonByName = name => [...DG.LIST, ...(DG.EXTRA || []), ...(DG.BONUS ? [DG.BONUS] : [])].find(x => x.name === name);
         function storyScenes(lines, d, phase) {
+            lines = storyLines(lines);
             const theme = d.theme || 'forest';
             const who = line => { const m = /^(.+?)「/.exec(line); return m ? m[1] : null; };
             return lines.map((text, i) => {
@@ -672,7 +679,7 @@
 
         // ----- お店 (ともいし) -----
         function shop() {
-            ask(`ともいし「いらっしゃい。今日は何にする？」　お金 ${money(p().money)}`, ['買う', '売る', 'やめる'], i => {
+            ask(`ともいし「いらっしゃい。今日は何にする？ こおり、お金はちゃんと返しなさいよ！」　お金 ${money(p().money)}`, ['買う', '売る', 'やめる'], i => {
                 if (i === 0) return buy();
                 if (i === 1) return sell();
                 menu();
@@ -1941,7 +1948,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
         const LEAD_X = 110, GAP = 30, MEET = 36;
         const ACT_TIME = 2600;                        // あいさつの 長さ (ミリ秒)
         const SUBS = {
-            furukawa: { name: 'ふるカワ', lines: ['クエスト、がんばってね！', '今日も いい天気だね！', 'ギルドに 新しい 依頼が 来てるよ！'] },
+            furukawa: { name: 'ふるカワ', lines: ['クエスト、がんばってね！', '今日も いい天気だね！', 'ギルドに 新しい 依頼が 来てるよ！', 'うちの実家なら、ダンジョンくらい 買えるけどね♪'] },
             // ともいしは こおりくんの お母さん。台詞は 前作 (スロット・パチンコ) から
             tomoishi: { name: 'ともいし', lines: ['お金返しなさい！', '内定はまだなの？', 'こおり、がんばって！', '内定とりなさい！'] }
         };
@@ -2357,7 +2364,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
         // この階で待っている ライバルのリーダー (受けている duel のクエスト)
         const duelsHere = (n, id) => TW.duelsAt(t().quests, id, n);
 
-        return { title, enter, menu, draw, storyScenes, bossTalk: (lines, d, done) => storyCut(lines, d, 'boss', done), soundSettings, onKill, onFloor, onClear, duelsHere, bonusRest, save, load, newTown, giveItem, countHave, questDone, seen, beat, noteItem, stat, check, repay };
+        return { title, enter, menu, draw, storyScenes, storyLines, bossTalk: (lines, d, done) => storyCut(lines, d, 'boss', done), soundSettings, onKill, onFloor, onClear, duelsHere, bonusRest, save, load, newTown, giveItem, countHave, questDone, seen, beat, noteItem, stat, check, repay };
     }
 
     KD.createTown = createTown;

@@ -331,7 +331,7 @@
             ...block('#5a5068', '#463e54', '#7a7088', { accent: '#ffd84a' }), stairs: ['#ffd84a', '#8a6a2a', '#fff0a0'],
             void: '#060408', mini: { floor: '#b8b098', path: '#c8a870' }
         },
-        // バージョン専用: 雪どけの氷河 (氷と 雪どけの 若葉) / 金色の鬼ヶ城 (朱ぬりの 柱と 金)
+        // バージョン専用: 雪どけの氷河 (氷と 雪どけの 若葉) / 金色のSE城 (朱ぬりの 柱と 金)
         glacier: {
             floor: ['#c8e0f0', '#c0d8ec', '#d0e8f4'], floorPattern: 'speck', speck: '#ffffff', path: '#a8c8e0', pathDark: '#88a8c8', pebble: '#e8f4ff',
             ...block('#4a7aa8', '#3a6a98', '#8ab8e0', { accent: '#ffb0c8' }), stairs: ['#8ac8f0', '#3a6a98', '#e8f8ff'],

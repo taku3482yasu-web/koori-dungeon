@@ -728,6 +728,8 @@
 
         // 台詞を 1 つずつ見せる (ボスに会ったとき)
         function talk(lines, done = () => {}) {
+            // 主人公ごとの 台詞 ({ koori, onioni }) を えらぶ (townui.js の storyLines)
+            if (lines && lines.some(l => typeof l !== 'string' || l.includes('{'))) lines = town.storyLines(lines);
             if (!lines || !lines.length) return done();
             ui.ask(lines[0], ['つぎへ'], () => talk(lines.slice(1), done));
         }

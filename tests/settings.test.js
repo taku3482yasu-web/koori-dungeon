@@ -21,7 +21,7 @@ const ctx = new Proxy({ measureText: t => ({ width: t.length * 9 }), createLinea
     get: (t, k) => (k in t ? t[k] : k === 'fillRect' ? () => { drawn++; } : () => {}), set: (t, k, v) => { t[k] = v; return true; }
 });
 
-function newGame(opts = {}) {
+function newGame(opts = {}, hero = 'こおりくん') {
     store.clear();
     const asks = [];
     const ui = { ask: (message, options, done, extra) => asks.push({ message, options, done, extra }), asking: () => asks.length > 0 };
@@ -35,7 +35,7 @@ function newGame(opts = {}) {
         q.done(i);
     };
     choose('はじめから');
-    choose('こおりくん');
+    choose(hero);
     for (let i = 0; i < 5; i++) choose('つぎへ');
     assert.match(asks[0].message, /1日目/);
     return { game, s: game.state, run, asks, choose };
@@ -305,4 +305,19 @@ test('曲: どの 曲にも B メロが ある (A → B → A → B で 長く)'
         assert.equal(s.b.length, 16, name);
         assert.equal(s.bb.length, 4, name);
     }
+});
+
+test('ストーリー: 主人公ごとの 台詞 ({ koori, onioni }) と {hero} (2026-10-22 ユーザーの 書き換え)', () => {
+    const forest = DG.byId('forest');
+    const k = newGame();
+    assert.equal(k.game.town.storyLines(forest.story.boss)[1], 'こおりくん「ごめんね。でも 借金を返さないと こおり生きていけないんだ！」');
+    assert.equal(k.game.town.storyLines(['{hero}「やあ」'])[0], 'こおりくん「やあ」');
+    const o = newGame({}, 'おにおに');
+    assert.equal(o.game.town.storyLines(forest.story.boss)[1], 'おにおに「あ？なんだてめえ。殺すぞ」');
+    assert.ok(o.game.town.storyLines(DG.BONUS.story.boss).some(l => l.includes('これで終わりだ！おにおに！')));
+    // 絵の 場面も 主人公の 台詞で 決まる
+    const sc = o.game.town.storyScenes(forest.story.boss, forest, 'boss').map(x => [x.scene.type, x.scene.who]);
+    assert.deepEqual(sc, [['bossAppear', 'harry'], ['talk', 'onioni']]);
+    // 金色の SE城 (2026-10-22 ユーザー指定)
+    assert.equal(DG.EXTRA.find(d => d.id === 'onijo').name, '金色のSE城');
 });
