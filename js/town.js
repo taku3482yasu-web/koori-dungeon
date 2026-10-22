@@ -220,7 +220,7 @@
         yamamou: { type: 'deliver', want: 'protein_powder', count: 5, money: 3500, text: 'やまもぅ「牛みたいに 強くなりたい！ プロテインの粉を 5 個 持ってきて」' },
         kotani: { type: 'kill', dungeon: 'mansion', kind: 'shurikenbo', count: 3, money: 4000, text: 'Mr.KOTANI「忍びの屋敷で シュリケンボーを 3 体。成功率は 87% と出ています」' },
         sasaki: { type: 'reach', dungeon: 'mountain', floor: 15, money: 4500, text: 'Mr.SASAKI「筋肉の山の B15F まで。締め切り厳守です。」' },
-        ueno: { type: 'deliver', want: 'magma_stone', count: 4, money: 4500, text: 'マッスルウエノーブル「妻への 贈りもの。マグマ石を 4 個 頼む」' },
+        shibata: { type: 'kill', dungeon: 'mountain', kind: 'magmatcho', count: 3, money: 4500, text: 'シバター「撮れ高のために、筋肉の山の マグマッチョを 3 体！ お願い マッスル！」' },
         ikekimu: { type: 'kill', dungeon: 'aso', kind: 'takaramimic', count: 2, money: 6000, text: 'イケキム「ASOの壺の底の タカラミミックを 2 体。…お宝は 山分けな？」' },
         maechokkin: { type: 'deliver', want: 'star_piece', count: 4, money: 4000, text: 'マエチョッキン「美しさに 磨きをかけたいの。星のかけらを 4 個 ちょうだい♪」' },
         norahan: { type: 'kill', dungeon: 'moon', kind: 'mikazukibat', count: 3, money: 4000, text: 'ノラハン「月の迷宮の ミカヅキバットを 3 体。お宝の 見張りがじゃまなの」' },
@@ -229,7 +229,7 @@
         // リーダーとの勝負
         okagappa: { type: 'duel', dungeon: 'coast', floor: 6, money: 8000, text: 'おかがっぱ「5DX の リーダーとして、勝負だ！ 海岸どうくつの B6F で 待ってるぜ！」' },
         asahara: { type: 'duel', dungeon: 'mansion', floor: 10, money: 9000, text: 'KING.ASAHARA「ひれ伏すのは どちらか……忍びの屋敷の B10F で 決めようではないか」' },
-        shibata: { type: 'duel', dungeon: 'mountain', floor: 12, money: 9000, text: 'シバター「撮れ高 勝負だ！ 筋肉の山の B12F で 待ってる！ お願い マッスル！」' },
+        ueno: { type: 'duel', dungeon: 'mountain', floor: 12, money: 9000, text: 'マッスルウエノーブル「お願いマッスルの 主として、筋肉の勝負を 申しこむ！ 筋肉の山の B12F で 待つ」' },
         yahami: { type: 'duel', dungeon: 'moon', floor: 10, money: 9000, text: 'ヤーハミー「チームバータスの リーダーとして、あなたを いただくわ。月の迷宮の B10F でね♪」' },
         ishii: { type: 'duel', dungeon: 'aso', floor: 15, money: 10000, text: 'イシイー「ブヒッ！ ケモノミチの 頭として 勝負だ！ ASOの壺の底の B15F だ！」' }
     };

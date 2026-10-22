@@ -165,8 +165,8 @@
         asahara: a(5, [115, 145, 95, 85, 90], '1:dopapanchi 1:mouda 15:tosshin 30:senpu 45:hissatsu', 'attacker'),
         kotani: a(4, [90, 75, 95, 135, 115], '1:nabi_tempo 1:dokubari 15:mekuramashi 30:shizuku 45:tankenkan', 'jammer'),
         sasaki: a(4, [100, 120, 95, 105, 95], '1:asa_slash 1:tsubute 15:tankenkan 30:mouda 45:hissatsu', 'supporter'),
-        shibata: a(5, [120, 140, 100, 70, 90], '1:shibata_driver 1:mouda 15:tosshin 30:jinarashi 45:hissatsu', 'attacker'),
-        ueno: a(4, [135, 130, 125, 60, 90], '1:ueno_crush 1:tate 15:teppeki 30:tosshin 45:jinarashi', 'defender'),
+        shibata: a(4, [120, 140, 100, 70, 90], '1:shibata_driver 1:mouda 15:tosshin 30:jinarashi 45:hissatsu', 'attacker'),
+        ueno: a(5, [135, 130, 125, 60, 90], '1:ueno_crush 1:tate 15:teppeki 30:tosshin 45:jinarashi', 'defender'),
         ikekimu: a(4, [95, 125, 85, 105, 90], '1:ikekimu_drive 1:mekuramashi 15:dokubari 30:mouda 45:hissatsu', 'jammer'),
         yahami: a(5, [100, 90, 95, 135, 115], '1:mirror_charm 1:shizuku 15:megumi 30:mekuramashi 45:senpu', 'healer'),
         maechokkin: a(4, [95, 130, 85, 105, 95], '1:chokkin 1:mouda 15:senpu 30:tosshin 45:hissatsu', 'attacker'),
@@ -175,8 +175,8 @@
         mazuda: a(4, [145, 125, 120, 65, 100], '1:bear_hug 1:tate 15:teppeki 30:jinarashi 45:tosshin', 'defender'),
         naitoon: a(4, [100, 120, 85, 110, 95], '1:night_howl 1:mekuramashi 15:mouda 30:senpu 45:hissatsu', 'jammer')
     };
-    // リーダー (★5) はチームの いちばんはじめ以外のこともあるので、ここに書く
-    const LEADERS = { '5DX': 'okagappa', 'ASK-3': 'asahara', 'お願いマッスル': 'shibata', 'チームバータス': 'yahami', 'チーム・ケモノミチ': 'ishii' };
+    // リーダー (★5) はチームの いちばんはじめ以外のこともあるので、ここに書く (お願いマッスルは マッスルウエノーブル。2026-10-22 ユーザー指定)
+    const LEADERS = { '5DX': 'okagappa', 'ASK-3': 'asahara', 'お願いマッスル': 'ueno', 'チームバータス': 'yahami', 'チーム・ケモノミチ': 'ishii' };
 
     // 'Lv:わざ ...' → [[Lv, わざ], ...]。振り分けは 平均が 1 になるように
     function prepare(x) {
