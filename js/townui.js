@@ -101,6 +101,7 @@
             const town = t();
             const kinds = [...state.allies, ...state.roster].map(a => a.kind);
             town.board = TW.questBoard(dayRng(1), town.day, { owned: town.owned, allyKinds: [...new Set(kinds)], dungeons: openDungeons() });
+            addRivalQuests();
             town.shop = TW.shopStock(dayRng(2));
             town.rare = TW.rareStock(dayRng(3));
             town.market = TW.rivalListings(dayRng(4));
@@ -189,28 +190,21 @@
                 else state.roster.push(a);
             }
             if (st.last) town.storyEnd = true;
-            const rivals = st.last ? joinRivals() : [];
             refreshDay();
             save();
+            // ストーリーをクリアすると、ライバル探検隊から クエストが届く (2026-10-22 ユーザー指定)
+            const rivals = st.last ? ['ふるカワ「たいへん！ ギルドに ライバル探検隊のみんなから クエストが 届いてるよ！」',
+                'ふるカワ「頼みを かなえたら 仲間になってくれるって。メンバーが そろうと、リーダーが 勝負を 挑んでくるみたい！」'] : [];
             g.talk([...lines, ...(st.clear || []), ...rivals], () => menu());
         }
 
-        // ストーリーをクリアすると、ライバル探検隊の 15 人が 町に来て仲間になる (2026-10-22 ユーザー指定)。
-        // 仲間の広場で待っている。台詞を返す (もう来ていたら 何もしない)
-        function joinRivals() {
+        // ライバル探検隊のクエストを 掲示板の いちばん上に (ストーリーをクリアしたあと。town.js の rivalQuests)
+        function addRivalQuests() {
             const town = t();
-            if (town.rivalsJoined) return [];
-            town.rivalsJoined = true;
-            const have = new Set([...state.allies, ...state.roster].map(a => a.kind));
-            const lv = Math.max(1, p().lv - 2);
-            Object.values(C.RIVALS).flat().forEach(kind => { if (!have.has(kind)) state.roster.push(g.makeAlly(kind, lv)); });
-            return ['そのころ、町の広場に ライバル探検隊のみんなが 集まっていた。',
-                'おかがっぱ「大魔王をたおすなんて、ノリが ちがうぜ！ 5DX も 力を貸してやる！」',
-                'KING.ASAHARA「ふん……おにおにの 探検隊に 手を貸すのは 今回だけだぞ」',
-                'シバター「撮れ高の においがする！ お願いマッスル、参戦！」',
-                'ヤーハミー「お宝の あるところには、わたしたち チームバータスも いるわ♪」',
-                'イシイー「ブヒッ！ 迷宮のことなら チーム・ケモノミチに まかせろ！」',
-                'ライバル探検隊の 15 人が 仲間になった！ 仲間の広場で 待っている。'];
+            if (!town.storyEnd || !town.board) return;
+            town.board = town.board.filter(q => !q.rival);
+            const have = [...state.allies, ...state.roster].map(a => a.kind);
+            town.board.unshift(...TW.rivalQuests({ have, accepted: town.quests.map(q => q.id) }));
         }
 
         const openDungeons = () => DG.LIST.slice(0, Math.min(DG.LIST.length, (t().cleared || 0) + 1));
@@ -309,13 +303,18 @@
                     lines.push(`★${I.ITEMS[q.item].name}を もらった！`);
                 }
                 if (q.ally) {
-                    const a = g.makeAlly(q.ally.kind, q.ally.lv);
+                    // ライバル探検隊は 主人公の Lv の 2 つ下で来る
+                    const a = g.makeAlly(q.ally.kind, q.ally.lv || Math.max(1, p().lv - 2));
                     a.name = q.ally.name;
                     state.roster.push(a);
-                    t().owned.push('ally:hari');
+                    t().owned.push(q.ally.key || 'ally:hari');
                     lines.push(`★${a.name}が 仲間になった！（仲間の広場で待っている）`);
+                    if (q.rival && q.type !== 'duel' && C.RIVALS[q.rival].every(k => k === KD.Allies.LEADERS[q.rival] || [...state.allies, ...state.roster].some(u => u.kind === k))) {
+                        lines.push(`${q.rival}の メンバーが そろった！ リーダーの ${U.ENEMIES[KD.Allies.LEADERS[q.rival]].name}から 勝負の クエストが 届いた！`);
+                    }
                 }
             });
+            addRivalQuests();
             save();
             ask(`ふるカワ「おつかれさま！」\n${lines.join('\n')}`, ['もどる'], guild);
         }
@@ -799,6 +798,10 @@
         const sameDungeon = (q, id) => (q.dungeon || 'forest') === id;
         function onKill(kind, id) {
             t().quests.forEach(q => {
+                if (q.type === 'duel' && q.kind === kind && q.progress < 1 && sameDungeon(q, id)) {
+                    q.progress = 1;
+                    return questReached(q);
+                }
                 if (q.type !== 'kill' || q.kind !== kind || q.progress >= q.count || !sameDungeon(q, id)) return;
                 q.progress++;
                 if (q.progress >= q.count) questReached(q);
@@ -863,8 +866,7 @@
             state.tactic = data.tactic || 'fight';
             state.town = { cleared: 0, seen: {}, storyEnd: false, ...collectionData(), ...data.town };
             state.town.stats = { ...C.newStats(), ...state.town.stats };
-            // この しくみより前に ストーリーをクリアしていたら、ライバル探検隊が いまから仲間になる
-            if (state.town.storyEnd && !state.town.rivalsJoined) joinRivals();
+            addRivalQuests();
             // ダンジョンの中でやめていたら、その階の はじめから (中断セーブ。仕様書 16章)
             if (data.run) return g.resume(data.run);
             menu();
@@ -1064,7 +1066,10 @@
             ctx.fillText(`BP ${t().bp}　役職：${U.ROLES[hero.role].name}`, 6, 10);
         }
 
-        return { title, enter, menu, draw, onKill, onFloor, onClear, save, load, newTown, giveItem, countHave, questDone, seen, beat, noteItem, stat, check, repay };
+        // この階で待っている ライバルのリーダー (受けている duel のクエスト)
+        const duelsHere = (n, id) => TW.duelsAt(t().quests, id, n);
+
+        return { title, enter, menu, draw, onKill, onFloor, onClear, duelsHere, save, load, newTown, giveItem, countHave, questDone, seen, beat, noteItem, stat, check, repay };
     }
 
     KD.createTown = createTown;

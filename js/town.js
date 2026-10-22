@@ -212,6 +212,49 @@
         return list;
     }
 
+    // ----- ライバル探検隊のクエスト (ストーリーをクリアしたあとだけ。2026-10-22 ユーザー指定。中身は案) -----
+    // メンバー (リーダー以外) は それぞれの頼みごと (納品・たおす・行く) をかなえると仲間になる。
+    // チームのメンバーが そろうと、リーダーとの勝負 (duel: その階に行くと リーダーが待っている。たおすと仲間になる)
+    const RIVAL_QUESTS = {
+        hibikimakuri: { type: 'reach', dungeon: 'moon', floor: 12, money: 4000, text: 'ひびきまくり「月の迷宮の B12F まで、いっしょに 響かせに行こうぜ！」' },
+        yamamou: { type: 'deliver', want: 'protein_powder', count: 5, money: 3500, text: 'やまもぅ「牛みたいに 強くなりたい！ プロテインの粉を 5 個 持ってきて」' },
+        kotani: { type: 'kill', dungeon: 'mansion', kind: 'shurikenbo', count: 3, money: 4000, text: 'Mr.KOTANI「忍びの屋敷で シュリケンボーを 3 体。成功率は 87% と出ています」' },
+        sasaki: { type: 'reach', dungeon: 'mountain', floor: 15, money: 4500, text: 'Mr.SASAKI「筋肉の山の B15F まで。締め切り厳守です。」' },
+        ueno: { type: 'deliver', want: 'magma_stone', count: 4, money: 4500, text: 'マッスルウエノーブル「妻への 贈りもの。マグマ石を 4 個 頼む」' },
+        ikekimu: { type: 'kill', dungeon: 'aso', kind: 'takaramimic', count: 2, money: 6000, text: 'イケキム「ASOの壺の底の タカラミミックを 2 体。…お宝は 山分けな？」' },
+        maechokkin: { type: 'deliver', want: 'star_piece', count: 4, money: 4000, text: 'マエチョッキン「美しさに 磨きをかけたいの。星のかけらを 4 個 ちょうだい♪」' },
+        norahan: { type: 'kill', dungeon: 'moon', kind: 'mikazukibat', count: 3, money: 4000, text: 'ノラハン「月の迷宮の ミカヅキバットを 3 体。お宝の 見張りがじゃまなの」' },
+        mazuda: { type: 'kill', dungeon: 'mountain', kind: 'dumbbellkong', count: 3, money: 5000, text: 'マズダ「筋肉の山の ダンベルコングを 3 体。縄張りあらそいだ」' },
+        naitoon: { type: 'reach', dungeon: 'moon', floor: 15, money: 4500, text: 'NAITOON「月の迷宮の B15F まで、夜の散歩に つきあえ」' },
+        // リーダーとの勝負
+        okagappa: { type: 'duel', dungeon: 'coast', floor: 6, money: 8000, text: 'おかがっぱ「5DX の リーダーとして、勝負だ！ 海岸どうくつの B6F で 待ってるぜ！」' },
+        asahara: { type: 'duel', dungeon: 'mansion', floor: 10, money: 9000, text: 'KING.ASAHARA「ひれ伏すのは どちらか……忍びの屋敷の B10F で 決めようではないか」' },
+        shibata: { type: 'duel', dungeon: 'mountain', floor: 12, money: 9000, text: 'シバター「撮れ高 勝負だ！ 筋肉の山の B12F で 待ってる！ お願い マッスル！」' },
+        yahami: { type: 'duel', dungeon: 'moon', floor: 10, money: 9000, text: 'ヤーハミー「チームバータスの リーダーとして、あなたを いただくわ。月の迷宮の B10F でね♪」' },
+        ishii: { type: 'duel', dungeon: 'aso', floor: 15, money: 10000, text: 'イシイー「ブヒッ！ ケモノミチの 頭として 勝負だ！ ASOの壺の底の B15F だ！」' }
+    };
+    // いま掲示板に出すライバルのクエスト。have: 仲間にいる キャラの種類 / accepted: 受けている クエストの id
+    function rivalQuests({ have = [], accepted = [] } = {}) {
+        const C = KD.Collection, A = KD.Allies;
+        const list = [];
+        Object.entries(C.RIVALS).forEach(([team, kinds]) => {
+            const leader = A.LEADERS[team];
+            const members = kinds.filter(k => k !== leader);
+            const open = members.filter(k => !have.includes(k));
+            const targets = open.length ? open : have.includes(leader) ? [] : [leader];
+            targets.forEach(kind => {
+                const id = `rival:${kind}`;
+                if (accepted.includes(id)) return;
+                const r = RIVAL_QUESTS[kind];
+                list.push({ ...r, id, rival: team, kind: r.type === 'deliver' || r.type === 'reach' ? undefined : r.kind || kind,
+                    ally: { kind, name: U.ENEMIES[kind].name, key: id }, progress: 0, count: r.type === 'duel' ? 1 : r.count });
+            });
+        });
+        return list;
+    }
+    // リーダーが待っている階 (duel のクエストを受けていたら その階に出す)
+    const duelsAt = (quests, dungeon, floor) => quests.filter(q => q.type === 'duel' && q.progress < 1 && q.dungeon === dungeon && q.floor === floor).map(q => q.ally.kind);
+
     const questGoal = q => (q.type === 'kill' || q.type === 'deliver' ? q.count : 1);
     function rewardText(q) {
         const parts = [`${q.money.toLocaleString()}えん`];
@@ -225,6 +268,6 @@
         ROLE_ORDER, OUGI, treeNodes, TREE_START, canUnlock, treeStats, rolesOpen, treeSkills, nodeText,
         shopStock, shopUnit, buyPrice, RECIPES, recipeText,
         RARE, rareStock, RIVALS, rivalListings, sellChance,
-        QUEST_ALLY, questBoard, questGoal, rewardText
+        QUEST_ALLY, questBoard, questGoal, rewardText, RIVAL_QUESTS, rivalQuests, duelsAt
     };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);

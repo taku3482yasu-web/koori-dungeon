@@ -290,3 +290,16 @@ test('仲間のちがい: 仲間になれるキャラは全員 ★・能力の�
     const r = U.allyStats('tsukiusagi', 30, 'healer'), y = U.allyStats('yahami', 30, 'healer');
     assert.ok(r.atk > r.spa * 0.95 && y.spa > y.atk * 1.3);
 });
+
+test('ライバルのリーダーとの勝負: クエストを受けていると 決まった階で 待っている (HP が多い)', () => {
+    const t = setup({});
+    const { s } = t;
+    const TW = globalThis.KD.Town;
+    const q = TW.rivalQuests({ have: ['hibikimakuri', 'yamamou'] }).find(x => x.type === 'duel' && x.ally.kind === 'okagappa');
+    s.town.quests.push({ ...q, dungeon: s.dungeon.id, floor: 2 });
+    down(t);
+    const e = s.enemies.find(x => x.kind === 'okagappa' && x.duel);
+    assert.ok(e, 'おかがっぱが いない');
+    assert.ok(e.stats.hp >= U.enemyStats('okagappa', e.lv).hp * 3);
+    assert.ok(s.messages.some(m => /待っている/.test(m.text)));
+});

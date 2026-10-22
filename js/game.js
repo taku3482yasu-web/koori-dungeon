@@ -210,6 +210,7 @@
                 for (let i = 0; i < 3 + Math.min(4, Math.ceil(n / 2)); i++) spawnEnemy(startRoom);
                 if (last && state.dungeon.boss) spawnBoss();
                 else maybeHappen();
+                if (state.town && town.duelsHere) town.duelsHere(n, state.dungeon.id).forEach(spawnDuel);
             }
             if (KD.Sound) KD.Sound.bgm(DUNGEON_BGM[state.dungeon.id] || 'forest');
             say(`${state.dungeon.name} B${n}F に着いた。`);
@@ -519,6 +520,21 @@
             if (!placeNear(e, stairs.x, stairs.y)) return;
             state.enemies.push(e);
             state.boss = e;
+        }
+
+        // ライバルのリーダーとの勝負 (クリア後のクエスト)。主人公のいない部屋で待っている。ボスほどではないが 強い
+        function spawnDuel(kind) {
+            const d = state.dungeon, p = state.player;
+            const startRoom = roomOf(p.x, p.y);
+            const rooms = state.map.rooms.map((r, i) => i).filter(i => i !== startRoom);
+            const room = state.map.rooms[rng.pick(rooms.length ? rooms : [startRoom])];
+            const e = makeEnemy(kind, DG.levelFor(d, state.floor) + 6, room.x + (room.w >> 1), room.y + (room.h >> 1));
+            if (!placeNear(e, e.x, e.y)) return;
+            e.stats.hp *= 3;
+            e.hp = e.stats.hp;
+            e.duel = true;
+            state.enemies.push(e);
+            say(`${e.name}が この階で 待っている……！`);
         }
 
         // 台詞を 1 つずつ見せる (ボスに会ったとき)

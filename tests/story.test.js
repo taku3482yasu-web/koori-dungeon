@@ -427,9 +427,11 @@ test('交易所オンライン: つながらないときは コンピュータ�
     assert.equal(globalThis.KD.createMarket({}).online, false);
 });
 
-test('ストーリーをクリアすると ライバル探検隊の 15 人が 仲間の広場に来る。リーダーは ★5、ほかは ★4', () => {
+test('ストーリーをクリアすると ライバル探検隊の クエストが出る。メンバーは 頼みごと、そろうと リーダーとの勝負。リーダーは ★5、ほかは ★4', () => {
     const { s, game, run, asks, choose } = setup({}, { town: true });
     const C = globalThis.KD.Collection, A = globalThis.KD.Allies;
+    // クリアする前は ライバルのクエストは出ない
+    assert.ok(!s.town.board.some(q => q.rival));
     s.town.cleared = 6;
     choose('ダンジョンへ');
     choose('ASOの壺の底');
@@ -446,15 +448,43 @@ test('ストーリーをクリアすると ライバル探検隊の 15 人が �
     let talk = '';
     while (!/日目/.test(asks[0].message)) { talk += asks[0].message; choose('つぎへ'); }
     assert.equal(s.town.storyEnd, true);
-    assert.match(talk, /ライバル探検隊の 15 人が 仲間になった/);
+    assert.match(talk, /ライバル探検隊のみんなから クエスト/);
     const rivals = Object.values(C.RIVALS).flat();
-    assert.equal(rivals.length, 15);
-    for (const kind of rivals) assert.ok([...s.allies, ...s.roster].some(a => a.kind === kind), kind);
+    assert.ok(!rivals.some(k => [...s.allies, ...s.roster].some(a => a.kind === k)), 'クリアしただけで 仲間になった');
+    // 掲示板: メンバー 10 人ぶん (リーダーは まだ)
+    const rq = s.town.board.filter(q => q.rival);
+    assert.equal(rq.length, 10);
+    assert.ok(!rq.some(q => q.type === 'duel'));
     for (const [team, kinds] of Object.entries(C.RIVALS)) {
         for (const kind of kinds) assert.equal(A.star(kind), kind === A.LEADERS[team] ? 5 : 4, `${team} の ${kind}`);
     }
-    // 2 回目は 来ない (増えない)
-    const n = s.roster.length;
-    assert.equal(s.roster.filter(a => a.kind === 'asahara').length, 1);
-    assert.ok(n >= 15);
+    // 5DX の ひびきまくり (行く) と やまもぅ (納品) を達成して 報告
+    const take = kind => { const q = s.town.board.find(x => x.ally && x.ally.kind === kind); s.town.board.splice(s.town.board.indexOf(q), 1); s.town.quests.push(q); return q; };
+    take('hibikimakuri').progress = 1;
+    take('yamamou');
+    game.town.giveItem({ id: 'protein_powder', n: 5 }, true);
+    choose('探検隊ギルド');
+    choose('報告する');
+    assert.match(asks[0].message, /ひびきまくりが 仲間になった/);
+    assert.match(asks[0].message, /やまもぅが 仲間になった/);
+    assert.match(asks[0].message, /5DXの メンバーが そろった/);
+    choose('もどる');
+    // リーダーとの勝負: 海岸どうくつの B6F に おかがっぱが待っている。たおすと 仲間に
+    const duel = s.town.board.find(q => q.type === 'duel');
+    assert.ok(duel && duel.ally.kind === 'okagappa');
+    s.town.board.splice(s.town.board.indexOf(duel), 1);
+    s.town.quests.push(duel);
+    assert.deepEqual(game.town.duelsHere(6, 'coast'), ['okagappa']);
+    assert.deepEqual(game.town.duelsHere(5, 'coast'), []);
+    game.town.onKill('okagappa', 'coast');
+    assert.equal(duel.progress, 1);
+    while (asks.length > 1) asks.pop();
+    choose('報告する');
+    assert.match(asks[0].message, /おかがっぱが 仲間になった/);
+    const oka = s.roster.find(a => a.kind === 'okagappa');
+    assert.ok(oka && A.star(oka.kind) === 5);
+    choose('もどる');
+    // 5DX は もう出ない。ほかのチームの メンバーのクエストは残っている
+    assert.ok(!s.town.board.some(q => q.rival === '5DX'));
+    assert.equal(s.town.board.filter(q => q.rival).length, 8);
 });

@@ -203,7 +203,7 @@
         section(d.id, `${i + 1}. ${d.name}`, `${d.floors} 階`, groups);
     });
     section('anywhere', 'どこにでも出る（まれ）', 'どのダンジョンにも まれに出る', [{ cards: DG.ANYWHERE.map(([id]) => enemyCard(id)) }]);
-    section('rivals', 'ライバル探検隊', 'ハプニングで鉢合わせする。たおすと お金を落とす。ストーリーをクリアすると 15 人とも仲間になる（リーダーは ★5、ほかは ★4）',
+    section('rivals', 'ライバル探検隊', 'ハプニングで鉢合わせする。たおすと お金を落とす。ストーリーをクリアすると 専用クエストで仲間になる。メンバーが そろうと リーダーとの勝負（リーダーは ★5、ほかは ★4）',
         Object.entries(C.RIVALS).map(([team, ids]) => ({ title: team, cards: ids.map(id => enemyCard(id, id === AL.LEADERS[team] ? { tags: [...enemyCard(id).tags, 'リーダー'] } : {})) })));
     section('plan', '段階 9：ドタバタ大迷宮', '借金を返し切ったあとの おまけダンジョン（99 階）の案', [
         { title: 'ボス（99 階）', cards: [PLAN_BOSS] },
