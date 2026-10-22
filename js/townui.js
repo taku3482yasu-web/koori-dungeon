@@ -432,7 +432,7 @@
             const news = town.news.splice(0);
             const done = town.quests.filter(questDone).length;
             const vl = version().lines;
-            const head = [`${TW.NAME}　${town.day}日目（${weather()[1]}）　借金 ${money(town.debt)}　お金 ${money(p().money)}　BP ${town.bp}`,
+            const head = [`${TW.NAME}　${town.day}日目（${weather()[1]}：${TW.weatherText(TW.weatherOf(town.day))}）　借金 ${money(town.debt)}　お金 ${money(p().money)}　BP ${town.bp}`,
                 ...(vl ? [vl.town[town.day % vl.town.length]] : []),   // バージョンの ひとこと (日がわり)
                 ...news, ...(done ? [`達成したクエストが ${done} 件ある。ギルドで報告しよう。`] : [])];
             // 建物の あとに 図鑑・設定 (町から すぐ 開ける。2026-10-22 ユーザー指定)
@@ -1959,8 +1959,8 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             ['借金、あと どれくらい？', 'か、考えたくない……']];
         const ONI_CHATS = [['借金、忘れてないだろうな', 'わ、わかってるよ～'], ['金返せ！', 'ダンジョンで かせぐから～']];
         // 天気 (日ごとに かわる)
-        const WEATHERS = [['sunny', 'はれ'], ['sunny', 'はれ'], ['cloudy', 'くもり'], ['rain', '雨'], ['sunny', 'はれ'], ['evening', '夕やけ'], ['snow', '雪']];
-        const weather = () => WEATHERS[Math.floor(hash(t().day * 13.37 + 1) * WEATHERS.length)];
+        //   天気の データと わざの 倍率は town.js の WEATHERS。[id, 名前]
+        const weather = () => { const w = TW.weatherOf(t().day); return [w.id, w.name]; };
         const FURUKAWA_WEATHER = { sunny: '今日も いい天気だね！', cloudy: 'くもってきたね……', rain: '雨の日は 足もとに 気をつけてね！', snow: '雪だ！ 雪だるま 作りたいな～', evening: '夕やけ、きれいだね' };
         const ACTIONS = ['wave', 'highfive', 'jump', 'bow', 'gift'];
         const ALLY_LINES = ['おーい！ 今度は つれてってね！', '広場で 待ってるよ～', 'いっしょに 冒険したいな！', '修行してたんだ！'];
@@ -2272,9 +2272,32 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                 `わざ：${(e.moves || []).map(([m]) => U.SKILLS[m].name).join('・') || 'なし'}`,
                 `とくちょう：${traits.join('・') || 'なし'}`,
                 `「${e.line}」`,
-                `見た ${known}　たおした ${t().dex.beat[kind] || 0}`
+                `見た ${t().dex.seen[kind] || 0}　たおした ${t().dex.beat[kind] || 0}`
             ];
             rows.forEach((row, i) => ctx.fillText(row, 108, 40 + i * 14));
+            // 説明 (js/profiles.js。前作の 図鑑から。2026-10-22 ユーザー指定)
+            const pr = (KD.Profiles || {})[kind];
+            if (!pr) return;
+            ctx.font = `bold 9px ${FONT}`;
+            ctx.fillStyle = '#ffd84a';
+            ctx.fillText(pr.title, 12, 116);
+            ctx.font = `9px ${FONT}`;
+            ctx.fillStyle = '#e8f4ff';
+            let y = 130;
+            for (const para of pr.text.split('\n')) {
+                let row = '';
+                for (const ch of para) {
+                    if (ctx.measureText(row + ch).width > W - 24) {
+                        ctx.fillText(row, 12, y);
+                        y += 11;
+                        row = '';
+                    }
+                    row += ch;
+                }
+                if (row) ctx.fillText(row, 12, y);
+                y += para ? 11 : 4;
+                if (y > H - 6) break;
+            }
         }
 
         // バトルツリー: まんなかから 5 つの枝。開放したマスは金色、開放できるマスは水色

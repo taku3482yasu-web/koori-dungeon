@@ -30,29 +30,49 @@
         ok: [[880, 0.04, 'square'], [1175, 0.06, 'square']],
         ach: [[1047, 0.08, 'triangle'], [1319, 0.08, 'triangle'], [1568, 0.25, 'triangle']]
     };
-    // BGM: 音の高さ (半音。0 = ラ 220Hz、null は休み) を 8 分音符でくり返す。bass は 2 拍ごと
+    // BGM: 音の高さ (半音。0 = ラ 220Hz、null は休み) を 8 分音符でくり返す。bass は 2 拍ごと。
+    //   b・bb は B メロ。tune() で A → B → A → B (+5 半音) に つなぐ
     const SONGS = {
-        title: { tempo: 150, lead: [7, 12, 14, 12, 7, 5, 7, null, 3, 5, 7, 12, 10, 7, 5, null], bass: [-17, -17, -12, -14], wave: 'square' },
-        town: { tempo: 132, lead: [12, 14, 16, 19, 16, 14, 12, null, 9, 12, 14, 12, 9, 7, 9, null], bass: [-12, -17, -15, -19], wave: 'triangle' },
-        forest: { tempo: 120, lead: [0, 3, 7, 3, 5, 3, 0, null, -2, 0, 3, 0, -2, -5, -2, null], bass: [-24, -24, -21, -19], wave: 'triangle' },
-        cave: { tempo: 104, lead: [0, null, 3, 5, 3, null, 0, -2, -5, null, -2, 0, -2, null, -5, null], bass: [-24, -26, -29, -26], wave: 'sine' },
-        deep: { tempo: 112, lead: [0, 1, 0, -2, 0, 3, 1, null, 0, -2, -4, -2, 0, null, -5, null], bass: [-24, -23, -24, -26], wave: 'square' },
-        boss: { tempo: 168, lead: [0, 0, 3, 0, 6, 5, 3, 1, 0, 0, 3, 0, 7, 6, 5, 3], bass: [-24, -24, -21, -18], wave: 'sawtooth' },
+        title: { tempo: 150, lead: [7, 12, 14, 12, 7, 5, 7, null, 3, 5, 7, 12, 10, 7, 5, null], bass: [-17, -17, -12, -14], wave: 'square',
+            b: [12, 14, 15, 17, 15, 14, 12, null, 10, 12, 14, 12, 10, 7, 12, null], bb: [-14, -12, -9, -12] },
+        town: { tempo: 132, lead: [12, 14, 16, 19, 16, 14, 12, null, 9, 12, 14, 12, 9, 7, 9, null], bass: [-12, -17, -15, -19], wave: 'triangle',
+            b: [16, 17, 19, 21, 19, 17, 16, null, 14, 16, 17, 16, 14, 12, 14, null], bb: [-15, -12, -10, -17] },
+        forest: { tempo: 120, lead: [0, 3, 7, 3, 5, 3, 0, null, -2, 0, 3, 0, -2, -5, -2, null], bass: [-24, -24, -21, -19], wave: 'triangle',
+            b: [5, 7, 8, 7, 5, 3, 5, null, 3, 5, 7, 5, 3, 2, 0, null], bb: [-19, -21, -17, -24] },
+        cave: { tempo: 104, lead: [0, null, 3, 5, 3, null, 0, -2, -5, null, -2, 0, -2, null, -5, null], bass: [-24, -26, -29, -26], wave: 'sine',
+            b: [3, null, 5, 7, 8, null, 7, 5, 3, null, 2, 0, -2, null, 0, null], bb: [-21, -19, -24, -26] },
+        deep: { tempo: 112, lead: [0, 1, 0, -2, 0, 3, 1, null, 0, -2, -4, -2, 0, null, -5, null], bass: [-24, -23, -24, -26], wave: 'square',
+            b: [3, 5, 3, 1, 0, 1, 3, null, 5, 3, 1, 0, -2, null, 0, null], bb: [-21, -23, -19, -24] },
+        boss: { tempo: 168, lead: [0, 0, 3, 0, 6, 5, 3, 1, 0, 0, 3, 0, 7, 6, 5, 3], bass: [-24, -24, -21, -18], wave: 'sawtooth',
+            b: [7, 7, 10, 7, 12, 10, 8, 7, 5, 5, 8, 5, 10, 8, 7, 5], bb: [-17, -17, -14, -12] },
         // ダンジョンごとの 曲 (2026-10-22 ユーザー指定: 曲を 増やす。名前は ダンジョンの id。曲は Claude が 作った)
-        coast: { tempo: 110, lead: [7, 9, 12, 9, 7, 4, 7, null, 5, 7, 9, 7, 5, 2, 4, null], bass: [-17, -19, -22, -20], wave: 'triangle' },
-        temple: { tempo: 96, lead: [0, 3, 5, 7, 10, 7, 5, null, 3, 5, 3, 0, -2, 0, null, null], bass: [-24, -24, -19, -21], wave: 'square' },
-        mansion: { tempo: 150, lead: [12, 8, 7, 5, 7, 8, 7, null, 5, 1, 0, 1, 5, null, 0, null], bass: [-24, -19, -23, -24], wave: 'square' },
-        moon: { tempo: 92, lead: [12, null, 15, 14, 12, null, 10, 7, 8, null, 10, 12, 7, null, null, null], bass: [-19, -24, -22, -17], wave: 'sine' },
-        mountain: { tempo: 140, lead: [0, 0, 7, 0, 10, 0, 7, 5, 3, 3, 5, 7, 5, 3, 0, null], bass: [-24, -24, -26, -21], wave: 'square' },
-        aso: { tempo: 100, lead: [0, 1, 0, null, -1, 0, 3, 1, 0, null, -4, -5, -4, null, -5, null], bass: [-24, -23, -25, -24], wave: 'sawtooth' },
-        code: { tempo: 176, lead: [12, 19, 24, 19, 12, 19, 22, 19, 10, 17, 22, 17, 10, 17, 20, 17], bass: [-12, -14, -16, -17], wave: 'square' },
-        alley: { tempo: 120, lead: [7, 10, 12, null, 10, 7, 5, 7, null, 3, 5, 7, 10, null, 7, null], bass: [-17, -12, -14, -19], wave: 'triangle' },
-        kingdom: { tempo: 128, lead: [12, 12, 14, 16, 12, 16, 14, 7, 12, 12, 14, 16, 12, null, 11, null], bass: [-12, -17, -12, -19], wave: 'square' },
-        glacier: { tempo: 104, lead: [19, 24, 22, 19, 17, 19, 15, null, 17, 19, 22, 24, 22, null, 19, null], bass: [-12, -14, -17, -15], wave: 'sine' },
-        onijo: { tempo: 132, lead: [0, null, 0, 3, 5, null, 7, 5, 3, null, 0, -2, 0, null, null, null], bass: [-24, -24, -19, -24], wave: 'sawtooth' },
+        coast: { tempo: 110, lead: [7, 9, 12, 9, 7, 4, 7, null, 5, 7, 9, 7, 5, 2, 4, null], bass: [-17, -19, -22, -20], wave: 'triangle',
+            b: [12, 14, 16, 14, 12, 9, 12, null, 9, 11, 12, 11, 9, 7, 9, null], bb: [-12, -15, -17, -20] },
+        temple: { tempo: 96, lead: [0, 3, 5, 7, 10, 7, 5, null, 3, 5, 3, 0, -2, 0, null, null], bass: [-24, -24, -19, -21], wave: 'square',
+            b: [7, 10, 12, 10, 7, 5, 7, null, 5, 3, 0, 3, 5, null, 0, null], bb: [-19, -17, -21, -24] },
+        mansion: { tempo: 150, lead: [12, 8, 7, 5, 7, 8, 7, null, 5, 1, 0, 1, 5, null, 0, null], bass: [-24, -19, -23, -24], wave: 'square',
+            b: [13, 12, 8, 7, 8, 12, 13, null, 12, 8, 7, 5, 1, null, 0, null], bb: [-23, -19, -16, -24] },
+        moon: { tempo: 92, lead: [12, null, 15, 14, 12, null, 10, 7, 8, null, 10, 12, 7, null, null, null], bass: [-19, -24, -22, -17], wave: 'sine',
+            b: [15, null, 17, 19, 17, null, 15, 12, 14, null, 12, 10, 12, null, null, null], bb: [-17, -14, -19, -24] },
+        mountain: { tempo: 140, lead: [0, 0, 7, 0, 10, 0, 7, 5, 3, 3, 5, 7, 5, 3, 0, null], bass: [-24, -24, -26, -21], wave: 'square',
+            b: [7, 7, 12, 7, 14, 12, 10, 7, 5, 5, 7, 10, 7, 5, 3, null], bb: [-17, -17, -14, -19] },
+        aso: { tempo: 100, lead: [0, 1, 0, null, -1, 0, 3, 1, 0, null, -4, -5, -4, null, -5, null], bass: [-24, -23, -25, -24], wave: 'sawtooth',
+            b: [3, 4, 3, null, 1, 0, -1, 0, 1, null, 3, 4, 6, null, 4, null], bb: [-21, -20, -22, -24] },
+        code: { tempo: 176, lead: [12, 19, 24, 19, 12, 19, 22, 19, 10, 17, 22, 17, 10, 17, 20, 17], bass: [-12, -14, -16, -17], wave: 'square',
+            b: [17, 24, 29, 24, 17, 24, 27, 24, 15, 22, 27, 22, 15, 22, 24, 22], bb: [-7, -9, -12, -14] },
+        alley: { tempo: 120, lead: [7, 10, 12, null, 10, 7, 5, 7, null, 3, 5, 7, 10, null, 7, null], bass: [-17, -12, -14, -19], wave: 'triangle',
+            b: [12, 15, 17, null, 15, 12, 10, 12, null, 8, 10, 12, 15, null, 12, null], bb: [-12, -7, -9, -17] },
+        kingdom: { tempo: 128, lead: [12, 12, 14, 16, 12, 16, 14, 7, 12, 12, 14, 16, 12, null, 11, null], bass: [-12, -17, -12, -19], wave: 'square',
+            b: [19, 19, 17, 16, 14, 16, 17, 12, 14, 14, 16, 17, 19, null, 19, null], bb: [-17, -12, -14, -12] },
+        glacier: { tempo: 104, lead: [19, 24, 22, 19, 17, 19, 15, null, 17, 19, 22, 24, 22, null, 19, null], bass: [-12, -14, -17, -15], wave: 'sine',
+            b: [24, 27, 26, 24, 22, 24, 19, null, 22, 24, 26, 27, 26, null, 24, null], bb: [-7, -9, -12, -14] },
+        onijo: { tempo: 132, lead: [0, null, 0, 3, 5, null, 7, 5, 3, null, 0, -2, 0, null, null, null], bass: [-24, -24, -19, -24], wave: 'sawtooth',
+            b: [7, null, 7, 8, 12, null, 13, 12, 8, null, 7, 5, 7, null, null, null], bb: [-19, -17, -24, -24] },
         // ストーリーデモ・エンディング
-        story: { tempo: 100, lead: [4, 7, 12, 11, 9, 7, 9, null, 5, 9, 12, 11, 12, null, null, null], bass: [-20, -15, -17, -15], wave: 'triangle' },
-        ending: { tempo: 120, lead: [12, 16, 19, 24, 23, 19, 21, null, 17, 21, 24, 23, 24, null, 19, null], bass: [-12, -17, -15, -19], wave: 'square' }
+        story: { tempo: 100, lead: [4, 7, 12, 11, 9, 7, 9, null, 5, 9, 12, 11, 12, null, null, null], bass: [-20, -15, -17, -15], wave: 'triangle',
+            b: [9, 12, 16, 14, 12, 11, 12, null, 7, 11, 14, 12, 11, null, null, null], bb: [-15, -17, -20, -15] },
+        ending: { tempo: 120, lead: [12, 16, 19, 24, 23, 19, 21, null, 17, 21, 24, 23, 24, null, 19, null], bass: [-12, -17, -15, -19], wave: 'square',
+            b: [21, 24, 28, 26, 24, 21, 23, null, 19, 23, 26, 24, 26, null, 28, null], bb: [-15, -12, -10, -12] }
     };
 
     // 音量は 0〜10 の目もり。BGM は 前の 3 倍くらいを ふつうにした (2026-10-22 ユーザー指定: BGM が 小さい)
@@ -147,6 +167,15 @@
     }
 
     const hz = n => 220 * Math.pow(2, n / 12);
+    // 曲を 長くする (2026-10-22 ユーザー指定): A (lead・bass) → B (b・bb) → A → B を 5 半音 上げたもの で 1 周 (64 音)
+    const up = list => list.map(n => (n === null ? null : n + 5));
+    const tunes = {};
+    function tune(name) {
+        if (tunes[name]) return tunes[name];
+        const s = SONGS[name];
+        const t = s.b ? { lead: [...s.lead, ...s.b, ...s.lead, ...up(s.b)], bass: [...s.bass, ...s.bb, ...s.bass, ...up(s.bb)] } : {};
+        return (tunes[name] = { ...s, ...t });
+    }
     // 少し先まで 音を予約しておく (タブが重くても とぎれにくい)。
     // 曲ごとに 出口 (song) を作り、曲を かえる・止めるときは 出口ごと 消す (予約ずみの音が 残って 重ならないように)
     function startLoop() {
@@ -157,8 +186,8 @@
         step = 0;
         next = ctx.currentTime + 0.05;
         timer = setInterval(() => {
-            const s = SONGS[current];
-            if (!s) return;
+            if (!SONGS[current]) return;
+            const s = tune(current);
             const beat = 30 / s.tempo;
             // おくれた (タブが 重かった・裏に回っていた) ときは、鳴らしそこねた音を まとめて 鳴らさず 今から 続ける
             if (next < ctx.currentTime) next = ctx.currentTime + 0.05;

@@ -55,6 +55,10 @@
     .learn .lv { color: var(--sub); }
     .learn .own { color: #ffb0c8; font-weight: bold; }
     .learn .gen { color: #9ad8ff; }
+    /* 説明 (js/profiles.js。前作の スロット・パチンコの 図鑑を もとに した) */
+    .prof { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 12px; line-height: 1.6; }
+    .prof b { display: block; color: var(--gold); margin-bottom: 2px; }
+    .prof p { margin: 0 0 6px; white-space: pre-line; }
 </style>
 </head>
 <body>
@@ -63,13 +67,14 @@
     <p>ゲームに出るキャラの絵です。ゲームと同じ絵を大きくして描いています（動いているのは待機のアニメーション）。</p>
     <p>仲間になれるキャラには、仲間のときの ★・役職・能力の振り分け（Lv30 のとき。<span style="color:#ffd84a">黄色</span>は とくに高い能力）・覚えるわざ を出しています。
         わざは <span style="color:#ffb0c8;font-weight:bold">ピンク＝そのキャラだけの わざ</span>・<span style="color:#9ad8ff">水色＝役職の汎用わざ</span>（かっこの中は その役職）・白＝敵のときの わざ。</p>
+    <p>前作（スロット・パチンコ）に 出た キャラには、前作の 図鑑の 説明を もとにした 説明を のせています（js/profiles.js）。</p>
     <nav id="nav"></nav>
     <div id="sections"></div>
 </main>
 
 <script src="../js/rng.js?v=d477476e"></script>
 <script src="../js/dungeon.js?v=00a347e2"></script>
-<script src="../js/units.js?v=c51766bd"></script>
+<script src="../js/units.js?v=61fa43f8"></script>
 <script src="../js/enemies.js?v=7eed88a2"></script>
 <script src="../js/items.js?v=2dc93420"></script>
 <script src="../js/dungeons.js?v=0c2e12b8"></script>
@@ -83,6 +88,7 @@
 <script src="../js/enemyart.js?v=4369f873"></script>
 <script src="../js/enemyart9.js?v=9ce94360"></script>
 <script src="../js/enemyart10.js?v=462eb5f0"></script>
+<script src="../js/profiles.js?v=ffed189e"></script>
 <script src="../js/enemyart11.js?v=959ce57f"></script>
 <script>
 (function () {
@@ -156,6 +162,9 @@
     const section = (id, title, note, groups, plan = false) => SECTIONS.push({ id, title, note, groups, plan });
     section('heroes', '主人公・仲間', '主人公は こおりくん か おにおに。やすさん・たむさん・だけさんは ストーリーで仲間になる',
         [{ cards: ['koori', 'onioni', 'yasu', 'tamu', 'dake'].map(heroCard) }]);
+    // SEタウンの人 (前作と 同じ 絵。2026-10-22)
+    section('town', 'SEタウンの人', '町の 施設に いる。町の 道を 歩いていると 向かい側から 来ることも ある',
+        [{ cards: [{ id: 'furukawa', name: 'ふるカワ', tags: ['探検隊ギルド'] }, { id: 'tomoishi', name: 'ともいし', tags: ['お店'] }].map(c => ({ no: '', desc: '', ...c })) }]);
     DG.LIST.forEach((d, i) => {
         const groups = [{ title: '敵', cards: d.enemies.map(id => enemyCard(id)) }];
         if (d.rare && d.rare.length) groups.push({ title: 'まれに出る強敵', cards: d.rare.map(id => enemyCard(id)) });
@@ -191,7 +200,8 @@
     const sprites = [];   // { canvas, id, scale, h }
     const BOX = 92;       // 絵の高さの上限 (ドット × 倍率)
     function makeCanvas(id, max = BOX) {
-        const size = A.SPRITES[id] ? { w: 16, h: 16 } : B.BIG[id];
+        const sp = A.SPRITES[id] && A.SPRITES[id].frames[0];
+        const size = sp ? { w: sp[0].length, h: sp.length } : B.BIG[id];
         const scale = Math.max(1, Math.min(5, Math.floor(max / size.h)));
         const c = document.createElement('canvas');
         c.width = size.w * scale;
@@ -208,6 +218,13 @@
     const hasArt = id => Boolean(A.SPRITES[id] || B.BIG[id]);
 
     const STAT_LABELS = [['hp', 'HP'], ['atk', 'こうげき'], ['def', 'ぼうぎょ'], ['spa', 'とくこう'], ['spd', 'とくぼう']];
+    // 説明 (前作の 図鑑から)。段落ごとに 分ける
+    function profileHtml(id) {
+        const pr = (KD.Profiles || {})[id];
+        if (!pr) return '';
+        const esc = t => t.replace(/[&<>]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch]);
+        return `<div class="prof"><b>${esc(pr.title)}</b>${pr.text.split('\n\n').map(p => `<p>${esc(p)}</p>`).join('')}</div>`;
+    }
     function allyHtml(info) {
         if (!info) return '';
         const max = { hp: 260, atk: 130, def: 130, spa: 130, spd: 130 };   // 棒の長さの目安 (Lv30。HP 以外は同じ基準)
@@ -241,7 +258,7 @@
         const baseName = base && U.ENEMIES[base] ? U.ENEMIES[base].name : null;
         el.insertAdjacentHTML('beforeend', `
             <div class="head"><span class="no">${c.no ? 'No.' + c.no : ''}</span><span class="name">${c.name}</span></div>
-            <div class="tags"><span class="tag" style="background:${ELEMENT_COLORS[c.element] || '#ffffff'}">${c.element}</span>
+            <div class="tags">${c.element ? `<span class="tag" style="background:${ELEMENT_COLORS[c.element] || '#ffffff'}">${c.element}</span>` : ''}
                 ${info ? `<span class="tag star">${'★'.repeat(info.star)}</span>` : ''}
                 ${c.boss ? '<span class="tag boss">ボス</span>' : ''}
                 ${c.tags.filter(t => t !== 'ボス').map(t => `<span class="tag plain">${t}</span>`).join('')}
@@ -249,7 +266,8 @@
             <div class="desc">${c.desc || ''}</div>
             ${c.evo ? `<div class="evo">${c.evo}</div>` : ''}
             ${c.line ? `<div class="line">「${c.line}」</div>` : ''}
-            ${allyHtml(info)}`);
+            ${allyHtml(info)}
+            ${profileHtml(c.id)}`);
         parent.append(el);
     }
 

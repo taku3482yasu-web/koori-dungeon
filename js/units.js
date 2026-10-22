@@ -207,13 +207,13 @@
     }
 
     // ダメージ。こうげきが ぼうぎょ より高いほど よく効く。少しばらつく。最低 1
-    //   opts: { power 強さ, element わざの属性, self 使う側の属性, target 受ける側の属性 }
+    //   opts: { power 強さ, element わざの属性, self 使う側の属性, target 受ける側の属性, weather 天気の倍率 (town.js の weatherBoost) }
     //   戻り値: { dmg, eff } (eff: 相性の倍率)
-    function hitDamage(rng, atk, def, { power = 1, element = null, self = null, target = null } = {}) {
+    function hitDamage(rng, atk, def, { power = 1, element = null, self = null, target = null, weather = 1 } = {}) {
         const eff = effect(element, target);
         const same = element && element === self ? SAME_ELEMENT : 1;
         const base = atk * atk / (atk + def);
-        return { dmg: Math.max(1, Math.round(base * power * eff * same * (0.85 + rng.next() * 0.3))), eff };
+        return { dmg: Math.max(1, Math.round(base * power * eff * same * weather * (0.85 + rng.next() * 0.3))), eff };
     }
     // ふつうの攻撃 (属性なし)
     const damage = (rng, atk, def) => hitDamage(rng, atk, def).dmg;

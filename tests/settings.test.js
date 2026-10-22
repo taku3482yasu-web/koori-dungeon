@@ -4,6 +4,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
+// 町の道で 来る人は Math.random で 決まるので、テストでは 乱数を 固定する (毎回 同じ 結果に)
+let seed = 12345;
+Math.random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
 let fakeNow = 1000;
 globalThis.performance = { now: () => fakeNow };
 const store = new Map();
@@ -191,13 +194,13 @@ test('町の道: 探検隊が 歩き、向かい側から 仲間や ふるカワ
     const rec = new Proxy({ measureText: t => ({ width: t.length * 9 }), createLinearGradient: () => ({ addColorStop() {} }), fillText: t => said.push(t) }, {
         get: (t, k) => (k in t ? t[k] : () => {}), set: (t, k, v) => { t[k] = v; return true; }
     });
-    for (let i = 0; i < 60 * 40; i++) {
+    for (let i = 0; i < 60 * 240; i++) {   // 来る人は ランダム (おしゃべりの ときも ある) なので 長めに 見る
         fakeNow += 16;
         game.town.draw(rec, fakeNow, 384, 240);
     }
     const lines = ['クエスト、がんばってね！', '今日も いい天気だね！', 'ギルドに 新しい 依頼が 来てるよ！', 'お金返しなさい！', '内定はまだなの？', 'こおり、がんばって！', '内定とりなさい！',
         'おーい！ 今度は つれてってね！', '広場で 待ってるよ～', 'いっしょに 冒険したいな！', '修行してたんだ！'];
-    assert.ok(said.some(t => lines.includes(t)), '40 秒の あいだに だれかが 来て 話す');
+    assert.ok(said.some(t => lines.includes(t)), '4 分の あいだに だれかが 来て 話す');
     assert.ok(said.some(t => ['やあ！', 'イェーイ！', 'わーい！', 'どうも！', 'ありがとう！'].includes(t)), '探検隊が 返事をする');
 });
 
@@ -256,4 +259,50 @@ test('ボスに 会ったときの 台詞は ダンジョンの中で 絵つき 
     choose('つぎへ');
     choose('つぎへ');
     assert.ok(done && !s.demo && s.phase === 'play');
+});
+
+test('天気: その日の わざの 属性に 倍率が かかる (雨は みず 1.3 倍・ほのお 0.7 倍 など)', () => {
+    const TW = globalThis.KD.Town, U = globalThis.KD.Units;
+    const days = {};
+    for (let d = 1; d <= 60; d++) days[TW.weatherOf(d).id] = days[TW.weatherOf(d).id] || d;
+    assert.deepEqual(Object.keys(days).sort(), ['cloudy', 'evening', 'rain', 'snow', 'sunny']);
+    assert.equal(TW.weatherBoost(days.rain, 'みず'), 1.3);
+    assert.equal(TW.weatherBoost(days.rain, 'ほのお'), 0.7);
+    assert.equal(TW.weatherBoost(days.snow, 'こおり'), 1.3);
+    assert.equal(TW.weatherBoost(days.sunny, 'こおり'), 1);
+    assert.equal(TW.weatherBoost(days.rain, null), 1, 'ふつうの 攻撃は かわらない');
+    const fixed = () => ({ next: () => 0.5 });
+    const a = U.hitDamage(fixed(), 100, 50, { element: 'みず' }).dmg, b = U.hitDamage(fixed(), 100, 50, { element: 'みず', weather: 1.3 }).dmg;
+    assert.equal(b, Math.round(a * 1.3));
+    // 町の メニューと ダンジョンに 入ったときに 出る
+    const { s, game, asks, choose, run } = newGame();
+    s.town.day = days.rain;
+    game.town.menu();
+    assert.match(asks[asks.length - 1].message, /日目（雨：みずの わざ 1.3 倍・ほのおの わざ 0.7 倍）/);
+    asks.splice(0, asks.length - 1);
+    choose('ダンジョンへ');
+    choose('ハリーの森');
+    choose('スキップ');
+    run(1300);
+    assert.ok(s.messages.some(m => /今日の 天気は 雨/.test(m.text)));
+});
+
+test('図鑑の 説明 (js/profiles.js): 前作の キャラは みんな ゲームに いて、肩書きと 説明が ある', () => {
+    vm.runInThisContext(readFileSync(new URL('../js/profiles.js', import.meta.url), 'utf8'));
+    const { Profiles: P, Units: U, Art: A } = globalThis.KD;
+    const ids = Object.keys(P);
+    assert.ok(ids.length >= 28);
+    for (const id of ids) {
+        assert.ok(U.ENEMIES[id] || U.HEROES[id] || A.SPRITES[id], id);
+        assert.ok(P[id].title && P[id].text.length > 20, id);
+        assert.ok(!/摩天楼に挑む|摩天楼についてきた。$/.test(P[id].text), `${id}: 今作に 合わせた`);
+    }
+    for (const id of ['furukawa', 'tomoishi', 'koori', 'onioni', 'harry', 'maou']) assert.ok(P[id], id);
+});
+
+test('曲: どの 曲にも B メロが ある (A → B → A → B で 長く)', () => {
+    for (const [name, s] of Object.entries(globalThis.KD.Sound.SONGS)) {
+        assert.equal(s.b.length, 16, name);
+        assert.equal(s.bb.length, 4, name);
+    }
 });

@@ -269,7 +269,27 @@
         return parts.join('・');
     }
 
+    // ----- 天気 (2026-10-22 ユーザー指定: 天気の しくみ。倍率は 案) -----
+    // 日ごとに かわる。その日の ダンジョンでは、わざの 属性に 倍率が かかる (味方にも 敵にも)。町の 絵にも 出る
+    const WEATHERS = {
+        sunny: { name: 'はれ', boost: { 'ほのお': 1.2, 'みず': 0.9 } },
+        cloudy: { name: 'くもり', boost: { 'かぜ': 1.2 } },
+        rain: { name: '雨', boost: { 'みず': 1.3, 'ほのお': 0.7 } },
+        snow: { name: '雪', boost: { 'こおり': 1.3, 'ほのお': 0.8 } },
+        evening: { name: '夕やけ', boost: { 'ふしぎ': 1.2 } }
+    };
+    const WEATHER_DAYS = ['sunny', 'sunny', 'cloudy', 'rain', 'sunny', 'evening', 'snow'];   // はれが 多め
+    const dayHash = n => { const x = Math.sin(n * 12.9898) * 43758.5453; return x - Math.floor(x); };
+    const weatherOf = day => {
+        const id = WEATHER_DAYS[Math.floor(dayHash(day * 13.37 + 1) * WEATHER_DAYS.length)];
+        return { id, ...WEATHERS[id] };
+    };
+    // わざの 属性に かかる 倍率 (1 なら かわらない)
+    const weatherBoost = (day, element) => (element && WEATHERS[weatherOf(day).id].boost[element]) || 1;
+    const weatherText = w => Object.entries(w.boost).map(([el, k]) => `${el}の わざ ${k} 倍`).join('・');
+
     KD.Town = {
+        WEATHERS, weatherOf, weatherBoost, weatherText,
         NAME, DEBT_START, BP_PER, BONUS_EVERY, BONUS_BP, INTEREST, bpFor, UNLOCK, isOpen,
         ROLE_ORDER, OUGI, treeNodes, TREE_START, canUnlock, treeStats, rolesOpen, treeSkills, nodeText,
         shopStock, shopUnit, buyPrice, RECIPES, recipeText,

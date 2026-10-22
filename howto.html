@@ -73,7 +73,8 @@
         <li>町の メニューの「図鑑」で 敵と 道具の 図鑑、「設定」で 音の 設定（家からも 開けます）</li>
         <li><b>鍛冶屋</b>：素材は 持ち物と 倉庫の 両方から 使います。作る前に、どちらから 何個 使うかが 出ます</li>
         <li><b>町の道</b>：探検隊が 道を 歩いていきます。ときどき 広場で 待っている 仲間・ふるカワ・ともいし・ライバル探検隊（月の迷宮のあと）が 向かい側から 来て あいさつ（手をふる・ハイタッチ・とびはねる・おじぎ・差し入れ）。おにおにが いっしょに いないときは 取り立てに 来ることも。仲間どうしの おしゃべりも あります</li>
-        <li><b>天気</b>：日ごとに はれ・くもり・雨・雪・夕やけ が かわります（メニューの 上に 出ます）</li>
+        <li><b>天気</b>：日ごとに はれ・くもり・雨・雪・夕やけ が かわります（メニューの 上と、ダンジョンに 入ったときに 出ます）。その日の ダンジョンでは、わざの 属性に 倍率が かかります（味方にも 敵にも）：<span id="weathers"></span></li>
+        <li><b>図鑑</b>：前作（スロット・パチンコ）に 出た キャラには、前作の 図鑑を もとにした 説明が あります</li>
         <li>パソコンでは、ダンジョンの外の 選ぶ画面は ゲーム画面の 横か 下に 出ます（町の 絵が かくれない）</li>
     </ul>
     <h3>借金と バトルポイント（BP）</h3>
@@ -159,7 +160,7 @@
 
 <script src="js/rng.js?v=d477476e"></script>
 <script src="js/dungeon.js?v=00a347e2"></script>
-<script src="js/units.js?v=c51766bd"></script>
+<script src="js/units.js?v=61fa43f8"></script>
 <script src="js/enemies.js?v=7eed88a2"></script>
 <script src="js/items.js?v=2dc93420"></script>
 <script src="js/dungeons.js?v=0c2e12b8"></script>
@@ -168,7 +169,11 @@
 <script src="js/enemies9.js?v=e898c34f"></script>
 <script src="js/enemies10.js?v=4ddcedc4"></script>
 <script src="js/enemies11.js?v=7d190add"></script>
-<script src="js/town.js?v=34a67c5d"></script>
+<script src="js/town.js?v=70d1aa66"></script>
+<script>
+// 天気の わざの 倍率 (js/town.js の WEATHERS。2026-10-22)
+document.getElementById('weathers').textContent = Object.values(KD.Town.WEATHERS).map(w => `${w.name}＝${KD.Town.weatherText(w)}`).join('／');
+</script>
 <script>
 (function () {
     'use strict';

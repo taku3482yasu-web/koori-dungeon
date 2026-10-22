@@ -457,6 +457,11 @@
             if (opts.seed) state.seed = (opts.seed + (state.town ? state.town.day - 1 : 0)) >>> 0;
             state.phase = 'play';
             changeFloor(floor, `${state.dungeon.name}  B${floor}F`);
+            // 今日の 天気 (わざの 倍率)
+            if (state.town && KD.Town.weatherOf) {
+                const w = KD.Town.weatherOf(state.town.day);
+                say(`今日の 天気は ${w.name}。${KD.Town.weatherText(w)}。`);
+            }
         }
 
         // ----- 続きから (2026-10-22 ユーザー指定) -----
@@ -1290,7 +1295,9 @@
                 power *= 2;
                 say(`${a.name}の 全力の一撃！`);
             }
-            let { dmg, eff } = U.hitDamage(rng, atk, def, { power, element, self: a.element, target: t.element });
+            // 天気: その日の わざの 属性に 倍率 (town.js。2026-10-22 ユーザー指定)
+            const weather = state.town && KD.Town.weatherBoost ? KD.Town.weatherBoost(state.town.day, element) : 1;
+            let { dmg, eff } = U.hitDamage(rng, atk, def, { power, element, self: a.element, target: t.element, weather });
             if (a.buffs.kiai) {
                 dmg *= 2;
                 a.buffs.kiai = false;
