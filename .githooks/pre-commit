@@ -1,0 +1,28 @@
+#!/bin/sh
+# コミットの前に (2026-10-22 ユーザー指定):
+#   1. 自動テスト (tests/*.test.js)
+#   2. 本物のブラウザでの テスト (tools/browser-test.mjs。Chrome がなければ 飛ばす)
+#   3. HTML が読み込む js / css の版番号 (?v=) を付け直して、コミットに含める (ブラウザに古いファイルを使わせないため。tools/bump-version.py)
+# どれかが失敗したら コミットしない。急ぎのときは git commit --no-verify で飛ばせる
+# 有効にするには、このフォルダで一度だけ: git config core.hooksPath .githooks
+# node が PATH にないとき (winget で入れた直後など) は、winget の場所も さがす
+if ! command -v node >/dev/null 2>&1; then
+    for d in "$HOME"/AppData/Local/Microsoft/WinGet/Packages/OpenJS.NodeJS.LTS_*/node-v*-win-x64; do PATH="$PATH:$d"; done
+fi
+echo "自動テストを実行中… (git commit --no-verify で飛ばせます)"
+if ! result=$(node --test tests/*.test.js 2>&1); then
+    echo "$result" | grep -E "✖|not ok" | head -20
+    echo "自動テストが失敗したので、コミットを中止しました"
+    exit 1
+fi
+echo "$result" | grep -E "^ℹ (pass|fail)"
+if ! result=$(node tools/browser-test.mjs 2>&1); then
+    echo "$result" | grep -E "✘|成功"
+    echo "ブラウザのテストが失敗したので、コミットを中止しました"
+    exit 1
+fi
+echo "$result" | tail -1
+changed=$(python tools/bump-version.py | tr -d '\r') || exit 1
+for file in $changed; do
+    git add "$file"
+done
