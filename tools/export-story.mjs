@@ -155,13 +155,12 @@ group('そのほか', Object.keys(U.ENEMIES));
 
 // 必殺技 (js/specials.js)
 const SPx = globalThis.KD.Specials;
-const RANGE = { room: '見えている 敵 みんな', pierce: '前に まっすぐ つらぬく', around2: '周り 2 マス', front: '正面の 1 体' };
+const RANGE = { room: '見えている 相手 みんな', pierce: '前に まっすぐ つらぬく', around2: '周り 2 マス', front: '正面の 1 体', cross: '十字（上下左右に つらぬく）' };
 w('### 9.4 必殺技（名前と 放つときの ひとこと）', '',
-    '1 人 1 回・チームで 3 回まで（ダンジョンごと）。名前の 行と ひとことの 行の 両方を 書き換えられる。ボス・決闘の 相手は HP が 半分で 1 回 放つ', '',
-    '【仮】は 前作に 技が ない ボス・決闘の 相手の 仮の 技（Claude の 案。書き換えてください。範囲を かえたいときも 書いてください）', '');
+    '1 人 1 回・チームで 3 回まで（ダンジョンごと）。名前の 行と ひとことの 行の 両方を 書き換えられる。ボス・決闘の 相手は HP が 半分で 1 回 放つ', '');
 Object.entries(SPx.LIST).forEach(([kind, sp]) => {
     const who = (U.HEROES[kind] || U.ENEMIES[kind] || {}).name || kind;
-    w(`**${sp.temp ? "【仮】" : ""}${who}**（${RANGE[sp.range]}）`);
+    w(`**${who}**（${RANGE[sp.range]}${sp.hits ? `・${sp.hits} 回 当たる` : ''}）`);
     line(`special.${kind}.name`, sp.name);
     line(`special.${kind}.shout`, `${who}「${sp.shout}」`);
     w('');

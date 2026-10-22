@@ -2173,31 +2173,42 @@
                 const t = foes.find(e => e.x === u.x + dx && e.y === u.y + dy) || foes.find(e => cheb(e, u) === 1);
                 return { targets: t ? [t] : [], to: t ? [t.x, t.y] : [u.x + dx, u.y + dy] };
             }
-            // pierce: 壁まで まっすぐ (敵を つらぬく)
-            const hit = [];
-            let x = u.x, y = u.y;
-            for (let i = 0; i < 10 && D.canMove(state.map, x, y, dx, dy); i++) {
-                x += dx;
-                y += dy;
-                const e = foes.find(f => f.x === x && f.y === y);
-                if (e) hit.push(e);
+            // pierce: 壁まで まっすぐ (敵を つらぬく)。cross: 上下左右の 4 方向に つらぬく
+            const ray = ([ddx, ddy]) => {
+                const hit = [];
+                let x = u.x, y = u.y;
+                for (let i = 0; i < 10 && D.canMove(state.map, x, y, ddx, ddy); i++) {
+                    x += ddx;
+                    y += ddy;
+                    const e = foes.find(f => f.x === x && f.y === y);
+                    if (e) hit.push(e);
+                }
+                return { hit, end: [x, y] };
+            };
+            if (sp.range === 'cross') {
+                const rays = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(ray);
+                return { targets: rays.flatMap(r => r.hit), to: [u.x, u.y], ends: rays.map(r => r.end) };
             }
-            return { targets: hit, to: [x, y] };
+            const r = ray([dx, dy]);
+            return { targets: r.hit, to: r.end };
         }
         function specialHit(u, sp) {
-            const { targets, to } = specialTargets(u, sp);
+            const { targets, to, ends } = specialTargets(u, sp);
             const now = performance.now();
-            state.bigfx.push({ type: sp.fx, range: sp.range, x: u.x, y: u.y, to, dir: u.dir, targets: targets.map(t => [t.x, t.y]), at: now, ms: SPECIAL_FX_MS, color: sp.color });
+            state.bigfx.push({ type: sp.fx, range: sp.range, x: u.x, y: u.y, to, ends, dir: u.dir, targets: targets.map(t => [t.x, t.y]), at: now, ms: SPECIAL_FX_MS, color: sp.color });
             u.lunge = { at: now, dir: u.dir };
             flash(sp.fx === 'flash' || sp.fx === 'moon' ? 'rgba(255,255,255,.7)' : 'rgba(255,240,180,.5)');
             shake(sp.range === 'around2' || sp.fx === 'quake' || sp.range === 'front' ? 6 : 4);
             sfx('skill');
             if (!targets.length && sp.power) say('しかし だれにも 当たらなかった。');
             for (const t of targets) {
+                // hits: 当たる 回数 (取り消しの二撃 など)
+                for (let n = 0; n < (sp.hits || 1) && t.hp > 0; n++) {
+                    const { dmg, eff } = deal(u, t, { power: sp.power * (u.side === 'party' ? 1 : BOSS_SPECIAL_POWER), element: sp.element, special: u.stats.spa >= u.stats.atk });
+                    say(`${t.name}に ${dmg} のダメージ！${effText(eff)}`);
+                    hurt(t, dmg, u);
+                }
                 if (t.hp <= 0) continue;
-                const { dmg, eff } = deal(u, t, { power: sp.power * (u.side === 'party' ? 1 : BOSS_SPECIAL_POWER), element: sp.element, special: u.stats.spa >= u.stats.atk });
-                say(`${t.name}に ${dmg} のダメージ！${effText(eff)}`);
-                hurt(t, dmg, u);
                 if (t.hp > 0 && sp.status && rng.chance(sp.chance)) inflict(t, sp.status, false);
             }
             // おまけ: 仲間 みんなを 回復・まもりの かまえ・きあいため (ボスは 自分だけ。回復は しない)
@@ -2290,6 +2301,7 @@
                 if (f.range === 'room') ring(ux, uy, k * T * 8, f.color, 6 * fade + 1, 0.7 * fade);
                 if (f.range === 'around2') { ring(ux, uy, k * T * 2.8, f.color, 8 * fade + 2, fade); ring(ux, uy, k * T * 2, '#ffffff', 2, fade); }
                 if (f.range === 'pierce') { line(ux, uy, ex, ey, f.color, 14 * fade + 2, 0.8); line(ux, uy, ex, ey, '#ffffff', 4 * fade + 1, 0.9); }
+                if (f.range === 'cross') (f.ends || []).forEach(([x, y]) => { line(ux, uy, X(x), Y(y), f.color, 14 * fade + 2, 0.8); line(ux, uy, X(x), Y(y), '#ffffff', 4 * fade + 1, 0.9); });
                 if (f.range === 'front') {
                     for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; line(ex, ey, ex + Math.cos(a) * (8 + k * 22), ey + Math.sin(a) * (8 + k * 22), f.color, 3, fade); }
                     dot(ex, ey, 14 * fade + 4, '#ffffff', fade);

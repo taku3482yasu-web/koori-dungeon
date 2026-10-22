@@ -467,3 +467,36 @@ test('ボスの 必殺技: HP が 半分に なったら 1 回だけ、カット
     assert.ok(p.hp < 9999, '探検隊に 当たった');
     assert.equal(s.specials.count, 0, 'チームの 回数は 減らない');
 });
+
+test('必殺技の 十字 (取り消しの二撃): 上下左右に つらぬいて 2 回 当たる', () => {
+    const { s, game, choose, run, asks } = newGame();
+    choose('ダンジョンへ');
+    choose('ハリーの森');
+    choose('スキップ');
+    run(1300);
+    asks.length = 0;
+    const sp = globalThis.KD.Specials.of('naitei');
+    assert.equal(sp.name, '取り消しの二撃');
+    assert.equal(sp.range, 'cross');
+    assert.equal(sp.hits, 2);
+    const p = s.player;
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => globalThis.KD.Dungeon.canMove(s.map, p.x, p.y, dx, dy));
+    const foes = dirs.map(([dx, dy]) => { const e = game.makeEnemy('donguriko', 1, p.x + dx, p.y + dy); e.hp = e.stats.hp = 9999; return e; });
+    s.enemies.splice(0, s.enemies.length, ...foes);
+    // HP が 減った 回数を 数える (メッセージは 4 つしか 残らないので)
+    let hits = 0;
+    foes.forEach(e => {
+        let hp = e.hp;
+        Object.defineProperty(e, 'hp', { get: () => hp, set: v => { if (v < hp) hits++; hp = v; }, configurable: true, enumerable: true });
+    });
+    const u = game.makeAlly('naitei', 30);
+    Object.assign(u, { x: p.x, y: p.y });
+    s.allies.length = 0;
+    // 主人公の 位置から 放った ことに する
+    p.kind = 'naitei';
+    game.specialMenu();
+    choose('取り消しの二撃');
+    run(3500);
+    assert.ok(foes.every(e => e.hp < 9999), '上下左右 ぜんぶに 当たった');
+    assert.equal(hits, foes.length * 2, '2 回ずつ');
+});

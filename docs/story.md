@@ -1574,9 +1574,7 @@
 
 1 人 1 回・チームで 3 回まで（ダンジョンごと）。名前の 行と ひとことの 行の 両方を 書き換えられる。ボス・決闘の 相手は HP が 半分で 1 回 放つ
 
-【仮】は 前作に 技が ない ボス・決闘の 相手の 仮の 技（Claude の 案。書き換えてください。範囲を かえたいときも 書いてください）
-
-**こおりくん**（見えている 敵 みんな）
+**こおりくん**（見えている 相手 みんな）
 - 〔special.koori.name〕 大腸炎アタック
 - 〔special.koori.shout〕 こおりくん「くらえ！ 大腸炎アタック！」
 
@@ -1600,7 +1598,7 @@
 - 〔special.okagappa.name〕 おかピポっと光線
 - 〔special.okagappa.shout〕 おかがっぱ「おかピポ！ イェア！」
 
-**ひびきまくり**（見えている 敵 みんな）
+**ひびきまくり**（見えている 相手 みんな）
 - 〔special.hibikimakuri.name〕 大音響4DX
 - 〔special.hibikimakuri.shout〕 ひびきまくり「これが４DXだ！」
 
@@ -1612,7 +1610,7 @@
 - 〔special.sasaki.name〕 ASAスラッシュ
 - 〔special.sasaki.shout〕 Mr.SASAKI「締め切り厳守です。」
 
-**Mr.KOTANI**（見えている 敵 みんな）
+**Mr.KOTANI**（見えている 相手 みんな）
 - 〔special.kotani.name〕 NABIテンポ
 - 〔special.kotani.shout〕 Mr.KOTANI「数字は うそを つきません。」
 
@@ -1636,7 +1634,7 @@
 - 〔special.harry.name〕 メンキョナイ・ニードル
 - 〔special.harry.shout〕 ハリー「メンキョナイー！」
 
-**浦の島重蔵**（見えている 敵 みんな）
+**浦の島重蔵**（見えている 相手 みんな）
 - 〔special.urashima.name〕 玉手箱スモーク
 - 〔special.urashima.shout〕 浦の島重蔵「えい、けむりじゃ！」
 
@@ -1652,15 +1650,15 @@
 - 〔special.goldDog.name〕 ゴールドかみまっくす
 - 〔special.goldDog.shout〕 ゴールド金面犬「ワン！（邪悪な笑み）」
 
-**ダイシ**（見えている 敵 みんな）
+**ダイシ**（見えている 相手 みんな）
 - 〔special.daishi.name〕 鬼面説法
 - 〔special.daishi.shout〕 ダイシ「仏の顔も、ここまでです。」
 
-**ズミタニ**（見えている 敵 みんな）
+**ズミタニ**（見えている 相手 みんな）
 - 〔special.zumitani.name〕 影分身クナイ乱れ打ち
 - 〔special.zumitani.shout〕 ズミタニ「ついてこられるかな♪」
 
-**ルナヤ**（見えている 敵 みんな）
+**ルナヤ**（見えている 相手 みんな）
 - 〔special.runaya.name〕 ルナティック・ムーンビーム
 - 〔special.runaya.shout〕 ルナヤ「月の力よ…！ 月の力よ…あら、もう言ったかしら？」
 
@@ -1668,75 +1666,75 @@
 - 〔special.nozoema.name〕 鏡筋一刀斬り
 - 〔special.nozoema.shout〕 ノゾエマ「この刀を越えてみせよ！」
 
-**大魔王ASO**（見えている 敵 みんな）
+**大魔王ASO**（見えている 相手 みんな）
 - 〔special.maou.name〕 亜祖宇激烈破
 - 〔special.maou.shout〕 大魔王ASO「消え去れ！」
 
-**【仮】大魔王ASO・真**（見えている 敵 みんな）
+**大魔王ASO・真**（見えている 相手 みんな）
 - 〔special.maoushin.name〕 亜祖宇激烈破・真
 - 〔special.maoushin.shout〕 大魔王ASO・真「真の力、思い知れ！ 亜祖宇激烈破・真！」
 
-**【仮】トリプルC**（前に まっすぐ つらぬく）
+**トリプルC**（前に まっすぐ つらぬく）
 - 〔special.triplec.name〕 トリプル・コンパイル
 - 〔special.triplec.shout〕 トリプルC「ビルド開始！ トリプル・コンパイル！」
 
-**【仮】国士無双ニャン**（見えている 敵 みんな）
+**国士無双ニャン**（見えている 相手 みんな）
 - 〔special.kokushinyan.name〕 国士無双・十三面ロン
 - 〔special.kokushinyan.shout〕 国士無双ニャン「十三面待ち……ロンだニャ！」
 
-**【仮】ハリー大帝**（周り 2 マス）
-- 〔special.harryemperor.name〕 インペリアル・ニードル
+**ハリー大帝**（周り 2 マス）
+- 〔special.harryemperor.name〕 インペリアル・カーブ・ニードル
 - 〔special.harryemperor.shout〕 ハリー大帝「余の トゲを 受けよ！」
 
-**【仮】ハル麒麟**（見えている 敵 みんな）
-- 〔special.harukirin.name〕 春告げの嵐
+**ハル麒麟**（見えている 相手 みんな）
+- 〔special.harukirin.name〕 春麗
 - 〔special.harukirin.shout〕 ハル麒麟「春よ、来たれ！」
 
-**【仮】金滅鬼**（周り 2 マス）
-- 〔special.kinmetsuki.name〕 金滅の金棒
+**金滅鬼**（周り 2 マス）
+- 〔special.kinmetsuki.name〕 金色の金棒
 - 〔special.kinmetsuki.shout〕 金滅鬼「金色の 鬼に ひれ伏せ！」
 
-**【仮】シーシャ・ナイテイ・ナイナイ**（見えている 敵 みんな）
-- 〔special.naitei.name〕 内定取り消し
+**シーシャ・ナイテイ・ナイナイ**（十字（上下左右に つらぬく）・2 回 当たる）
+- 〔special.naitei.name〕 取り消しの二撃
 - 〔special.naitei.shout〕 シーシャ・ナイテイ・ナイナイ「お前に内定はない！」
 
-**【仮】シーシャ・ナイテイ・アルアル**（見えている 敵 みんな）
-- 〔special.aruaru.name〕 内定の理
+**シーシャ・ナイテイ・アルアル**（見えている 相手 みんな）
+- 〔special.aruaru.name〕 内定の一撃
 - 〔special.aruaru.shout〕 シーシャ・ナイテイ・アルアル「内定の理を 見せてやろう！」
 
-**【仮】ナイテイ・ナナッシャ・ナディ**（見えている 敵 みんな）
-- 〔special.nadi.name〕 お祈りメール
+**ナイテイ・ナナッシャ・ナディ**（周り 2 マス）
+- 〔special.nadi.name〕 お祈りの惨劇
 - 〔special.nadi.shout〕 ナイテイ・ナナッシャ・ナディ「お祈り 申し上げます」
 
-**【仮】ヒョウガリュウ**（前に まっすぐ つらぬく）
+**ヒョウガリュウ**（前に まっすぐ つらぬく）
 - 〔special.hyougaryu.name〕 氷河の咆哮
 - 〔special.hyougaryu.shout〕 ヒョウガリュウ「凍てつけ！」
 
-**【仮】ゴウキオニ**（前に まっすぐ つらぬく）
+**ゴウキオニ**（前に まっすぐ つらぬく）
 - 〔special.goukioni.name〕 豪鬼一番槍
 - 〔special.goukioni.shout〕 ゴウキオニ「一番槍、いくぞ！」
 
-**【仮】ヤーハミー**（見えている 敵 みんな）
-- 〔special.yahami.name〕 美しき大強奪
+**ヤーハミー**（見えている 相手 みんな）
+- 〔special.yahami.name〕 傲慢な美しき大強奪
 - 〔special.yahami.shout〕 ヤーハミー「お宝も 視線も、ぜんぶ いただくわ！」
 
-**【仮】イシイー**（前に まっすぐ つらぬく）
+**イシイー**（前に まっすぐ つらぬく）
 - 〔special.ishii.name〕 ケモノミチ大暴走
 - 〔special.ishii.shout〕 イシイー「ブヒッ！ 突撃だ！」
 
-**【仮】マエチョッキン**（前に まっすぐ つらぬく）
+**マエチョッキン**（前に まっすぐ つらぬく）
 - 〔special.maechokkin.name〕 前髪そろえ・乱れ切り
 - 〔special.maechokkin.shout〕 マエチョッキン「チョッキン♪ ぜんぶ 切りそろえて あげる！」
 
-**【仮】ノラハン**（見えている 敵 みんな）
+**ノラハン**（見えている 相手 みんな）
 - 〔special.norahan.name〕 ニャハッと大どろぼう
 - 〔special.norahan.shout〕 ノラハン「ニャハッ♪ ぜんぶ いただき！」
 
-**【仮】マズダ**（周り 2 マス）
+**マズダ**（周り 2 マス）
 - 〔special.mazuda.name〕 ダンジョン育ちの剛拳
 - 〔special.mazuda.shout〕 マズダ「ダンジョン育ちを なめるなよ！」
 
-**【仮】NAITOON**（見えている 敵 みんな）
+**NAITOON**（見えている 相手 みんな）
 - 〔special.naitoon.name〕 月下の遠吠え
 - 〔special.naitoon.shout〕 NAITOON「ワォーン！ 夜の迷宮は おれたちの もの！」
 
