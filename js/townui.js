@@ -549,7 +549,18 @@
         // 入ったとき: ほかのプレイヤーに売れた分の お金を受け取る
         function trade() {
             if (!net.online) return tradeMenu();
-            connect(net.claim(), rows => {
+            // 自分の出品は、日がたつと コンピューターの探検隊も 買っていく (出品した日から 1 日ごとに抽選)
+            const town = t();
+            town.posts = town.posts || [];
+            const r = dayRng(6);
+            const buys = [];
+            town.posts.forEach(post => {
+                for (let d = post.day; d < town.day && !post.sold; d++) if (r.chance(0.6)) post.sold = r.pick(TW.RIVALS);
+                post.day = town.day;
+                if (post.sold) buys.push(net.buyAs(post.remote, post.sold).catch(() => null));
+            });
+            town.posts = town.posts.filter(post => !post.sold);
+            connect(Promise.all(buys).then(() => net.claim()), rows => {
                 const sold = (rows || []).filter(r => tradable(r.item_id));
                 if (!sold.length) return tradeMenu();
                 const total = sold.reduce((n, r) => n + r.price, 0);
@@ -627,19 +638,21 @@
             ask(`どれを出品する？（${when}）`, [...items.map(I.label), 'もどる'], i => {
                 if (i >= items.length) return tradeMenu();
                 const it = items[i];
-                const base = (I.ITEMS[it.id].price || 10) * (it.n || 1);
-                const prices = [Math.round(base * 0.8), base, Math.round(base * 1.5)];
-                ask(`${I.label(it)}を いくらで出品する？`, [`安め ${money(prices[0])}`, `ふつう ${money(prices[1])}`, `高め ${money(prices[2])}`, 'やめる'], j => {
-                    if (j === 3) return list();
-                    const done = () => ask(`${I.label(it)}を ${money(prices[j])}で 出品した。`, ['もどる'], tradeMenu, { list: false });
+                // 値段は 道具ごとに 決まっている (2026-10-22 ユーザー指定)
+                const price = TW.listPrice(it);
+                ask(`${I.label(it)}を ${money(price)}で 出品しますか？\n（売れたら お金を受け取れる）`, ['出品する', 'やめる'], j => {
+                    if (j === 1) return list();
+                    const done = () => ask(`${I.label(it)}を ${money(price)}で 出品した。`, ['もどる'], tradeMenu, { list: false });
                     if (!net.online) {
                         p().bag.splice(p().bag.indexOf(it), 1);
-                        t().listings.push({ id: it.id, n: it.n || 1, price: prices[j] });
+                        t().listings.push({ id: it.id, n: it.n || 1, price });
                         save();
                         return done();
                     }
-                    connect(net.post(myName(), { id: it.id, n: it.n || 1, price: prices[j] }), () => {
+                    connect(net.post(myName(), { id: it.id, n: it.n || 1, price }), id => {
                         if (p().bag.includes(it)) p().bag.splice(p().bag.indexOf(it), 1);
+                        // 日がたつと コンピューターの探検隊も 買っていく (trade)
+                        if (id != null) (t().posts = t().posts || []).push({ remote: id, day: t().day });
                         save();
                         done();
                     }, () => offline(list));
@@ -663,6 +676,7 @@
                     }
                     connect(net.cancel(l.remote), res => {
                         const r = res && res[0];
+                        t().posts = (t().posts || []).filter(post => post.remote !== l.remote);
                         if (!r) return ask('もう 売れていた！ 交易所に入りなおすと、お金を受け取れる。', ['もどる'], tradeMenu, { list: false });
                         giveItem({ id: r.item_id, n: r.n }, true);
                         save();
@@ -720,12 +734,31 @@
         }
 
         // ----- 仲間の広場 (仕様書 8章) -----
+        // 並べかえ (2026-10-22 ユーザー指定): ★順・役職順・Lv順・仲間になった順
+        const SORTS = { star: '★順', role: '役職順', lv: 'Lv順', order: '仲間になった順' };
+        let plazaSort = 'order';
+        function sorted(list) {
+            const roleIndex = id => U.ROLE_IDS.indexOf(id);
+            const s = [...list];
+            if (plazaSort === 'star') s.sort((a, b) => (KD.Allies.star(b.kind) || 0) - (KD.Allies.star(a.kind) || 0) || b.lv - a.lv);
+            if (plazaSort === 'role') s.sort((a, b) => roleIndex(a.role) - roleIndex(b.role) || b.lv - a.lv);
+            if (plazaSort === 'lv') s.sort((a, b) => b.lv - a.lv);
+            return s;
+        }
+        // お別れできない 特別なキャラ: 主人公と同じ仲間 (こおりくん・おにおに)・ストーリーの仲間・ライバル探検隊・クエストの仲間
+        const special = a => Boolean(U.HEROES[a.kind] || (U.ENEMIES[a.kind] && U.ENEMIES[a.kind].rival) || a.name !== (U.ENEMIES[a.kind] || {}).name);
         function plaza() {
             const max = g.partyMax() - 1;
-            const all = [...state.allies, ...state.roster];
+            const all = [...state.allies, ...sorted(state.roster)];
             if (!all.length) return ask('広場には だれも いない。', ['もどる'], menu, { list: false });
             ask(`連れていく仲間をえらぶ（主人公のほかに ${max} 人まで。えらぶと 入れかわる）`,
-                [...all.map(a => `${state.allies.includes(a) ? '【いっしょ】' : '　　　　　'}${a.name}${KD.Allies.star(a.kind) ? ' ' + '★'.repeat(KD.Allies.star(a.kind)) : ''} Lv${a.lv}　${U.ROLES[a.role].name}`), 'もどる'], i => {
+                [`並べかえ：${SORTS[plazaSort]}`, ...all.map(a => `${state.allies.includes(a) ? '【いっしょ】' : '　　　　　'}${a.name}${KD.Allies.star(a.kind) ? ' ' + '★'.repeat(KD.Allies.star(a.kind)) : ''} Lv${a.lv}　${U.ROLES[a.role].name}`), 'もどる'], i => {
+                    if (i === 0) {
+                        const keys = Object.keys(SORTS);
+                        plazaSort = keys[(keys.indexOf(plazaSort) + 1) % keys.length];
+                        return plaza();
+                    }
+                    i--;
                     if (i >= all.length) {
                         save();
                         return menu();
@@ -741,6 +774,7 @@
             const opts = [going ? 'はずす' : '連れていく'];
             const giveable = v && v.how === 'item' && countHave(v.item) > 0;
             if (giveable) opts.push(`「${I.ITEMS[v.item].name}」を わたす`);
+            if (!special(a)) opts.push('お別れする');
             opts.push('もどる');
             const info = `${a.name}${KD.Allies.star(a.kind) ? ' ' + '★'.repeat(KD.Allies.star(a.kind)) : ''} Lv${a.lv}　${U.ROLES[a.role].name}`;
             ask(`${info}\n${v ? '進化：' + KD.Allies.evolveText(a.kind) : '進化しない'}`, opts, j => {
@@ -752,6 +786,13 @@
                     if (state.allies.length >= max) return ask(`いっしょに行けるのは 主人公のほかに ${max} 人まで。先に だれかを はずしてね。`, ['もどる'], plaza, { list: false });
                     state.roster.splice(state.roster.indexOf(a), 1);
                     state.allies.push(a);
+                } else if (pick === 'お別れする') {
+                    return ask(`${a.name}と お別れしますか？\n（お別れすると もう もどってこない）`, ['いいえ', 'はい、お別れする'], k => {
+                        if (k !== 1) return plazaUnit(a, max);
+                        [state.allies, state.roster].forEach(list => { if (list.includes(a)) list.splice(list.indexOf(a), 1); });
+                        save();
+                        ask(`${a.name}「いままで ありがとう！ 元気でね！」\n${a.name}と お別れした。`, ['もどる'], plaza, { list: false });
+                    });
                 } else if (giveable && j === 1) {
                     if (!KD.Allies.canEvolve(a, { item: v.item })) return ask(`${a.name}「……まだ 早いみたい」\n（Lv${v.lv} から 進化できる）`, ['もどる'], () => plazaUnit(a, max), { list: false });
                     takeItems({ [v.item]: 1 });

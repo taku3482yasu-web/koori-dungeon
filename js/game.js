@@ -28,7 +28,6 @@
     const SHOOT_RANGE = 6;                        // 「撃つ」敵の届くマス数
     const LINE_RANGE = 10;                        // 直線のわざの届くマス数
     const GUARD_TURNS = 5;                        // まもりのかまえ が続くターン
-    const RECRUIT_RATE = 0.1;                     // たおした敵が「仲間になりたそうに」する確率
     const TACTICS = { fight: 'みんなで戦う', follow: 'ついてきて', flee: 'にげて' };
     const DIRS8 = [[0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]];
     const FONT = '"BIZ UDPGothic", "Yu Gothic", sans-serif';
@@ -570,6 +569,10 @@
                 if (!c) continue;
                 say(`${e.name}「出でよ、四天王！」 ${c.name}が よみがえった！`);
                 state.rings.push({ x: c.x, y: c.y, at: performance.now(), color: '#d8a8ff' });
+                // カットイン: よみがえった四天王
+                state.cutin = { kind: c.kind, name: c.name, sub: '四天王 よみがえる！', color: '#d8a8ff', at: performance.now() };
+                shake(4);
+                sfx('boss');
             }
         }
 
@@ -969,7 +972,8 @@
 
         // たおした敵が仲間になりたそうにする (仕様書 8章)。いっぱいなら町の広場で待つ
         function maybeRecruit(e) {
-            const rate = typeof opts.recruit === 'number' ? opts.recruit : RECRUIT_RATE;
+            // ★が高いほど なりにくい (allies.js の RECRUIT_RATE)
+            const rate = typeof opts.recruit === 'number' ? opts.recruit : KD.Allies.recruitRate(e.kind);
             if (opts.recruit === false || e.boss || e.big || !rng.chance(rate)) return;
             state.queue.push(() => {
                 if (state.over) return 0;
@@ -1327,6 +1331,12 @@
                 e.berserk = true;
                 e.stats.atk = Math.round(e.stats.atk * 1.5);
                 say(e.kind === 'maou' || e.kind === 'maoushin' ? `${e.name}は 本気を 出した！` : `${e.name}は 鬼の顔に なった！ こうげきが 上がった！`);
+                // ボスが本気を出したら カットイン
+                if (e.boss) {
+                    state.cutin = { kind: e.kind, name: e.name, sub: '本気を 出した！', color: '#ff5a4a', at: performance.now() };
+                    shake(5);
+                    flash('rgba(255,60,40,.4)');
+                }
             }
             if (e.kind === 'maoushin') shinSummon(e);
             if (has(e, 'split') && rng.chance(0.35) && addNear(e.kind, e.lv, e.x, e.y)) say(`${e.name}が 分裂した！`);
@@ -2082,7 +2092,7 @@
             ctx.globalAlpha = a;
             ctx.fillStyle = 'rgba(30,0,0,.75)';
             ctx.fillRect(0, H / 2 - 40, W, 80);
-            ctx.fillStyle = '#ff5a4a';
+            ctx.fillStyle = state.cutin.color || '#ff5a4a';
             ctx.fillRect(0, H / 2 - 40, W, 2);
             ctx.fillRect(0, H / 2 + 38, W, 2);
             const slide = Math.min(1, k / 0.25);
@@ -2093,7 +2103,7 @@
             ctx.fillText(state.cutin.name, 24, H / 2 - 6);
             ctx.font = `10px ${FONT}`;
             ctx.fillStyle = '#ffffff';
-            ctx.fillText(`${state.dungeon.name}の ボス`, 24, H / 2 + 14);
+            ctx.fillText(state.cutin.sub || `${state.dungeon.name}の ボス`, 24, H / 2 + 14);
             ctx.globalAlpha = 1;
         }
 

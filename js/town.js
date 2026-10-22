@@ -150,7 +150,7 @@
     const RARE = ['gold_band', 'moon_drop', 'lucky_coin', 'omamori', 'haramaki', 'revive_seed'];
     const rareStock = rng => rng.shuffle(RARE).slice(0, 2).map(id => ({ id, price: Math.round(I.ITEMS[id].price * 1.2) }));
     // ほかの探検隊 (いまはコンピューター。仕様書 2章のライバル探検隊)。本当のプレイヤーの出品は、サーバーができたら入れる
-    const RIVALS = ['5DX', 'ASK-3', 'お願いマッスル'];
+    const RIVALS = ['5DX', 'ASK-3', 'お願いマッスル', 'チームバータス', 'チーム・ケモノミチ'];
     const LISTABLE = ['big_onigiri', 'ice_shard', 'ice_pellet', 'warp_orb', 'sweep_orb', 'sleep_seed', 'revive_seed', 'power_band',
         'guard_scarf', 'haramaki', 'soft_needle', 'bee_wing', 'acorn_shell', 'sleep_spore', 'fluffy_fur', 'tough_vine', 'owl_feather', 'needle_sword', 'shell_shield'];
     function rivalListings(rng) {
@@ -162,6 +162,8 @@
     }
     // 自分の出品が 1 日で売れる確率 (ふつうの値段なら 6 割。高いほど売れにくい)
     const sellChance = listing => Math.max(0.05, Math.min(0.9, 0.6 * (I.ITEMS[listing.id].price * listing.n) / listing.price));
+    // 出品の値段 (道具ごとに 決まっている。2026-10-22 ユーザー指定)
+    const listPrice = item => (I.ITEMS[item.id].price || 10) * (item.n || 1);
 
     // ----- クエスト (仕様書 13.1) -----
     //   kill たおす / deliver 納品 (want を count 個) / ally 仲間と攻略 / reach 決められた階まで行く (案)
@@ -269,7 +271,7 @@
         NAME, DEBT_START, BP_PER, BONUS_EVERY, BONUS_BP, INTEREST, bpFor, UNLOCK, isOpen,
         ROLE_ORDER, OUGI, treeNodes, TREE_START, canUnlock, treeStats, rolesOpen, treeSkills, nodeText,
         shopStock, shopUnit, buyPrice, RECIPES, recipeText,
-        RARE, rareStock, RIVALS, rivalListings, sellChance,
+        RARE, rareStock, RIVALS, rivalListings, sellChance, listPrice,
         QUEST_ALLY, questBoard, questGoal, rewardText, RIVAL_QUESTS, rivalQuests, duelsAt
     };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);

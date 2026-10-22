@@ -193,6 +193,9 @@
     const HERO_STARS = { koori: 5, onioni: 5, yasu: 4, tamu: 4, dake: 4 };
     const star = kind => HERO_STARS[kind] || (ALLIES[kind] && ALLIES[kind].star) || null;
     const STAR_K = { 1: 0.6, 2: 0.7, 3: 0.8, 4: 0.9, 5: 1 };
+    // たおした敵が 仲間になりたそうにする確率 (★が高いほど なりにくい。2026-10-22 ユーザー指定。数は案)
+    const RECRUIT_RATE = { 1: 0.12, 2: 0.09, 3: 0.06, 4: 0.04, 5: 0.025 };
+    const recruitRate = kind => RECRUIT_RATE[(ALLIES[kind] && ALLIES[kind].star) || 3];
 
     // ----- 能力: こおりくん (★5) の Lv ごとの能力を目安に、★と振り分けをかける -----
     const REF_BASE = { hp: 30, atk: 10, def: 9, spa: 10, spd: 9 };
@@ -223,7 +226,7 @@
 
     U.enemyAllySkillsOld = U.enemyAllySkills;
     Object.assign(U, { allyStats, enemyAllySkills, learnedBetween });
-    KD.Allies = { ALLIES, GENERIC, LEADERS, HERO_STARS, STAR_K, star, roleOf, learnList, signature, add };
+    KD.Allies = { ALLIES, GENERIC, LEADERS, HERO_STARS, STAR_K, RECRUIT_RATE, recruitRate, star, roleOf, learnList, signature, add };
 
     // ストーリーの仲間の わざを足す (役職の汎用わざ・固有わざ)
     U.HEROES.yasu.learn.push([6, 'shizuku'], [14, 'yasu_aid'], [24, 'tsubute'], [36, 'megumi']);

@@ -169,11 +169,11 @@ test('交易所: 珍しい道具・ほかの探検隊の出品を買う。自分
     assert.ok(p.bag.some(i => i.id === m.id));
     choose('もどる');
     choose('もどる');
-    // 出品: 安めで出して、何日かすすめると売れる
+    // 出品: 値段は 道具ごとに 決まっていて、何日かすすめると売れる
     p.bag.push({ id: 'power_band', n: 1 });
     choose('出品する');
     choose('ちからのハチマキ');
-    choose('安め');
+    choose('出品する');
     assert.equal(s.town.listings.length, 1);
     choose('もどる');
     choose('やめる');
@@ -412,4 +412,35 @@ test('セーブして、つづきから遊べる。ダンジョンの中なら�
     assert.equal(c.s.phase, 'play');
     assert.equal(c.s.floor, 2);
     assert.equal(c.s.player.money, 50);
+});
+
+test('仲間の広場: 並べかえ (★順・役職順・Lv順) と お別れ。こおりくん・おにおに など 特別なキャラとは お別れできない', () => {
+    const A = globalThis.KD.Allies;
+    // ★が高いほど 仲間になりにくい
+    assert.ok(A.recruitRate('haribaby') > A.recruitRate('tsukiusagi') && A.recruitRate('tsukiusagi') > A.recruitRate('takaramimic'));
+    const { s, game, choose, asks } = newGame();
+    s.roster.push(game.makeAlly('haribaby', 9), game.makeAlly('takaramimic', 3), game.makeAlly('nemuridake', 5), game.makeAlly('okagappa', 4));
+    choose('仲間の広場');
+    assert.match(asks[0].options[0], /並べかえ：仲間になった順/);
+    choose('並べかえ');
+    assert.match(asks[0].options[0], /★順/);
+    const names = asks[0].options.slice(2, 6).map(o => o.trim());
+    assert.ok(names[0].includes('タカラミミック') || names[0].includes('おかがっぱ'), names.join(' / '));
+    choose('並べかえ');
+    choose('並べかえ');
+    assert.match(asks[0].options[0], /Lv順/);
+    assert.ok(asks[0].options[2].includes('ハリベビー'), 'Lv の高い順');
+    // お別れ: ハリベビーとは できる
+    choose('ハリベビー');
+    choose('お別れする');
+    choose('はい、お別れする');
+    assert.match(asks[0].message, /お別れした/);
+    assert.ok(![...s.allies, ...s.roster].some(a => a.kind === 'haribaby'));
+    choose('もどる');
+    // おにおに (最初の仲間)・ライバル探検隊 とは お別れできない
+    choose('おにおに');
+    assert.ok(!asks[0].options.includes('お別れする'));
+    choose('もどる');
+    choose('おかがっぱ');
+    assert.ok(!asks[0].options.includes('お別れする'));
 });

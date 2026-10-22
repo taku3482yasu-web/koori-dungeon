@@ -62,6 +62,8 @@
             post: (name, item) => call('rpc/post_listing', { p_seller: me, p_name: name, p_item: item.id, p_n: item.n, p_price: item.price }),
             // 買う。買えたら [{ item_id, n, price }]、売り切れなら []
             buy: (id, name) => call('rpc/buy_listing', { p_id: id, p_buyer: me, p_buyer_name: name }),
+            // コンピューターの探検隊が 自分の出品を 買う (日がたつと売れる。買い手の ID は そのたびに作る)
+            buyAs: (id, name) => call('rpc/buy_listing', { p_id: id, p_buyer: newId(), p_buyer_name: name }),
             // 自分の出品 (売れていないもの)
             mine: () => call('rpc/my_listings', { p_seller: me }),
             // 取り下げる。できたら [{ item_id, n }]

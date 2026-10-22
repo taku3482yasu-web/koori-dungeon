@@ -385,7 +385,8 @@ test('交易所オンライン: ほかのプレイヤーの出品を買う・自
     // 自分で出品 → ほかのプレイヤーが買う → 交易所に入りなおすと お金を受け取る
     choose('出品する');
     choose('おにぎり');
-    choose('ふつう');
+    assert.match(asks[0].message, new RegExp(`${I.ITEMS.onigiri.price}えんで 出品しますか`), '値段は 道具ごとに 決まっている');
+    choose('出品する');
     await flush();
     assert.match(asks[0].message, /出品した/);
     assert.ok(!s.player.bag.some(i => i.id === 'onigiri'));
@@ -402,7 +403,7 @@ test('交易所オンライン: ほかのプレイヤーの出品を買う・自
     // 取り下げ
     choose('出品する');
     choose('氷のかけら');
-    choose('高め');
+    choose('出品する');
     await flush();
     choose('もどる');
     choose('自分の出品');
@@ -410,6 +411,23 @@ test('交易所オンライン: ほかのプレイヤーの出品を買う・自
     choose('氷のかけら');
     await flush();
     assert.ok(s.player.bag.some(i => i.id === 'ice_shard'), '取り下げて 戻ってきた');
+    // だれも買わなくても、日がたつと コンピューターの探検隊が 買っていく
+    choose('もどる');
+    choose('出品する');
+    choose('氷のかけら');
+    choose('出品する');
+    await flush();
+    choose('もどる');
+    choose('やめる');
+    s.town.day += 6;
+    const before = s.player.money;
+    choose('交易所');
+    await flush();
+    await flush();
+    assert.match(asks[0].message, /売れていた/);
+    assert.match(asks[0].message, /5DX|ASK-3|お願いマッスル|チームバータス|チーム・ケモノミチ/);
+    assert.ok(s.player.money > before);
+    assert.equal(s.town.posts.length, 0);
     globalThis.KD.CONFIG.supabase = { url: '', key: '' };
 });
 
