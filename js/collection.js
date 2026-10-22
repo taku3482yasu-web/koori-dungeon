@@ -78,8 +78,9 @@
     const HAPPENINGS = { rival: 3, treasure: 3, call: 2, collect: 2, house: 2 };
 
     // ----- 図鑑 (敵キャラ表の No の順。ボス・強敵・ライバルは あと) -----
-    function dexOrder() {
-        const all = Object.entries(U.ENEMIES);
+    //   version: いまの バージョン (koori / onioni)。ほかの バージョンの 限定キャラは 数えない
+    function dexOrder(version) {
+        const all = Object.entries(U.ENEMIES).filter(([, e]) => !e.hideDex && !(version && e.version && e.version !== version));
         const numbered = all.filter(([, e]) => e.no).sort((a, b) => a[1].no.localeCompare(b[1].no));
         const others = all.filter(([, e]) => !e.no);
         return [...numbered, ...others].map(([kind]) => kind);
@@ -119,8 +120,8 @@
         { id: 'clutch', name: 'ギリギリセーフ', note: 'HP 1 で 生きのびる', test: c => c.stats.clutch >= 1 },
         { id: 'rival', name: 'ライバルに勝った', note: 'ライバル探検隊を たおす', test: c => c.stats.rivals >= 1 },
         { id: 'house', name: 'モンスターハウス', note: 'モンスターハウスに 入る', test: c => c.stats.houses >= 1 },
-        { id: 'dex_half', name: '図鑑 半分', note: '図鑑の敵を 半分 見る', test: c => Object.keys(c.town.dex.seen).length >= Math.ceil(dexOrder().length / 2) },
-        { id: 'dex_all', name: '図鑑 完成', note: '図鑑の敵を 全部 たおす', test: c => dexOrder().every(k => c.town.dex.beat[k]) }
+        { id: 'dex_half', name: '図鑑 半分', note: '図鑑の敵を 半分 見る', test: c => Object.keys(c.town.dex.seen).length >= Math.ceil(dexOrder(c.town.version).length / 2) },
+        { id: 'dex_all', name: '図鑑 完成', note: '図鑑の敵を 全部 たおす', test: c => dexOrder(c.town.version).every(k => c.town.dex.beat[k]) }
     ];
 
     const newStats = () => ({ kills: 0, quests: 0, crafted: 0, recruited: 0, sold: 0, colitis: 0, clutch: 0, rivals: 0, houses: 0, evolved: 0 });

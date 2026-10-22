@@ -9,7 +9,7 @@ globalThis.performance = { now: () => fakeNow };
 const store = new Map();
 globalThis.localStorage = { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
 globalThis.KD = {};
-for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'enemies9.js', 'enemies10.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'enemyart9.js', 'enemyart10.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) {
+for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'enemies9.js', 'enemies10.js', 'enemies11.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'enemyart9.js', 'enemyart10.js', 'enemyart11.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) {
     vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
 }
 const { Units: U, Dungeons: DG, Collection: C, BigArt: B, Allies: A } = globalThis.KD;
@@ -70,12 +70,13 @@ test('名前を指定された 21 体と 新キャラ 50 体: 絵・仲間のデ
 });
 
 test('ダンジョン 3 つ: コード塔は ネット寺のあと (クリア前)、横丁・王国は クリア後。無限ではない', () => {
-    const [code, alley, kingdom] = DG10.EXTRA;
-    assert.deepEqual(DG10.EXTRA.map(d => [d.id, d.floors]), [['code', 15], ['alley', 20], ['kingdom', 25]]);
+    const EX = DG10.EXTRA.filter(d => !d.version);   // バージョン専用 (enemies11.js) は べつ
+    const [code, alley, kingdom] = EX;
+    assert.deepEqual(EX.map(d => [d.id, d.floors]), [['code', 15], ['alley', 20], ['kingdom', 25]]);
     assert.ok(!code.opens({ cleared: 2 }) && code.opens({ cleared: 3 }));
     assert.ok(!alley.opens({ cleared: 7 }) && alley.opens({ cleared: 7, storyEnd: true }));
     assert.ok(!kingdom.opens({ cleared: 6 }) && kingdom.opens({ storyEnd: true }));
-    for (const d of DG10.EXTRA) {
+    for (const d of EX) {
         assert.ok(U.ENEMIES[d.boss].boss, `${d.name} の ボス`);
         for (let f = 1; f <= d.floors; f++) assert.ok(DG10.tableFor(d, f).every(k => U.ENEMIES[k]), `${d.name} B${f}F`);
         assert.ok(globalThis.KD.Art.THEMES[d.theme], `${d.name} の 見た目`);

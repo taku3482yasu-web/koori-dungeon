@@ -9,7 +9,7 @@ globalThis.performance = { now: () => fakeNow };
 const store = new Map();
 globalThis.localStorage = { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
 globalThis.KD = {};
-for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'enemies9.js', 'enemies10.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'enemyart9.js', 'enemyart10.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) {
+for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'enemies9.js', 'enemies10.js', 'enemies11.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'enemyart9.js', 'enemyart10.js', 'enemyart11.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) {
     vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
 }
 const { Units: U, Items: I, Town: TW, Dungeon: D, Dungeons: DG, createRng } = globalThis.KD;
@@ -470,9 +470,10 @@ test('ストーリーをクリアすると ライバル探検隊の クエスト
     assert.match(talk, /ライバル探検隊のみんなから クエスト/);
     const rivals = Object.values(C.RIVALS).flat();
     assert.ok(!rivals.some(k => [...s.allies, ...s.roster].some(a => a.kind === k)), 'クリアしただけで 仲間になった');
-    // 掲示板: メンバー 10 人ぶん (リーダーは まだ)
+    // 掲示板: 氷隊 (こおりくん) なので 5DX・チームバータス・チーム・ケモノミチの メンバー 6 人ぶん (リーダーは まだ)
     const rq = s.town.board.filter(q => q.rival);
-    assert.equal(rq.length, 10);
+    assert.equal(rq.length, 6);
+    assert.deepEqual([...new Set(rq.map(q => q.rival))].sort(), ['5DX', 'チーム・ケモノミチ', 'チームバータス'].sort());
     assert.ok(!rq.some(q => q.type === 'duel'));
     for (const [team, kinds] of Object.entries(C.RIVALS)) {
         for (const kind of kinds) assert.equal(A.star(kind), kind === A.LEADERS[team] ? 5 : 4, `${team} の ${kind}`);
@@ -489,7 +490,7 @@ test('ストーリーをクリアすると ライバル探検隊の クエスト
     assert.match(asks[0].message, /5DXの メンバーが そろった/);
     choose('もどる');
     // リーダーとの勝負: 海岸どうくつの B6F に おかがっぱが待っている。たおすと 仲間に
-    const duel = s.town.board.find(q => q.type === 'duel');
+    const duel = s.town.board.find(q => q.rival && q.type === 'duel');
     assert.ok(duel && duel.ally.kind === 'okagappa');
     s.town.board.splice(s.town.board.indexOf(duel), 1);
     s.town.quests.push(duel);
@@ -505,5 +506,15 @@ test('ストーリーをクリアすると ライバル探検隊の クエスト
     choose('もどる');
     // 5DX は もう出ない。ほかのチームの メンバーのクエストは残っている
     assert.ok(!s.town.board.some(q => q.rival === '5DX'));
-    assert.equal(s.town.board.filter(q => q.rival).length, 8);
+    assert.equal(s.town.board.filter(q => q.rival).length, 4);
+});
+
+test('バージョン: こおりくん → 氷隊 / おにおに → 鬼鬼団。ライバルの クエストは バージョンの チーム (ケモノミチは どちらでも)', () => {
+    const TW = globalThis.KD.Town, DG = globalThis.KD.Dungeons;
+    assert.equal(DG.versionOf({ version: 'koori' }).name, '氷隊');
+    assert.equal(DG.versionOf({ version: 'onioni' }).name, '鬼鬼団');
+    assert.equal(DG.versionOf({}, 'onioni').name, '鬼鬼団', '前の版の セーブは 主人公から');
+    const teams = v => [...new Set(TW.rivalQuests({ teams: DG.VERSIONS[v].teams }).map(q => q.rival))].sort();
+    assert.deepEqual(teams('koori'), ['5DX', 'チーム・ケモノミチ', 'チームバータス'].sort());
+    assert.deepEqual(teams('onioni'), ['ASK-3', 'お願いマッスル', 'チーム・ケモノミチ'].sort());
 });

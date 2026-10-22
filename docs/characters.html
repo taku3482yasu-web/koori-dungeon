@@ -73,15 +73,17 @@
 <script src="../js/enemies.js?v=7eed88a2"></script>
 <script src="../js/items.js?v=2dc93420"></script>
 <script src="../js/dungeons.js?v=60f7b169"></script>
-<script src="../js/collection.js?v=d19cab15"></script>
+<script src="../js/collection.js?v=fc707e84"></script>
 <script src="../js/allies.js?v=e19c60c5"></script>
 <script src="../js/enemies9.js?v=e898c34f"></script>
 <script src="../js/enemies10.js?v=4ddcedc4"></script>
-<script src="../js/art.js?v=58d5976a"></script>
+<script src="../js/enemies11.js?v=d86f3257"></script>
+<script src="../js/art.js?v=d1c9fb50"></script>
 <script src="../js/bigart.js?v=8b50860b"></script>
 <script src="../js/enemyart.js?v=4369f873"></script>
 <script src="../js/enemyart9.js?v=9ce94360"></script>
 <script src="../js/enemyart10.js?v=462eb5f0"></script>
+<script src="../js/enemyart11.js?v=959ce57f"></script>
 <script>
 (function () {
     'use strict';
@@ -169,6 +171,11 @@
     });
     section('naitei', 'ナイテイの きょうだい', 'ごくまれに 掲示板に出る クエストで 決まった階に 待っている。たおすと 仲間になる',
         [{ cards: Object.keys(DG.RARE_QUESTS || {}).map(id => enemyCard(id, { desc: `${DG.byId(DG.RARE_QUESTS[id].dungeon).name}の B${DG.RARE_QUESTS[id].floor}F で 待っている` })) }]);
+    // バージョン限定 (氷隊 / 鬼鬼団): 専用クエストだけの キャラと 限定ボスの 再戦
+    if (DG.VERSION_QUESTS) Object.entries(DG.VERSIONS).forEach(([v, info]) => {
+        section(`ver-${v}`, `${info.name}の 専用クエスト`, `${info.name}（${v === 'koori' ? 'こおりくん' : 'おにおに'}を えらんだとき）だけ。たおして 報告すると 仲間になる（★5）`,
+            [{ cards: DG.VERSION_QUESTS[v].filter(q => q.ally).map(q => enemyCard(q.ally, { desc: `${DG.byId(q.dungeon).name}の B${q.floor}F で 待っている` })) }]);
+    });
     section('anywhere', 'どこにでも出る（まれ）', 'どのダンジョンにも まれに出る', [{ cards: DG.ANYWHERE.map(([id]) => enemyCard(id)) }]);
     section('rivals', 'ライバル探検隊', 'ハプニングで鉢合わせする。たおすと お金を落とす。ストーリーをクリアすると 専用クエストで仲間になる。メンバーが そろうと リーダーとの勝負（リーダーは ★5、ほかは ★4）',
         Object.entries(C.RIVALS).map(([team, ids]) => ({ title: team, cards: ids.map(id => enemyCard(id, id === AL.LEADERS[team] ? { tags: [...enemyCard(id).tags, 'リーダー'] } : {})) })));

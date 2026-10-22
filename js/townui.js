@@ -52,9 +52,20 @@
             state.town = {
                 seed, day: 1, debt: TW.DEBT_START, paid: 0, bp: 0, bank: 0, storage: [], quests: [], owned: [],
                 board: [], shop: [], rare: [], market: [], listings: [], news: [], ended: false,
-                cleared: 0, seen: {}, storyEnd: false, ...collectionData()
+                cleared: 0, seen: {}, storyEnd: false, ...collectionData(),
+                version: (p() && p().kind) || 'koori'   // バージョン: こおりくん → 氷隊 / おにおに → 鬼鬼団 (2026-10-22 ユーザー指定)
             };
+            showVersion();
             refreshDay();
+        }
+
+        // いまの バージョン ({ id, name, teams, dungeon })。タイトルと ページの 名前にも 付ける
+        const version = () => DG.versionOf(t(), p() && p().kind);
+        const GAME_TITLE = 'こおりくんの大冒険～ダンジョンドタバタ大道中～';
+        let titleVersion = null;   // タイトル画面に 出す バージョン (セーブが あれば その バージョン)
+        function showVersion(v = version()) {
+            titleVersion = v;
+            if (typeof document !== 'undefined' && document.title !== undefined) document.title = v ? `${GAME_TITLE} ${v.name}` : GAME_TITLE;
         }
 
         // 図鑑・実績・数 (たおした数など)
@@ -102,6 +113,7 @@
             const kinds = [...state.allies, ...state.roster].map(a => a.kind);
             town.board = TW.questBoard(dayRng(1), town.day, { owned: town.owned, allyKinds: [...new Set(kinds)], dungeons: openDungeons().filter(d => !d.bonus && !d.extra) });
             addRivalQuests();
+            addVersionQuests();
             addRareQuests();
             town.shop = TW.shopStock(dayRng(2));
             town.rare = TW.rareStock(dayRng(3));
@@ -122,7 +134,8 @@
             view = 'title';
             bgm('title');
             const saved = load(true);
-            ask('こおりくんの大冒険～ダンジョンドタバタ大道中～', saved ? ['つづきから', 'はじめから'] : ['はじめから'], i => {
+            titleVersion = saved ? DG.versionOf(saved.town, saved.hero && saved.hero.kind) : null;
+            ask(titleVersion ? `${GAME_TITLE}\n${titleVersion.name}` : GAME_TITLE, saved ? ['つづきから', 'はじめから'] : ['はじめから'], i => {
                 if (saved && i === 0) return load();
                 if (saved) {
                     return ask('セーブを消して、はじめから遊びますか？', ['はい', 'いいえ'], j => (j === 0 ? newGame() : title()));
@@ -144,7 +157,8 @@
         function story(i) {
             const oni = p().kind === 'onioni';
             const lines = [
-                '摩天楼の財宝で 借金を返したはずが……\n打ち上げで散財して、また借金ができてしまった。',
+                // 1 枚目に バージョン (氷隊 / 鬼鬼団) を 出す (2026-10-22 ユーザー指定)
+                `【${GAME_TITLE} ${version().name}】\n摩天楼の財宝で 借金を返したはずが……打ち上げで散財して、また借金ができてしまった。`,
                 'こおりくん「どうしよう。こおり生きていけないよ～～！！」',
                 'ふるカワ「SEタウンの近くに、不思議なダンジョンが いくつも現れたんだって。\n探検隊になって依頼をこなせば、お金がもらえるよ！」',
                 oni ? 'おにおに「貸した金は 自分で取り返す！ こおりくん、ダンジョンへ ついてこい！」'
@@ -252,7 +266,16 @@
             if (!town.storyEnd || !town.board) return;
             town.board = town.board.filter(q => !q.rival);
             const have = [...state.allies, ...state.roster].map(a => a.kind);
-            town.board.unshift(...TW.rivalQuests({ have, accepted: town.quests.map(q => q.id) }));
+            town.board.unshift(...TW.rivalQuests({ have, accepted: town.quests.map(q => q.id), teams: version().teams }));
+        }
+
+        // バージョンの 専用クエスト (enemies11.js の VERSION_QUESTS)。条件が そろえば いつも 掲示板の 上に出る
+        function addVersionQuests() {
+            const town = t();
+            if (!town.board || !DG.versionQuests) return;
+            town.board = town.board.filter(q => !q.version);
+            const have = [...state.allies, ...state.roster].map(a => a.kind);
+            town.board.unshift(...DG.versionQuests(town, { have, accepted: town.quests.map(q => q.id) }));
         }
 
         // ナイテイの きょうだい (ナイナイ・アルアル・ナディ) の クエスト: ごくまれに 掲示板に出る (段階 10。2026-10-22 ユーザー指定)
@@ -373,6 +396,7 @@
                     t().owned.push(q.item);
                     lines.push(`★${I.ITEMS[q.item].name}を もらった！`);
                 }
+                if (q.version && !q.ally) t().owned.push(q.id);   // 専用クエストは 一度だけ
                 if (q.ally) {
                     // ライバル探検隊は 主人公の Lv の 2 つ下で来る
                     const a = g.makeAlly(q.ally.kind, q.ally.lv || Math.max(1, p().lv - 2));
@@ -386,6 +410,7 @@
                 }
             });
             addRivalQuests();
+            addVersionQuests();
             save();
             ask(`ふるカワ「おつかれさま！」\n${lines.join('\n')}`, ['もどる'], guild);
         }
@@ -879,7 +904,7 @@
 
         // ----- 図鑑 (敵・道具) -----
         function dexMenu() {
-            const order = C.dexOrder();
+            const order = C.dexOrder(t().version);
             const nSeen = order.filter(k => t().dex.seen[k]).length, nBeat = order.filter(k => t().dex.beat[k]).length;
             const items = Object.keys(I.ITEMS);
             const nItems = items.filter(id => t().dexItems[id]).length;
@@ -891,7 +916,7 @@
         }
 
         function enemyDex() {
-            const order = C.dexOrder();
+            const order = C.dexOrder(t().version);
             const label = kind => {
                 const e = U.ENEMIES[kind];
                 const no = e.no ? `No.${e.no}` : e.boss ? 'ボス' : e.rival ? 'ライバル' : '強敵';
@@ -981,7 +1006,7 @@
                 data = null;
             }
             if (!data || data.v !== 1) return false;
-            if (peek) return true;
+            if (peek) return data;
             const h = data.hero;
             const hero = g.makeHero(h.kind, h.role);
             Object.assign(hero, { lv: h.lv, exp: h.exp, skills: h.skills, tree: h.tree, bag: h.bag, money: h.money, belly: h.belly ?? I.BELLY_MAX });
@@ -999,7 +1024,10 @@
             state.tactic = data.tactic || 'fight';
             state.town = { cleared: 0, seen: {}, storyEnd: false, ...collectionData(), ...data.town };
             state.town.stats = { ...C.newStats(), ...state.town.stats };
+            if (!state.town.version) state.town.version = hero.kind;
+            showVersion();
             addRivalQuests();
+            addVersionQuests();
             // ダンジョンの中でやめていたら、その場所から 続ける (階の様子がない 前の版のセーブは その階の はじめから。仕様書 16章)
             if (data.run && data.snap) return g.resumeSnap(data.snap);
             if (data.run) return g.resume(data.run);
@@ -1046,6 +1074,12 @@
             ctx.font = `12px ${FONT}`;
             ctx.fillStyle = '#ffffff';
             ctx.fillText('～ダンジョンドタバタ大道中～', W / 2, 62);
+            if (titleVersion) {
+                // バージョン (氷隊 / 鬼鬼団)
+                ctx.font = `bold 14px ${FONT}`;
+                ctx.fillStyle = titleVersion.color;
+                ctx.fillText(`― ${titleVersion.name} ―`, W / 2, 152);
+            }
             const bob = Math.floor(now / 400) % 2;
             A.drawSprite(ctx, 'koori', bob, W / 2 - 72, 80 - bob, { scale: 4 });
             A.drawSprite(ctx, 'onioni', 1 - bob, W / 2 + 8, 80 - (1 - bob), { scale: 4 });

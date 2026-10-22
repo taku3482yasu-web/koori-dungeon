@@ -236,6 +236,17 @@
             ...block('#5a5068', '#463e54', '#7a7088', { accent: '#ffd84a' }), stairs: ['#ffd84a', '#8a6a2a', '#fff0a0'],
             void: '#060408', mini: { floor: '#b8b098', path: '#c8a870' }
         },
+        // バージョン専用: 雪どけの氷河 (氷と 雪どけの 若葉) / 金色の鬼ヶ城 (朱ぬりの 柱と 金)
+        glacier: {
+            floor: ['#c8e0f0', '#c0d8ec', '#d0e8f4'], floorPattern: 'speck', speck: '#ffffff', path: '#a8c8e0', pathDark: '#88a8c8', pebble: '#e8f4ff',
+            ...block('#4a7aa8', '#3a6a98', '#8ab8e0', { accent: '#ffb0c8' }), stairs: ['#8ac8f0', '#3a6a98', '#e8f8ff'],
+            water: ['#3a8ad8', '#8ac8f0'], void: '#020814', mini: { floor: '#d8ecf8', path: '#a8c8e0', water: '#5aa8e8' }
+        },
+        onijo: {
+            floor: ['#6a3a2a', '#623426', '#724030'], floorPattern: 'boards', speck: '#4a2418', path: '#8a6a3a', pathDark: '#6a4a2a', pebble: '#c8a050',
+            ...block('#a82a1a', '#7a1a10', '#d84a2a', { accent: '#ffd840' }), stairs: ['#ffd840', '#8a6a2a', '#fff0a0'],
+            lava: ['#e85a1a', '#ffb040'], void: '#0a0402', mini: { floor: '#b87a5a', path: '#c8a050', lava: '#ff7a3a' }
+        },
         aso: {
             floor: ['#4a2a2a', '#442626', '#523030'], floorPattern: 'speck', speck: '#7a3a2a', path: '#3a2020', pathDark: '#2a1414', pebble: '#6a3a3a',
             ...block('#2a1414', '#1e0e0e', '#5a2a2a', { accent: '#e85a1a' }), stairs: ['#8a6a6a', '#4a2a2a', '#c8a0a0'],

@@ -9,7 +9,7 @@ globalThis.performance = { now: () => fakeNow };
 const store = new Map();
 globalThis.localStorage = { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
 globalThis.KD = {};
-for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'enemies9.js', 'enemies10.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'enemyart9.js', 'enemyart10.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) {
+for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'enemies9.js', 'enemies10.js', 'enemies11.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'enemyart9.js', 'enemyart10.js', 'enemyart11.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) {
     vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
 }
 const { Units: U, Dungeon: D, Collection: C, Town: TW } = globalThis.KD;
@@ -168,7 +168,10 @@ test('図鑑: 見た敵・たおした敵を おぼえる。敵は みんな図�
     for (let i = 0; i < 5 && s.enemies.length; i++) { e.x = e.fx = p.x + dx; e.y = e.fy = p.y; game.attack(); run(700); }
     assert.equal(s.town.dex.beat.donguriko, 1);
     const order = C.dexOrder();
-    assert.equal(order.length, Object.keys(U.ENEMIES).length);
+    // 再戦の すがた (hideDex) は のらない。バージョンを わたすと ほかの バージョンの 限定キャラは のらない
+    assert.equal(order.length, Object.values(U.ENEMIES).filter(e => !e.hideDex).length);
+    assert.ok(C.dexOrder('koori').includes('yukiusapon') && !C.dexOrder('koori').includes('konin'));
+    assert.ok(C.dexOrder('onioni').includes('konin') && !C.dexOrder('onioni').includes('yukiusapon'));
     assert.equal(order[0], 'haribaby');
     assert.ok(order.indexOf('harry') > order.indexOf('kinmenkoinu'), 'ボスは あと');
 });

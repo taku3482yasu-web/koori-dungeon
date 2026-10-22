@@ -238,10 +238,11 @@
         ishii: { type: 'duel', dungeon: 'aso', floor: 15, money: 10000, text: 'イシイー「ブヒッ！ ケモノミチの 頭として 勝負だ！ ASOの壺の底の B15F だ！」' }
     };
     // いま掲示板に出すライバルのクエスト。have: 仲間にいる キャラの種類 / accepted: 受けている クエストの id
-    function rivalQuests({ have = [], accepted = [] } = {}) {
+    //   teams: クエストを 受けられる チーム (バージョンで ちがう。2026-10-22 ユーザー指定)。なければ ぜんぶ
+    function rivalQuests({ have = [], accepted = [], teams = null } = {}) {
         const C = KD.Collection, A = KD.Allies;
         const list = [];
-        Object.entries(C.RIVALS).forEach(([team, kinds]) => {
+        Object.entries(C.RIVALS).filter(([team]) => !teams || teams.includes(team)).forEach(([team, kinds]) => {
             const leader = A.LEADERS[team];
             const members = kinds.filter(k => k !== leader);
             const open = members.filter(k => !have.includes(k));
