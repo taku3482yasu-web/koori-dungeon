@@ -130,13 +130,122 @@ for (const [hero, v, other] of [['こおりくん', 'koori', 'onioni'], ['おに
     });
 }
 
-test('セーブと 読みこみ: バージョンは のこる。前の版の セーブは 主人公から 決まる', () => {
-    const { s, game } = setup({}, 'おにおに');
-    game.town.save();
-    const data = JSON.parse(localStorage.getItem('koori-dungeon-save'));
-    assert.equal(data.town.version, 'onioni');
-    delete data.town.version;
-    localStorage.setItem('koori-dungeon-save', JSON.stringify(data));
-    game.town.load();
-    assert.equal(s.town.version, 'onioni');
+test('セーブは バージョンごとに 2 つ。タイトルで えらべる。前の版の セーブは バージョンの ほうへ 移る', () => {
+    // 鬼鬼団で はじめて セーブ
+    const a = setup({}, 'おにおに');
+    a.game.town.save();
+    assert.ok(localStorage.getItem('koori-dungeon-save-onioni'));
+    // 氷隊も はじめる (鬼鬼団の セーブは 消えない)。setup は store.clear() するので、セーブを とっておく
+    const oni = localStorage.getItem('koori-dungeon-save-onioni');
+    const b = setup({}, 'こおりくん');
+    b.game.town.save();
+    localStorage.setItem('koori-dungeon-save-onioni', oni);
+    // タイトル: 両方の つづきから
+    b.game.town.title();
+    while (b.asks.length > 1) b.asks.shift();
+    assert.match(b.asks[0].message, /氷隊 ／ 鬼鬼団/);
+    assert.deepEqual(b.asks[0].options, ['つづきから（氷隊）', 'つづきから（鬼鬼団）', 'はじめから']);
+    b.choose('つづきから（鬼鬼団）');
+    assert.equal(b.s.town.version, 'onioni');
+    assert.equal(b.s.player.kind, 'onioni');
+    // はじめから: えらんだ バージョンの セーブが あれば 聞く。いいえ なら タイトルへ
+    b.game.town.title();
+    while (b.asks.length > 1) b.asks.shift();
+    b.choose('はじめから');
+    b.choose('こおりくん');
+    assert.match(b.asks[0].message, /氷隊の セーブが あります/);
+    b.choose('いいえ');
+    assert.ok(b.asks[0].options.includes('つづきから（氷隊）'));
+    // 前の版の セーブ (バージョンなし・ひとつだけの キー) は 主人公の バージョンへ
+    const old = JSON.parse(localStorage.getItem('koori-dungeon-save-onioni'));
+    delete old.town.version;
+    store.clear();
+    localStorage.setItem('koori-dungeon-save', JSON.stringify(old));
+    b.game.town.title();
+    while (b.asks.length > 1) b.asks.shift();
+    assert.deepEqual(b.asks[0].options, ['つづきから', 'はじめから']);
+    assert.equal(localStorage.getItem('koori-dungeon-save'), null);
+    b.choose('つづきから');
+    assert.equal(b.s.town.version, 'onioni');
+});
+
+test('キャラ交換: 交易所で もう片方の バージョンの 限定キャラを 買える。自分の 限定キャラを 出品できる', () => {
+    const { s, game, asks, choose } = setup({ unlockAll: true });
+    const DGv = globalThis.KD.Dungeons;
+    // コンピューターの探検隊の 出品に 鬼鬼団の キャラが 出る (1 日 35%。何日か すすめる)
+    let swap = null;
+    for (let d = 0; d < 40 && !swap; d++) swap = DGv.rivalAllyListing(globalThis.KD.createRng(d), s.town, 30, ['5DX']);
+    assert.ok(swap && U.ENEMIES[DGv.allyOfTradeId(swap.id)].version === 'onioni', '氷隊には 鬼鬼団の キャラ');
+    assert.equal(DGv.rivalAllyListing(globalThis.KD.createRng(1), { ...s.town, cleared: 4 }, 30, ['5DX']), null, '月の迷宮の 前は 出ない');
+    s.town.market = [{ ...swap, n: 20 }];
+    s.player.money = 100000;
+    choose('交易所');
+    choose('ほかの探検隊の出品');
+    const name = U.ENEMIES[DGv.allyOfTradeId(swap.id)].name;
+    assert.ok(asks[0].options[0].includes(`${name} Lv20`) && asks[0].options[0].includes('鬼鬼団限定'), asks[0].options[0]);
+    choose(name);
+    assert.match(asks[0].message, /買った/);
+    assert.ok(s.roster.some(a => a.kind === DGv.allyOfTradeId(swap.id) && a.lv === 20));
+    choose('もどる');
+    choose('もどる');
+    // 出品: 仲間の広場の 限定キャラだけ
+    s.roster.push(game.makeAlly('yukiusapon', 12));
+    choose('キャラを出品する');
+    assert.ok(asks[0].options.some(o => o.includes('ユキウサポン Lv12')));
+    choose('ユキウサポン');
+    assert.match(asks[0].message, new RegExp(`${DGv.allyPrice('yukiusapon').toLocaleString()}えんで 出品しますか`));
+    choose('出品する');
+    assert.ok(!s.roster.some(a => a.kind === 'yukiusapon'));
+    assert.deepEqual(s.town.listings.map(l => [l.id, l.n]), [['ally_yukiusapon', 12]]);
+    choose('もどる');
+    // 取り下げると もどってくる
+    choose('自分の出品');
+    choose('ユキウサポン');
+    assert.ok(s.roster.some(a => a.kind === 'yukiusapon' && a.lv === 12));
+    // 再戦の すがた・ふつうの キャラは 出せない
+    assert.ok(!DGv.tradableAlly('harukirin_q') && !DGv.tradableAlly('harry') && DGv.tradableAlly('goukioni'));
+});
+
+test('バージョンの 会話: 町の 見出しに 日がわりの ひとこと', () => {
+    for (const [hero, v] of [['こおりくん', 'koori'], ['おにおに', 'onioni']]) {
+        const { asks } = setup({}, hero);
+        assert.ok(DG.VERSIONS[v].lines.town.some(l => asks[0].message.includes(l)), `${DG.VERSIONS[v].name}の ひとこと: ${asks[0].message}`);
+    }
+});
+
+// 敵を となりに置いて 見えるようにし、1 ターン すすめる
+function meet(t, e) {
+    const { s, game, run } = t;
+    const p = s.player;
+    s.enemies.splice(0, s.enemies.length, e);
+    e.x = e.fx = p.x + [1, -1].find(d => D.canMove(s.map, p.x, p.y, d, 0));
+    e.y = e.fy = p.y;
+    s.visible = D.visibleFrom(s.map, p.x, p.y);
+    game.wait();
+    run(100);
+}
+const D = globalThis.KD.Dungeon;
+
+test('カットイン: 限定ボスは「氷隊 限定ボス」。再戦の 相手は 見つけたときに カットイン', () => {
+    const t = setup({ enemies: false }, 'こおりくん');
+    const { s, game, run } = t;
+    t.asks.length = 0;   // 町の 画面を 閉じる
+    game.startDungeon('glacier');
+    run(1500);
+    game.spawnBoss();
+    assert.equal(s.boss.kind, 'harukirin');
+    meet(t, s.boss);
+    assert.ok(s.cutin && s.cutin.kind === 'harukirin', 'ボスの カットイン');
+    assert.equal(s.cutin.sub, '氷隊 限定ボス');
+    run(3000);
+    // 再戦の 相手 (クエストで 待っている): 見えるまで 動かず、見つけると カットイン
+    t.asks.length = 0;   // ボスの 台詞を 閉じる
+    s.cutin = null;
+    s.boss = null;
+    const e = game.makeEnemy('harukirin_q', 20, 1, 1);
+    e.duel = true;
+    e.awake = false;
+    meet(t, e);
+    assert.ok(s.cutin && s.cutin.kind === 'harukirin_q', '再戦の カットイン');
+    assert.equal(s.cutin.sub, '再戦！');
 });

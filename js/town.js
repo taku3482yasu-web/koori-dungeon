@@ -161,7 +161,8 @@
         });
     }
     // 自分の出品が 1 日で売れる確率 (ふつうの値段なら 6 割。高いほど売れにくい)
-    const sellChance = listing => Math.max(0.05, Math.min(0.9, 0.6 * (I.ITEMS[listing.id].price * listing.n) / listing.price));
+    const sellChance = listing => (!I.ITEMS[listing.id] ? 0.5   // キャラ (ally_<種類>。enemies11.js) は 1 日 5 割
+        : Math.max(0.05, Math.min(0.9, 0.6 * (I.ITEMS[listing.id].price * listing.n) / listing.price)));
     // 出品の値段 (道具ごとに 決まっている。2026-10-22 ユーザー指定)
     const listPrice = item => (I.ITEMS[item.id].price || 10) * (item.n || 1);
 

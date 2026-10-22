@@ -118,12 +118,14 @@
             town.shop = TW.shopStock(dayRng(2));
             town.rare = TW.rareStock(dayRng(3));
             town.market = TW.rivalListings(dayRng(4));
+            const swap = DG.rivalAllyListing && DG.rivalAllyListing(dayRng(8), town, p().lv, TW.RIVALS);
+            if (swap) town.market.push(swap);   // もう片方の バージョンの 限定キャラ (キャラ交換)
             const r = dayRng(5);
             town.listings = town.listings.filter(l => {
                 if (!r.chance(TW.sellChance(l))) return true;
                 p().money += l.price;
                 town.stats.sold = (town.stats.sold || 0) + 1;
-                town.news.push(`出品していた ${I.label(l)}が ${r.pick(TW.RIVALS)}に 売れた！ +${money(l.price)}`);
+                town.news.push(`出品していた ${rowLabel(l)}が ${r.pick(TW.RIVALS)}に 売れた！ +${money(l.price)}`);
                 return false;
             });
         }
@@ -133,21 +135,27 @@
             state.phase = 'title';
             view = 'title';
             bgm('title');
-            const saved = load(true);
-            titleVersion = saved ? DG.versionOf(saved.town, saved.hero && saved.hero.kind) : null;
-            ask(titleVersion ? `${GAME_TITLE}\n${titleVersion.name}` : GAME_TITLE, saved ? ['つづきから', 'はじめから'] : ['はじめから'], i => {
-                if (saved && i === 0) return load();
-                if (saved) {
-                    return ask('セーブを消して、はじめから遊びますか？', ['はい', 'いいえ'], j => (j === 0 ? newGame() : title()));
-                }
+            migrateSave();
+            const slots = SLOTS.filter(readSlot);
+            // セーブが 1 つなら その バージョン、2 つなら 両方を タイトルに 出す
+            titleVersion = slots.length === 1 ? DG.VERSIONS[slots[0]] : slots.length ? { name: slots.map(v => DG.VERSIONS[v].name).join(' ／ '), color: '#ffe680' } : null;
+            const label = v => (slots.length > 1 ? `つづきから（${DG.VERSIONS[v].name}）` : 'つづきから');
+            ask(titleVersion ? `${GAME_TITLE}\n${titleVersion.name}` : GAME_TITLE, [...slots.map(label), 'はじめから'], i => {
+                if (i < slots.length) return load(false, slots[i]);
                 newGame();
             }, { place: 'bottom', list: false });
         }
 
+        // はじめから: 主人公を えらぶと バージョンが 決まる。その バージョンの セーブが あれば 消してよいか 聞く
         function newGame() {
             g.selectHero(() => {
-                newTown((Date.now() ^ (Math.random() * 1e9)) >>> 0);
-                story(0);
+                const start = () => {
+                    newTown((Date.now() ^ (Math.random() * 1e9)) >>> 0);
+                    story(0);
+                };
+                const v = DG.versionOf(null, p().kind);
+                if (!readSlot(v.id)) return start();
+                ask(`${v.name}の セーブが あります。消して、はじめから遊びますか？\n（もう片方の バージョンの セーブは そのまま）`, ['はい', 'いいえ'], j => (j === 0 ? start() : title()), { list: false });
             });
         }
 
@@ -230,7 +238,7 @@
                 return cutscene([...withScenes([...lines, ...(st.clear || [])], ['asoDown', 'asoDown', 'asoSeal', 'townParty', 'stillDebt', 'stillDebt', 'clearCard']),
                     ...withScenes(rivals, ['rivalsQuest'])], () => menu());
             }
-            g.talk([...lines, ...(st.clear || []), ...rivals], () => menu());
+            g.talk([...lines, ...(st.clear || []), ...((version().lines || {}).clear || []), ...rivals], () => menu());
         }
 
         // ドタバタ大迷宮を抜けた (段階 9): ほんとうの ほんとうの エンディング。何度でも 挑戦できる
@@ -310,7 +318,9 @@
             const town = t();
             const news = town.news.splice(0);
             const done = town.quests.filter(questDone).length;
+            const vl = version().lines;
             const head = [`${TW.NAME}　${town.day}日目　借金 ${money(town.debt)}　お金 ${money(p().money)}　BP ${town.bp}`,
+                ...(vl ? [vl.town[town.day % vl.town.length]] : []),   // バージョンの ひとこと (日がわり)
                 ...news, ...(done ? [`達成したクエストが ${done} 件ある。ギルドで報告しよう。`] : [])];
             ui.ask(head.join('\n'), PLACES.map(pl => (isOpen(pl.id) ? pl.name : `${pl.name}（あと ${money(paidNeed(pl.id))}）`)), i => {
                 const pl = PLACES[i];
@@ -441,9 +451,10 @@
             t().ended = true;
             save();
             const lines = ['おにおに「……全部、返したな」', 'こおりくん「やったー！ これで こおり 生きていけるよ～～！！」',
-                'ふるカワ「探検隊『ばりきつよめ』、大活躍だったね！」', '～ おしまい ～\n（このあとも 遊べます）',
+                'ふるカワ「探検隊『ばりきつよめ』、大活躍だったね！」', ...((version().lines || {}).ending || []), '～ おしまい ～\n（このあとも 遊べます）',
                 'ふるカワ「たいへん！ SEタウンのはずれに、底の見えない 大きな穴が 開いたよ！」', '新しいダンジョン「ドタバタ大迷宮」（99 階）が 現れた！'];
-            cutscene(withScenes(lines, ['paid', 'paidJoy', 'townParty', 'endCard', 'hole', 'hole']), () => menu());
+            const vEnd = ((version().lines || {}).ending || []).map(() => 'townParty');
+            cutscene(withScenes(lines, ['paid', 'paidJoy', 'townParty', ...vEnd, 'endCard', 'hole', 'hole']), () => menu());
         }
 
         // ----- バトルツリー (仕様書 6.4) -----
@@ -605,7 +616,20 @@
         // Supabase につながっていれば (config.js)、本当のプレイヤーの出品を買える・自分の出品が ほかのプレイヤーに売れる。
         // つながっていなければ、コンピューターの探検隊 (ライバル探検隊) だけ。自分の出品は 日がたつとコンピューターが買う
         const myName = () => `${p().name}（ばりきつよめ）`;
-        const tradable = id => Boolean(I.ITEMS[id]) && I.ITEMS[id].only !== 'quest';
+        const tradable = id => tradeAlly(id) || (Boolean(I.ITEMS[id]) && I.ITEMS[id].only !== 'quest');
+        // キャラ交換 (enemies11.js): 'ally_<種類>' (n は Lv) は 限定キャラ
+        const tradeAlly = id => { const k = DG.allyOfTradeId && DG.allyOfTradeId(id); return k && DG.tradableAlly(k) ? k : null; };
+        const rowLabel = l => {
+            const k = tradeAlly(l.id);
+            return k ? `${U.ENEMIES[k].name} Lv${l.n}（★${KD.Allies.star(k)}・${DG.VERSIONS[U.ENEMIES[k].version].name}限定）` : I.label(l);
+        };
+        // 買った・取り下げた 物を 受け取る (キャラは 仲間の広場へ)
+        function receive(l) {
+            const k = tradeAlly(l.id);
+            if (!k) return giveItem({ id: l.id, n: l.n }, true);
+            const a = g.makeAlly(k, l.n);
+            state.roster.push(a);
+        }
 
         // つないでいるあいだは「つないでいます…」を見せる。つながらなければ fail
         function connect(promise, ok, fail) {
@@ -641,17 +665,18 @@
                 p().money += total;
                 stat('sold', sold.length);
                 save();
-                ask(['出品していた道具が 売れていた！', ...sold.map(r => `${I.label({ id: r.item_id, n: r.n })} → ${r.buyer_name || 'だれか'}（+${money(r.price)}）`)].join('\n'),
+                ask(['出品していた物が 売れていた！', ...sold.map(r => `${rowLabel({ id: r.item_id, n: r.n })} → ${r.buyer_name || 'だれか'}（+${money(r.price)}）`)].join('\n'),
                     ['もどる'], tradeMenu, { list: false });
             }, tradeMenu);
         }
 
         function tradeMenu() {
-            ask(`交易所「珍しい品が そろってますよ」　お金 ${money(p().money)}`, ['珍しい道具', 'ほかの探検隊の出品', '出品する', '自分の出品', 'やめる'], i => {
+            ask(`交易所「珍しい品が そろってますよ」　お金 ${money(p().money)}`, ['珍しい道具', 'ほかの探検隊の出品', '出品する', 'キャラを出品する', '自分の出品', 'やめる'], i => {
                 if (i === 0) return rare();
                 if (i === 1) return market();
                 if (i === 2) return list();
-                if (i === 3) return mine();
+                if (i === 3) return listAlly();
+                if (i === 4) return mine();
                 menu();
             });
         }
@@ -680,24 +705,24 @@
                     ...rivals.map(l => ({ ...l, seller: `${l.seller}（コンピューター）`, src: l }))
                 ];
                 if (!rows.length) return ask('いまは 出品が ない。', ['もどる'], tradeMenu, { list: false });
-                ask(`ほかの探検隊の出品${net.online ? '' : '（いまはコンピューターの探検隊だけ）'}`, [...rows.map(l => `${l.seller}：${I.label(l)}　${money(l.price)}`), 'もどる'], i => {
+                ask(`ほかの探検隊の出品${net.online ? '' : '（いまはコンピューターの探検隊だけ）'}`, [...rows.map(l => `${l.seller}：${rowLabel(l)}　${money(l.price)}`), 'もどる'], i => {
                     if (i >= rows.length) return tradeMenu();
                     const l = rows[i];
                     if (p().money < l.price) return ask('お金が たりない。', ['もどる'], market, { list: false });
                     if (l.src) {
                         p().money -= l.price;
                         rivals.splice(rivals.indexOf(l.src), 1);
-                        giveItem({ id: l.id, n: l.n }, true);
+                        receive(l);
                         save();
-                        return ask(`${l.seller}から ${I.label(l)}を 買った！`, ['もどる'], market, { list: false });
+                        return ask(`${l.seller}から ${rowLabel(l)}を 買った！${tradeAlly(l.id) ? '（仲間の広場で待っている）' : ''}`, ['もどる'], market, { list: false });
                     }
                     connect(net.buy(l.remote, myName()), res => {
                         const r = res && res[0];
                         if (!r) return ask('ひと足おそく、売り切れていた！', ['もどる'], market, { list: false });
                         p().money -= r.price;
-                        giveItem({ id: r.item_id, n: r.n }, true);
+                        receive({ id: r.item_id, n: r.n });
                         save();
-                        ask(`${l.seller}から ${I.label(l)}を 買った！`, ['もどる'], market, { list: false });
+                        ask(`${l.seller}から ${rowLabel(l)}を 買った！${tradeAlly(l.id) ? '（仲間の広場で待っている）' : ''}`, ['もどる'], market, { list: false });
                     }, () => offline(market));
                 });
             };
@@ -734,17 +759,45 @@
             });
         }
 
+        // キャラを 出品する: 仲間の広場で 待っている 限定キャラ (氷隊・鬼鬼団の。値段は ★で 決まる)
+        function listAlly() {
+            const list = state.roster.filter(a => DG.tradableAlly(a.kind));
+            if (!list.length) return ask('出品できる キャラが いない。\n（仲間の広場で 待っている 限定キャラ＝氷隊・鬼鬼団の キャラだけ 出品できる）', ['もどる'], tradeMenu, { list: false });
+            ask('どの キャラを 出品する？（もう片方の バージョンの プレイヤーが 買うかも）', [...list.map(a => rowLabel({ id: DG.allyTradeId(a.kind), n: a.lv })), 'もどる'], i => {
+                if (i >= list.length) return tradeMenu();
+                const a = list[i];
+                const row = { id: DG.allyTradeId(a.kind), n: Math.min(99, a.lv), price: DG.allyPrice(a.kind) };
+                ask(`${a.name}を ${money(row.price)}で 出品しますか？\n（売れると いなくなる。取り下げると もどってくる）`, ['出品する', 'やめる'], j => {
+                    if (j === 1) return listAlly();
+                    const done = () => ask(`${a.name}を ${money(row.price)}で 出品した。`, ['もどる'], tradeMenu, { list: false });
+                    const take = () => { if (state.roster.includes(a)) state.roster.splice(state.roster.indexOf(a), 1); };
+                    if (!net.online) {
+                        take();
+                        t().listings.push(row);
+                        save();
+                        return done();
+                    }
+                    connect(net.post(myName(), row), id => {
+                        take();
+                        if (id != null) (t().posts = t().posts || []).push({ remote: id, day: t().day });
+                        save();
+                        done();
+                    }, () => offline(listAlly));
+                }, { list: false });
+            });
+        }
+
         function mine() {
             const local = t().listings;
             const show = remote => {
                 const rows = [...remote.map(l => ({ id: l.item_id, n: l.n, price: l.price, remote: l.id })), ...local.map(l => ({ ...l, src: l }))];
-                if (!rows.length) return ask('出品している道具は ない。', ['もどる'], tradeMenu, { list: false });
-                ask('自分の出品（えらぶと 取り下げる）', [...rows.map(l => `${I.label(l)}　${money(l.price)}`), 'もどる'], i => {
+                if (!rows.length) return ask('出品している物は ない。', ['もどる'], tradeMenu, { list: false });
+                ask('自分の出品（えらぶと 取り下げる）', [...rows.map(l => `${rowLabel(l)}　${money(l.price)}`), 'もどる'], i => {
                     if (i >= rows.length) return tradeMenu();
                     const l = rows[i];
                     if (l.src) {
                         local.splice(local.indexOf(l.src), 1);
-                        giveItem({ id: l.id, n: l.n }, true);
+                        receive(l);
                         save();
                         return mine();
                     }
@@ -752,7 +805,7 @@
                         const r = res && res[0];
                         t().posts = (t().posts || []).filter(post => post.remote !== l.remote);
                         if (!r) return ask('もう 売れていた！ 交易所に入りなおすと、お金を受け取れる。', ['もどる'], tradeMenu, { list: false });
-                        giveItem({ id: r.item_id, n: r.n }, true);
+                        receive({ id: r.item_id, n: r.n });
                         save();
                         mine();
                     }, () => offline(mine));
@@ -978,6 +1031,28 @@
 
         // ----- セーブ (仕様書 16章。localStorage) -----
         const unitData = u => ({ kind: u.kind, name: u.name, role: u.role, lv: u.lv, exp: u.exp, hp: u.hp, skills: u.skills });
+        // セーブは バージョンごとに 1 つずつ (氷隊・鬼鬼団。2026-10-22 ユーザー指定)。前の版の セーブ (SAVE_KEY) は バージョンの ほうへ 移す
+        const slotKey = v => `${SAVE_KEY}-${v}`;
+        const SLOTS = ['koori', 'onioni'];
+        function readSlot(v) {
+            try {
+                const data = JSON.parse(localStorage.getItem(slotKey(v)) || 'null');
+                return data && data.v === 1 ? data : null;
+            } catch (e) {
+                return null;
+            }
+        }
+        function migrateSave() {
+            try {
+                const old = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+                if (!old || old.v !== 1) return;
+                const v = DG.versionOf(old.town, old.hero && old.hero.kind).id;
+                if (!readSlot(v)) localStorage.setItem(slotKey(v), JSON.stringify(old));
+                localStorage.removeItem(SAVE_KEY);
+            } catch (e) {
+                // 読めなければ そのまま
+            }
+        }
         function save() {
             if (g.opts.save === false || !state.town) return false;
             const hero = p();
@@ -990,22 +1065,18 @@
                 snap: state.phase === 'play' ? g.snapshot() : null
             };
             try {
-                localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+                localStorage.setItem(slotKey(version().id), JSON.stringify(data));
                 return true;
             } catch (e) {
                 return false;
             }
         }
 
-        // peek なら、セーブがあるか見るだけ
-        function load(peek) {
-            let data = null;
-            try {
-                data = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
-            } catch (e) {
-                data = null;
-            }
-            if (!data || data.v !== 1) return false;
+        // slot: どの バージョンの セーブか (なければ ある ほう)。peek なら、セーブがあるか見るだけ
+        function load(peek, slot) {
+            migrateSave();
+            const data = slot ? readSlot(slot) : readSlot(SLOTS.find(readSlot) || SLOTS[0]);
+            if (!data) return false;
             if (peek) return data;
             const h = data.hero;
             const hero = g.makeHero(h.kind, h.role);

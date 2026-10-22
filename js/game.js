@@ -714,6 +714,7 @@
             e.stats.hp *= 3;
             e.hp = e.stats.hp;
             e.duel = true;
+            e.awake = false;   // 見えるまで 待っている (見つけたら カットイン)
             state.enemies.push(e);
             say(`${e.name}が この階で 待っている……！`);
         }
@@ -811,9 +812,9 @@
             if (has(e, 'malfunction') && rng.chance(0.2)) return void (seen(e) && say(`${e.name}は 故障して 止まった。`));
             if (!e.awake) {
                 // 「まつ」敵・化けている敵は 近くに来るまで、ボスは 見えるまで 動かない
-                if (e.boss ? !state.visible[idx(e.x, e.y)] : !party().some(u => cheb(e, u) <= 2)) return;
+                if (e.boss || e.duel ? !state.visible[idx(e.x, e.y)] : !party().some(u => cheb(e, u) <= 2)) return;
                 wake(e);
-                if (e.boss) return;
+                if (e.boss || e.duel) return;
             }
             // こんらん: 半分の確率で、でたらめな方向へ歩く
             if (st === 'confuse' && rng.chance(0.5)) {
@@ -887,8 +888,9 @@
             if (has(e, 'disguise') || has(e, 'mimic')) say(`${e.name}が 化けていた！「${U.ENEMIES[e.kind].line}」`);
             if (e.boss && !e.met) {
                 e.met = true;
-                // ボスのカットイン・BGM
-                state.cutin = { kind: e.kind, name: e.name, at: performance.now() };
+                // ボスのカットイン・BGM (限定ボスは「氷隊 限定ボス」などと 出す)
+                const ver = U.ENEMIES[e.kind].version;
+                state.cutin = { kind: e.kind, name: e.name, at: performance.now(), ...(ver ? { sub: `${DG.VERSIONS[ver].name} 限定ボス`, color: DG.VERSIONS[ver].color } : {}) };
                 sfx('boss');
                 if (KD.Sound) KD.Sound.bgm('boss');
                 if (state.town) town.seen(e.kind);
@@ -896,6 +898,16 @@
                 // カットインが終わってから 台詞
                 state.queue.push(() => 1300, () => {
                     talk(lines || [`${e.name}「${U.ENEMIES[e.kind].line}」`]);
+                    return 0;
+                });
+            } else if (e.duel && e.big && !e.met) {
+                // クエストで 待っている 大きな相手 (限定ボスとの 再戦・ナイテイの きょうだい): 見つけたら カットイン
+                e.met = true;
+                state.cutin = { kind: e.kind, name: e.name, sub: e.kind.endsWith('_q') ? '再戦！' : '勝負だ！', color: '#ffd84a', at: performance.now() };
+                sfx('boss');
+                if (state.town) town.seen(e.kind);
+                state.queue.push(() => 1300, () => {
+                    talk([`${e.name}「${U.ENEMIES[e.kind].line}」`]);
                     return 0;
                 });
             }

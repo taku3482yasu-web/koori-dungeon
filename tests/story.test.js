@@ -419,7 +419,7 @@ test('交易所オンライン: ほかのプレイヤーの出品を買う・自
     await flush();
     choose('もどる');
     choose('やめる');
-    s.town.day += 6;
+    s.town.day += 40;   // 1 日 6 割の 抽選なので、40 日あれば まず 売れている (6 日だと まれに 売れ残って テストが 落ちた)
     const before = s.player.money;
     choose('交易所');
     await flush();

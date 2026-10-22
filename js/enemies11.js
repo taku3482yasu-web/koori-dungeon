@@ -192,5 +192,40 @@
                 ...(ally ? { ally: { kind: ally, name: U.ENEMIES[ally].name, key: q.id } } : {}) }));
     }
 
-    Object.assign(DG, { VERSIONS, versionOf, VERSION_DUNGEONS, VERSION_QUESTS, versionQuests });
+    // ----- バージョンごとの 会話 (2026-10-22 ユーザー指定。中身は案) -----
+    //   town: 町の 見出しに 日がわりで 1 つ / clear: ストーリーの ダンジョンを 突破したとき / ending: 借金を 返し切ったとき
+    VERSIONS.koori.lines = {
+        town: ['SEタウンの子ども「あっ、氷隊だ！ こおりくん、サインちょうだい！」', 'ふるカワ「氷隊の 旗、町の 入り口に かざってもらったよ！」',
+            'お店の人「氷隊さん、きょうは 氷のかけらが 安いよ！」', 'ギルドの人「氷隊の うわさ、となり町まで 広がってるらしいぞ」',
+            'おにおに「氷隊だか なんだか 知らんが、借金は 借金だぞ」'],
+        clear: ['こおりくん「氷隊、また 一歩 前進だね！ こおり、どんどん 強くなってるよ！」'],
+        ending: ['こおりくん「氷隊の みんな、ありがとう！ こおり、これからも 氷隊で がんばるよ！」']
+    };
+    VERSIONS.onioni.lines = {
+        town: ['SEタウンの子ども「鬼鬼団だ！ ……ちょっと こわいけど かっこいい！」', 'ふるカワ「鬼鬼団の 旗、町の 入り口に かざってもらったよ！ 赤くて 目立つね」',
+            'お店の人「鬼鬼団さん、取り立ては お手やわらかに……」', 'ギルドの人「鬼鬼団の 名を 聞くと、悪い 探検隊は 逃げだすらしいぞ」',
+            'こおりくん「鬼鬼団って 名前、やっぱり こわくない？」'],
+        clear: ['おにおに「鬼鬼団に 不可能は ない！ つぎへ 行くぞ！」'],
+        ending: ['おにおに「鬼鬼団の 初仕事、大成功だな。……おまえら、よく ついてきた」']
+    };
+
+    // ----- キャラ交換 (交易所。2026-10-22 ユーザー指定) -----
+    //   限定キャラ (再戦の すがたを のぞく) を 交易所で 出品・購入できる。もう片方の バージョンの キャラも 手に入る。
+    //   オンラインの出品は item_id = 'ally_<種類>'・n = Lv で 置く (Supabase の 表は そのまま使える)
+    const ALLY_PRICE = { 1: 3000, 2: 5000, 3: 8000, 4: 15000, 5: 40000 };
+    const allyTradeId = kind => `ally_${kind}`;
+    const allyOfTradeId = id => (typeof id === 'string' && id.startsWith('ally_') ? id.slice(5) : null);
+    const tradableAlly = kind => Boolean(kind && U.ENEMIES[kind] && U.ENEMIES[kind].version && !U.ENEMIES[kind].hideDex && A.ALLIES[kind]);
+    const allyPrice = kind => ALLY_PRICE[A.star(kind)] || 8000;
+    // コンピューターの探検隊が 出す もう片方の バージョンの 限定キャラ (1 日 35%・月の迷宮を 突破したあと)
+    function rivalAllyListing(rng, town, lv, sellers) {
+        const v = versionOf(town).id;
+        if ((town.cleared || 0) < 5 || !rng.chance(0.35)) return null;
+        const kinds = Object.keys(U.ENEMIES).filter(k => tradableAlly(k) && U.ENEMIES[k].version !== v);
+        const kind = rng.pick(kinds);
+        return { id: allyTradeId(kind), n: Math.max(1, Math.min(99, lv)), seller: rng.pick(sellers), price: allyPrice(kind) };
+    }
+
+    Object.assign(DG, { VERSIONS, versionOf, VERSION_DUNGEONS, VERSION_QUESTS, versionQuests,
+        allyTradeId, allyOfTradeId, tradableAlly, allyPrice, rivalAllyListing });
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);
