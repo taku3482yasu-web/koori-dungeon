@@ -1530,7 +1530,8 @@
         function animate(u, now) {
             if (!u.anim) return;
             const { pts, at, ms } = u.anim;
-            const t = (now - at) / ms;
+            // 描く時刻 (requestAnimationFrame の now) は 動きはじめた時刻より 少し前のことがあるので 0 より小さくしない
+            const t = Math.max(0, (now - at) / ms);
             if (t >= pts.length - 1) {
                 [u.fx, u.fy] = pts[pts.length - 1];
                 u.anim = null;

@@ -223,8 +223,13 @@
                     }
                 }
             }
-            game.draw(now);
-            renderSkills();
+            // 1 回エラーが出ても 止まらないように (止まると ボタンも キーも 効かなくなる)
+            try {
+                game.draw(now);
+                renderSkills();
+            } catch (e) {
+                console.error(e);
+            }
             requestAnimationFrame(frame);
         }
         requestAnimationFrame(frame);

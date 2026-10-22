@@ -137,7 +137,9 @@
             });
         }
 
-        // はじまりの話 (仕様書 2章。前作スロットの第10話の続き)
+        // はじまりの話 = オープニング (仕様書 2章。前作スロットの第10話の続き)。
+        // キャラをえらんだら始まる。1 枚ごとに 場面の絵が動く (drawOpening)。「スキップ」で 町へ (2026-10-22 ユーザー指定)
+        let opening = { scene: 0, at: 0 };
         function story(i) {
             const oni = p().kind === 'onioni';
             const lines = [
@@ -152,7 +154,11 @@
                 save();
                 return menu();
             }
-            ask(lines[i], ['つぎへ'], () => story(i + 1), { place: 'bottom', list: false });
+            state.phase = 'title';   // 町の画面として描く (キャラ選択の画面を出さない)
+            view = 'opening';
+            opening = { scene: i, at: performance.now() };
+            if (i === 0) bgm('title');
+            ask(lines[i], ['つぎへ', 'スキップ'], j => story(j === 0 ? i + 1 : lines.length), { place: 'bottom', list: false });
         }
 
         // ----- 町のメニュー -----
@@ -911,6 +917,7 @@
         // ----- 絵 -----
         function draw(ctx, now, W, H) {
             if (view === 'title') return drawTitle(ctx, now, W, H);
+            if (view === 'opening') return drawOpening(ctx, now, W, H);
             if (view === 'tree') return drawTree(ctx, now, W, H);
             if (view === 'dex') return drawDex(ctx, now, W, H);
             drawTown(ctx, now, W, H);
@@ -950,6 +957,161 @@
             A.drawSprite(ctx, 'koori', bob, W / 2 - 72, 80 - bob, { scale: 4 });
             A.drawSprite(ctx, 'onioni', 1 - bob, W / 2 + 8, 80 - (1 - bob), { scale: 4 });
             ctx.textAlign = 'left';
+        }
+
+        // ----- オープニングの場面 (はじまりの話の 1 枚ごと) -----
+        // 0 摩天楼の財宝と打ち上げ (コインが飛んでいく) / 1 泣くこおりくんに 借用書が降る / 2 ふるカワと 現れるダンジョン /
+        // 3 おにおにの取り立て / 4 探検隊「ばりきつよめ」結成
+        const hash = n => { const x = Math.sin(n * 12.9898) * 43758.5453; return x - Math.floor(x); };
+        function drawFurukawa(ctx, x, y, s, bob) {
+            // ふるカワ (茶色のロングヘア・ピンクの服) 12 x 22 ドット
+            const r = (rx, ry, rw, rh, c) => { ctx.fillStyle = c; ctx.fillRect(x + rx * s, y + (ry + bob) * s, rw * s, rh * s); };
+            r(2, 0, 8, 3, '#7a4a2a'); r(1, 2, 10, 9, '#7a4a2a');
+            r(3, 3, 6, 6, '#f8d8b8'); r(3, 3, 6, 1, '#7a4a2a');
+            r(4, 5, 1, 2, '#2a1a10'); r(7, 5, 1, 2, '#2a1a10'); r(3, 7, 1, 1, '#ff9ab0'); r(8, 7, 1, 1, '#ff9ab0'); r(5, 8, 2, 1, '#d0506a');
+            r(9, 1, 2, 2, '#ff6a9a');
+            r(2, 11, 8, 7, '#ff8ab8'); r(4, 11, 4, 2, '#ffffff');
+            r(0, 12, 2, 5, '#f8d8b8'); r(10, 12, 2, 5, '#f8d8b8');
+            r(3, 18, 2, 3, '#f8d8b8'); r(7, 18, 2, 3, '#f8d8b8'); r(3, 21, 2, 1, '#c03a5a'); r(7, 21, 2, 1, '#c03a5a');
+        }
+        function drawOpening(ctx, now, W, H) {
+            const t = (now - opening.at) / 1000;   // この場面になってからの秒
+            const bob = Math.floor(now / 400) % 2;
+            const sky = (top, bottom) => {
+                const g = ctx.createLinearGradient(0, 0, 0, H);
+                g.addColorStop(0, top);
+                g.addColorStop(1, bottom);
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, W, H);
+            };
+            const rect = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
+            const label = (text, x, y, size, color) => {
+                ctx.font = `bold ${size}px ${FONT}`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = 'rgba(0,0,0,.7)';
+                ctx.strokeText(text, x, y);
+                ctx.fillStyle = color;
+                ctx.fillText(text, x, y);
+                ctx.textAlign = 'left';
+            };
+            const scene = opening.scene;
+            if (scene === 0) {
+                // 夜の摩天楼。財宝の箱から コインが どんどん 飛んでいく (打ち上げで散財)
+                sky('#0a1030', '#2a1a4a');
+                for (let i = 0; i < 40; i++) rect(hash(i) * W, hash(i + 99) * 110, 1, 1, hash(i + 7) > 0.5 ? '#ffffff' : '#a0a8ff');
+                rect(150, 10, 84, 170, '#1a1f3a');
+                rect(170, 0, 44, 12, '#1a1f3a');
+                rect(190, -10, 4, 14, '#c03a3a');
+                for (let wy = 18; wy < 170; wy += 10) for (let wx = 156; wx < 228; wx += 9) if (hash(wx * 3 + wy) > 0.35) rect(wx, wy, 5, 5, hash(wx + wy * 7) > 0.5 ? '#ffe680' : '#ffb84a');
+                rect(0, 180, W, 60, '#202838');
+                // 宝箱
+                rect(166, 168, 52, 24, '#a06a2a');
+                rect(166, 160, 52, 10, '#c88a3a');
+                rect(188, 170, 8, 8, '#ffd84a');
+                // 飛んでいくコイン
+                for (let i = 0; i < 18; i++) {
+                    const k = (t * 0.6 + hash(i)) % 1;
+                    const x = 192 + (hash(i + 3) - 0.5) * 300 * k, y = 160 - 150 * k + 120 * k * k;
+                    rect(x, y, 6, 6, '#ffd84a');
+                    rect(x + 1, y + 1, 2, 2, '#fff8c0');
+                }
+                // 打ち上げの紙ふぶき
+                for (let i = 0; i < 30; i++) {
+                    const y = ((t * 40 + hash(i) * 240) % 240);
+                    rect(hash(i + 50) * W + Math.sin(t * 3 + i) * 6, y, 3, 2, ['#ff6a9a', '#7fd3f7', '#ffe680', '#9ae07a'][i % 4]);
+                }
+                A.drawSprite(ctx, 'koori', bob, 70, 128 - bob * 3, { scale: 3 });
+                A.drawSprite(ctx, 'onioni', 1 - bob, 270, 128 - (1 - bob) * 3, { scale: 3 });
+                label('かんぱーい！', 96, 116, 12, '#ffe680');
+                label('財宝で 借金完済！', W / 2, 24, 16, '#ffd84a');
+            } else if (scene === 1) {
+                // 借用書が 降ってきて、こおりくんが泣く
+                sky('#1a2440', '#0a0f1e');
+                for (let i = 0; i < 14; i++) {
+                    const y = ((t * 50 + hash(i) * 280) % 280) - 40;
+                    const x = hash(i + 20) * (W - 40) + Math.sin(t * 2 + i) * 10;
+                    rect(x, y, 26, 32, '#f4f0e0');
+                    rect(x + 3, y + 4, 20, 3, '#c03a3a');
+                    rect(x + 3, y + 11, 16, 2, '#888888');
+                    rect(x + 3, y + 16, 18, 2, '#888888');
+                    rect(x + 3, y + 21, 12, 2, '#888888');
+                }
+                const shake = Math.sin(now / 40) * 2;
+                A.drawSprite(ctx, 'koori', 0, W / 2 - 40 + shake, 70, { scale: 5 });
+                // なみだ
+                for (let i = 0; i < 4; i++) {
+                    const k = (t * 1.5 + i / 4) % 1;
+                    rect(W / 2 - 22 - k * 14, 108 + k * 40, 4, 6, '#7fd3f7');
+                    rect(W / 2 + 18 + k * 14, 108 + k * 40, 4, 6, '#7fd3f7');
+                }
+                label('借金', W / 2, 40, 22 + Math.sin(now / 200) * 2, '#ff6a6a');
+            } else if (scene === 2) {
+                // SEタウンと、まわりに 次々と現れる ダンジョンの入り口
+                sky('#7ac8f0', '#d8f0ff');
+                rect(0, 150, W, 90, '#6ab454');
+                rect(0, 150, W, 4, '#4a8f38');
+                // 町の家
+                [[150, 118, '#d84a4a'], [184, 110, '#4a7ad8'], [218, 120, '#e0a030']].forEach(([x, y, roof]) => {
+                    rect(x, y + 12, 28, 152 - y - 12, '#f4e8d0');
+                    rect(x - 3, y, 34, 14, roof);
+                    rect(x + 10, 140, 8, 12, '#7a4a2a');
+                });
+                label(KD.Town.NAME, 200, 100, 12, '#ffffff');
+                // ダンジョンの入り口 (ぽこっと 現れる)
+                const caves = [[300, 160], [130, 168], [350, 178], [262, 176], [96, 176], [330, 152], [36, 176]];
+                caves.forEach(([x, y], i) => {
+                    const k = Math.min(1, Math.max(0, t * 1.6 - i * 0.35));
+                    if (k <= 0) return;
+                    const w = 34 * k, h = 24 * k;
+                    rect(x - w / 2 - 4, y - h - 4, w + 8, h + 6, '#7a6a5a');
+                    rect(x - w / 2, y - h, w, h, '#1a1410');
+                    if (k < 1) for (let j = 0; j < 6; j++) rect(x + Math.cos(j) * 24 * (1 - k) * 2, y - h / 2 + Math.sin(j) * 18 * (1 - k) * 2, 3, 3, '#ffe680');
+                });
+                drawFurukawa(ctx, 30, 60, 4, bob);
+                label('！', 92, 66, 18, '#ff6a6a');
+            } else if (scene === 3) {
+                // おにおにの取り立て
+                sky('#401010', '#1a0505');
+                for (let i = 0; i < 12; i++) {
+                    const a = i / 12 * Math.PI * 2 + t * 0.4;
+                    ctx.fillStyle = 'rgba(255,90,60,.18)';
+                    ctx.beginPath();
+                    ctx.moveTo(W / 2, 120);
+                    ctx.lineTo(W / 2 + Math.cos(a) * 400, 120 + Math.sin(a) * 400);
+                    ctx.lineTo(W / 2 + Math.cos(a + 0.12) * 400, 120 + Math.sin(a + 0.12) * 400);
+                    ctx.fill();
+                }
+                const shake = t < 0.6 ? Math.sin(now / 25) * 3 : 0;
+                A.drawSprite(ctx, 'onioni', bob, W / 2 - 48 + shake, 40, { scale: 6 });
+                A.drawSprite(ctx, 'koori', 0, 40, 170 + Math.sin(now / 90) * 2, { scale: 3 });
+                label('金返せ！', W / 2 + 100, 50, 22, '#ffe680');
+            } else {
+                // 探検隊「ばりきつよめ」結成
+                sky('#0a2040', '#1a4a3a');
+                for (let i = 0; i < 16; i++) {
+                    const a = i / 16 * Math.PI * 2 + t * 0.5;
+                    ctx.fillStyle = i % 2 ? 'rgba(255,230,128,.16)' : 'rgba(143,214,247,.12)';
+                    ctx.beginPath();
+                    ctx.moveTo(W / 2, 100);
+                    ctx.lineTo(W / 2 + Math.cos(a) * 400, 100 + Math.sin(a) * 400);
+                    ctx.lineTo(W / 2 + Math.cos(a + 0.2) * 400, 100 + Math.sin(a + 0.2) * 400);
+                    ctx.fill();
+                }
+                const pop = Math.min(1, t * 2);
+                label('探検隊', W / 2, 34, 14, '#ffffff');
+                label('ばりきつよめ', W / 2, 62, Math.round(30 * pop) || 1, '#ffe680');
+                A.drawSprite(ctx, 'koori', bob, W / 2 - 76, 96 - bob * 3, { scale: 4 });
+                A.drawSprite(ctx, 'onioni', 1 - bob, W / 2 + 12, 96 - (1 - bob) * 3, { scale: 4 });
+                for (let i = 0; i < 10; i++) {
+                    const k = (t * 0.8 + hash(i)) % 1;
+                    const x = hash(i + 4) * W, y = 170 - k * 160;
+                    rect(x, y, 2, 6, '#ffffff');
+                    rect(x - 2, y + 2, 6, 2, '#ffffff');
+                }
+                label(`借金 ${money(state.town ? state.town.debt : TW.DEBT_START)}`, W / 2, 168, 12, '#ff9a8a');
+            }
         }
 
         function drawTown(ctx, now, W, H) {
