@@ -56,7 +56,12 @@
         hyougaryu: { temp: true, name: '氷河の咆哮', element: 'こおり', range: 'pierce', power: 3, status: 'freeze', chance: 0.5, fx: 'ice', color: '#bff0ff', shout: '凍てつけ！' },
         goukioni: { temp: true, name: '豪鬼一番槍', element: 'ほのお', range: 'pierce', power: 3, fx: 'dash', color: '#ff5a3a', shout: '一番槍、いくぞ！' },
         yahami: { temp: true, name: '美しき大強奪', element: 'ふしぎ', range: 'room', power: 2.4, fx: 'flash', color: '#ff9ae0', shout: 'お宝も 視線も、ぜんぶ いただくわ！' },
-        ishii: { temp: true, name: 'ケモノミチ大暴走', element: 'しぜん', range: 'pierce', power: 3, fx: 'dash', color: '#9ae07a', shout: 'ブヒッ！ 突撃だ！' }
+        ishii: { temp: true, name: 'ケモノミチ大暴走', element: 'しぜん', range: 'pierce', power: 3, fx: 'dash', color: '#9ae07a', shout: 'ブヒッ！ 突撃だ！' },
+        // 【仮】チームバータス・チーム・ケモノミチの メンバー (2026-10-22 ユーザー指定: 新しい チームの メンバーも)。役職の おまけは 汎用の 必殺技と 同じ
+        maechokkin: { temp: true, name: '前髪そろえ・乱れ切り', element: 'かぜ', range: 'pierce', power: 2.8, fx: 'slash', color: '#e8f4ff', shout: 'チョッキン♪ ぜんぶ 切りそろえて あげる！' },
+        norahan: { temp: true, name: 'ニャハッと大どろぼう', element: 'みず', range: 'room', power: 1.8, kiai: true, fx: 'wave', color: '#4fa0ff', shout: 'ニャハッ♪ ぜんぶ いただき！' },
+        mazuda: { temp: true, name: 'ダンジョン育ちの剛拳', element: 'ふつう', range: 'around2', power: 2.8, guard: 4, fx: 'quake', color: '#c8a878', shout: 'ダンジョン育ちを なめるなよ！' },
+        naitoon: { temp: true, name: '月下の遠吠え', element: 'かぜ', range: 'room', power: 1.8, status: 'flinch', chance: 1, fx: 'sound', color: '#d8d0ff', shout: 'ワォーン！ 夜の迷宮は おれたちの もの！' }
     };
 
     // ----- 汎用の 必殺技 (2026-10-22 ユーザー指定: 必殺技が ない キャラは 属性と 役職で 決まる。例 こおり×アタッカー＝アイスブリザード) -----
