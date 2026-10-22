@@ -239,7 +239,10 @@
             const free = () => rng.shuffle(cells).find(([x, y]) => !occupied(x, y) && !itemAt(x, y) && !trapAt(x, y) && !(x === state.map.stairs.x && y === state.map.stairs.y));
             sfx('happen');
             if (id === 'rival') {
-                const team = rng.pick(Object.keys(C.RIVALS));
+                // RIVAL_FROM のチームは、そのダンジョンに入れるようになってから (いまのダンジョンか、クリアしたダンジョンの次まで)
+                const reach = Math.max(DG.LIST.indexOf(state.dungeon), state.town.cleared || 0);
+                const teams = Object.keys(C.RIVALS).filter(t => !C.RIVAL_FROM[t] || DG.LIST.findIndex(d => d.id === C.RIVAL_FROM[t]) <= reach);
+                const team = rng.pick(teams);
                 C.RIVALS[team].forEach(kind => {
                     const spot = free();
                     if (!spot) return;

@@ -236,3 +236,28 @@ test('仕様書に おにおにの機嫌は ない (2026-10-22 ユーザー指�
     const src = readFileSync(new URL('../js/collection.js', import.meta.url), 'utf8');
     assert.ok(src.includes('おにおにの機嫌は入れない'));
 });
+
+test('ライバル探検隊: チームバータス・チーム・ケモノミチ は 3 人ずつ 絵とデータがあり、月の迷宮より前には 鉢合わせしない', () => {
+    const { BigArt: B, Dungeons: DG } = globalThis.KD;
+    for (const team of ['チームバータス', 'チーム・ケモノミチ']) {
+        assert.equal(C.RIVALS[team].length, 3);
+        for (const id of C.RIVALS[team]) {
+            assert.ok(U.ENEMIES[id] && U.ENEMIES[id].rival && U.ENEMIES[id].line, `${id} のデータ`);
+            assert.ok(B.has(id), `${id} の絵`);
+        }
+        assert.ok(DG.byId(C.RIVAL_FROM[team]), `${team} が出はじめるダンジョン`);
+    }
+    // ハリーの森 (まだ月の迷宮に行けない) では 前からの 3 チームだけ
+    const seen = new Set();
+    for (let seed = 1; seed <= 12; seed++) {
+        const t = setup({ happen: 'rival', seed });
+        down(t);
+        t.s.enemies.filter(e => e.team).forEach(e => seen.add(e.team));
+    }
+    assert.ok(seen.size >= 2);
+    assert.ok(![...seen].some(team => C.RIVAL_FROM[team]), [...seen].join('・'));
+    // 月の迷宮の はじめの話で 2 チームと出会う
+    const intro = DG.byId('moon').story.intro.join('\n');
+    assert.match(intro, /チームバータス/);
+    assert.match(intro, /チーム・ケモノミチ/);
+});

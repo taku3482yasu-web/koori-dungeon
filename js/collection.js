@@ -34,11 +34,17 @@
     };
 
     // ----- ライバル探検隊 (仕様書 2章・11章。前作のキャラ) -----
+    //   チームバータス・チーム・ケモノミチ は 2026-10-22 ユーザー指定で追加 (迷宮に挑んでいる。チーム・ケモノミチ の名前と動物は Claude の案)。
+    //   月の迷宮 (RIVAL_FROM) のストーリーで出会ってから 鉢合わせするようになる
     const RIVALS = {
         '5DX': ['okagappa', 'hibikimakuri', 'yamamou'],
         'ASK-3': ['sasaki', 'kotani', 'asahara'],
-        'お願いマッスル': ['shibata', 'ueno', 'ikekimu']
+        'お願いマッスル': ['shibata', 'ueno', 'ikekimu'],
+        'チームバータス': ['yahami', 'maechokkin', 'norahan'],
+        'チーム・ケモノミチ': ['ishii', 'mazuda', 'naitoon']
     };
+    // このダンジョン (の何番目) から鉢合わせするチーム。書いていないチームは はじめから
+    const RIVAL_FROM = { 'チームバータス': 'moon', 'チーム・ケモノミチ': 'moon' };
     // ライバルの能力 (敵として出る。たおすと お金を落とす)
     const r = (name, element, hp, atk, def, line) => ({ no: '', name, element, ai: 'approach', speed: 1, hp, atk, def, exp: 40, role: 'attacker', line, big: true, rival: true, traits: ['rich'], moves: [] });
     Object.assign(U.ENEMIES, {
@@ -50,8 +56,21 @@
         asahara: r('KING.ASAHARA', 'ほのお', 20, 8, 6, 'ひれ伏せ！ 王の前だぞ！'),
         shibata: r('シバター', 'ふつう', 18, 8, 5, 'お願い マッスル！'),
         ueno: r('マッスルウエノーブル', 'ふつう', 20, 9, 6, '筋肉は 貴族のたしなみ'),
-        ikekimu: r('イケキム', 'かぜ', 15, 8, 5, 'キラッ。…惚れるなよ？')
+        ikekimu: r('イケキム', 'かぜ', 15, 8, 5, 'キラッ。…惚れるなよ？'),
+        // チームバータス (美しさに磨きをかけている 女盗賊集団。お金を取って逃げる)
+        yahami: r('ヤーハミー', 'ふしぎ', 17, 8, 6, 'お宝も 視線も、ぜんぶ いただくわ'),
+        maechokkin: r('マエチョッキン', 'かぜ', 15, 9, 5, 'チョッキン♪ 前髪も お宝も 切りそろえて あげる'),
+        norahan: r('ノラハン', 'みず', 15, 8, 5, 'ニャハッ。盗むのは お宝だけじゃないかもね♪'),
+        // チーム・ケモノミチ (ダンジョンで生活している 全員動物の戦闘集団)
+        ishii: r('イシイー', 'しぜん', 19, 9, 6, 'ブヒッ！ 迷宮は おれたちの 家だ！'),
+        mazuda: r('マズダ', 'ふつう', 22, 9, 7, 'ダンジョン育ちを なめるなよ'),
+        naitoon: r('NAITOON', 'かぜ', 16, 9, 5, 'ワォーン……夜の迷宮で おれに 勝てると 思うなよ')
     });
+    // それぞれの とくちょう (女盗賊は お金を取って逃げる。イシイーは突進・マズダは怒ると強い・NAITOON はすばやい)
+    ['yahami', 'maechokkin', 'norahan'].forEach(id => U.ENEMIES[id].traits.push('stealMoney'));
+    U.ENEMIES.ishii.traits.push('charge');
+    U.ENEMIES.mazuda.traits.push('berserk');
+    U.ENEMIES.naitoon.speed = 2;
 
     // ----- ハプニング (仕様書 17章: 階に着いたとき まれに起こる) -----
     //   rival ライバル探検隊と鉢合わせ / treasure 宝箱の部屋 / call ふるカワから通信 / collect おにおにの取り立て / house モンスターハウス (仕様書 4.3)
@@ -104,5 +123,5 @@
 
     const newStats = () => ({ kills: 0, quests: 0, crafted: 0, recruited: 0, sold: 0, colitis: 0, clutch: 0, rivals: 0, houses: 0 });
 
-    KD.Collection = { LINES, lineFor, RIVALS, HAPPEN_RATE, HAPPENINGS, dexOrder, TRAIT_NAMES, ACHIEVEMENTS, newStats };
+    KD.Collection = { LINES, lineFor, RIVALS, RIVAL_FROM, HAPPEN_RATE, HAPPENINGS, dexOrder, TRAIT_NAMES, ACHIEVEMENTS, newStats };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);
