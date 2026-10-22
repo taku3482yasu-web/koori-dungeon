@@ -1937,6 +1937,169 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             }
         }
 
+        // ----- 町の道 (2026-10-22 ユーザー指定) -----
+        // 建物の 下の 道を 探検隊が 歩いていく (道の 景色が 流れる)。ときどき 向かい側から 広場で 待っている 仲間・
+        // ふるカワ・ともいし などが 歩いてきて、立ち止まって あいさつ (手をふる・ハイタッチ・とびはねる・おじぎ・差し入れ) をして すれちがう
+        const ROAD_Y = 156, ROAD_H = 46, FEET = 196;   // 道の 上・高さ、キャラの 足元
+        const SCALE = 2;                              // キャラは 2 倍で 描く (スマホでも 見えるように)
+        const WALK_SPEED = 18, VISITOR_SPEED = 22;    // 1 秒に 進む ドット
+        // 先頭 (主人公) の 位置・ならぶ間・あいさつで 止まる 間 (PC では まんなかに メニューが 重なるので 左に 寄せる)
+        const LEAD_X = 52, GAP = 30, MEET = 36;
+        const ACT_TIME = 2600;                        // あいさつの 長さ (ミリ秒)
+        const SUBS = {
+            furukawa: { name: 'ふるカワ', lines: ['クエスト、がんばってね！', '今日も いい天気だね！', 'ギルドに 新しい 依頼が 来てるよ！'] },
+            tomoishi: { name: 'ともいし', lines: ['いいもの 入ったよ！', 'おにぎり 持った？', '帰りに 寄ってってね！'] }
+        };
+        const ACTIONS = ['wave', 'highfive', 'jump', 'bow', 'gift'];
+        const ALLY_LINES = ['おーい！ 今度は つれてってね！', '広場で 待ってるよ～', 'いっしょに 冒険したいな！', '修行してたんだ！'];
+        const REPLY = { wave: 'やあ！', highfive: 'イェーイ！', jump: 'わーい！', bow: 'どうも！', gift: 'ありがとう！' };
+        const street = { scroll: 0, last: 0, visitor: null, nextAt: 0 };
+        function drawTomoishi(ctx, x, y, s, bob) {
+            // ともいし (お店の 人。白い ハチマキ・オレンジの エプロン) 12 x 22 ドット
+            const r = (rx, ry, rw, rh, c) => { ctx.fillStyle = c; ctx.fillRect(x + rx * s, y + (ry + bob) * s, rw * s, rh * s); };
+            r(2, 0, 8, 4, '#2a1a10'); r(2, 3, 8, 1, '#ffffff'); r(10, 2, 2, 2, '#ffffff');
+            r(3, 4, 6, 6, '#f8d8b8');
+            r(4, 6, 1, 1, '#2a1a10'); r(7, 6, 1, 1, '#2a1a10'); r(5, 8, 2, 1, '#c0504a');
+            r(2, 10, 8, 8, '#4a9a5a'); r(3, 11, 6, 7, '#f0902a'); r(5, 14, 2, 2, '#c86a1a');
+            r(0, 11, 2, 5, '#f8d8b8'); r(10, 11, 2, 5, '#f8d8b8');
+            r(3, 18, 2, 3, '#5a4a3a'); r(7, 18, 2, 3, '#5a4a3a'); r(3, 21, 2, 1, '#2a1a10'); r(7, 21, 2, 1, '#2a1a10');
+        }
+        // キャラ 1 人 (足元の まんなか が x, FEET)。flip: 左を 向く
+        function walker(ctx, kind, frame, x, lift = 0, flip = false) {
+            const y = FEET - lift, s = SCALE;
+            if (kind === 'furukawa') return drawFurukawa(ctx, Math.round(x - 6 * s), y - 22 * s, s, frame);
+            if (kind === 'tomoishi') return drawTomoishi(ctx, Math.round(x - 6 * s), y - 22 * s, s, frame);
+            if (A.SPRITES[kind]) {
+                const rows = A.SPRITES[kind].frames[0];
+                return A.drawSprite(ctx, kind, frame, Math.round(x - rows[0].length * s / 2), y - rows.length * s, { flip, scale: s });
+            }
+            if (KD.BigArt.has(kind)) KD.BigArt.drawBig(ctx, kind, frame, x, y, { height: 22 * s, flip });
+        }
+        function bubble(ctx, text, x, y) {
+            ctx.font = `bold 9px ${FONT}`;
+            const w = Math.ceil(ctx.measureText(text).width) + 10;
+            const left = Math.max(2, Math.round(x + 12 - w));   // 左へ のばす (PC の メニューに 重ならないように)
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(left, y - 14, w, 14);
+            ctx.fillRect(Math.round(x) - 2, y, 4, 3);
+            ctx.strokeStyle = '#2a2a3a';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(left + 0.5, y - 13.5, w - 1, 13);
+            ctx.fillStyle = '#2a2a3a';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, left + w / 2, y - 7);
+            ctx.textAlign = 'left';
+        }
+        // 次に 歩いてくる 人: 広場で 待っている 仲間 と サブキャラ から えらぶ
+        function newVisitor(now) {
+            const going = [p(), ...state.allies].map(u => u.kind);   // いっしょに 歩いている キャラは 来ない
+            const allies = state.roster.filter(a => !going.includes(a.kind)).map(a => ({ kind: a.kind, name: a.name, lines: ALLY_LINES }));
+            const subs = Object.entries(SUBS).map(([kind, s]) => ({ kind, ...s }));
+            const pool = [...subs, ...allies, ...allies];   // 仲間が いれば 仲間が 多め
+            const v = pool[Math.floor(Math.random() * pool.length)];
+            return { ...v, x: 384 + 16, phase: 'come', at: now, action: ACTIONS[Math.floor(Math.random() * ACTIONS.length)],
+                line: v.lines[Math.floor(Math.random() * v.lines.length)] };
+        }
+        function drawStreet(ctx, now, W) {
+            const dt = street.last ? Math.min(100, now - street.last) / 1000 : 0;
+            street.last = now;
+            if (!street.nextAt) street.nextAt = now + 2500;
+            let v = street.visitor;
+            if (!v && now >= street.nextAt) v = street.visitor = newVisitor(now);
+            const stopped = v && v.phase === 'act';
+            if (!stopped) street.scroll += WALK_SPEED * dt;
+            const sc = street.scroll;
+            // 道 (石だたみ が 流れる) と、道ばたの 街灯・草むら
+            ctx.fillStyle = '#c8b48a';
+            ctx.fillRect(0, ROAD_Y, W, ROAD_H);
+            ctx.fillStyle = '#a8946a';
+            ctx.fillRect(0, ROAD_Y, W, 2);
+            ctx.fillRect(0, ROAD_Y + ROAD_H - 2, W, 2);
+            for (let i = -1; i < W / 24 + 1; i++) {
+                const x = Math.round(i * 24 - (sc % 24));
+                ctx.fillStyle = '#b8a47a';
+                ctx.fillRect(x, ROAD_Y + 12, 14, 3);
+                ctx.fillRect(x + 10, ROAD_Y + 30, 14, 3);
+            }
+            for (let i = -1; i < W / 96 + 1; i++) {
+                const n = i + Math.floor(sc / 96);
+                const x = Math.round(n * 96 - sc);
+                if (n % 2 === 0) {
+                    ctx.fillStyle = '#3a3a4a';
+                    ctx.fillRect(x + 40, ROAD_Y + ROAD_H, 3, 30);
+                    ctx.fillStyle = '#ffe680';
+                    ctx.fillRect(x + 37, ROAD_Y + ROAD_H - 3, 9, 5);
+                } else {
+                    ctx.fillStyle = '#3f8a3a';
+                    ctx.fillRect(x + 30, ROAD_Y + ROAD_H + 6, 20, 8);
+                    ctx.fillStyle = hash(n) > 0.5 ? '#ffb0c8' : '#ffe680';
+                    ctx.fillRect(x + 36, ROAD_Y + ROAD_H + 7, 3, 3);
+                }
+            }
+            // 探検隊 (主人公が 先頭。右へ 歩く)
+            const party = [p(), ...state.allies];
+            const step = stopped ? 0 : Math.floor(now / 250) % 2;
+            const act = v && v.phase === 'act' ? (now - v.at) / ACT_TIME : -1;
+            const lift = (i, base) => {
+                if (act < 0) return step && (i % 2) ? 1 : 0;
+                if (v.action === 'jump') return Math.round(Math.abs(Math.sin(act * Math.PI * 4)) * 14);
+                if (v.action === 'highfive' && i === 0 && act > 0.25 && act < 0.45) return 6;
+                if (v.action === 'bow' && i === 0) return 0;
+                return base;
+            };
+            party.forEach((u, i) => walker(ctx, u.kind, (step + i) % 2, LEAD_X - i * GAP, lift(i, 0)));
+            if (!v) return;
+            // 向かい側から 来る人
+            if (v.phase === 'come') {
+                v.x -= (VISITOR_SPEED + WALK_SPEED) * dt;
+                if (v.x <= LEAD_X + MEET) {
+                    v.x = LEAD_X + MEET;
+                    v.phase = 'act';
+                    v.at = now;
+                }
+            } else if (v.phase === 'act' && now - v.at >= ACT_TIME) {
+                v.phase = 'go';
+                v.at = now;
+            } else if (v.phase === 'go') {
+                v.x -= (VISITOR_SPEED + WALK_SPEED) * dt;
+                if (v.x < -24) {
+                    street.visitor = null;
+                    street.nextAt = now + 5000 + Math.random() * 7000;
+                    return;
+                }
+            }
+            const vStep = v.phase === 'act' ? 0 : Math.floor(now / 220) % 2;
+            const bowing = v.phase === 'act' && v.action === 'bow' && act > 0.15 && act < 0.6;
+            walker(ctx, v.kind, vStep, v.x, v.phase === 'act' ? lift(1, 0) : 0, true);
+            if (bowing) {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(Math.round(v.x) - 14, FEET - 46, 4, 4);
+            }
+            if (v.phase !== 'act') return;
+            // あいさつ
+            const mid = (LEAD_X + v.x) / 2;
+            if (v.action === 'highfive' && act > 0.25 && act < 0.6) {
+                ctx.fillStyle = '#ffe680';
+                for (let i = 0; i < 8; i++) {
+                    const a = i / 8 * Math.PI * 2;
+                    const r = 4 + (act - 0.25) * 30;
+                    ctx.fillRect(Math.round(mid + Math.cos(a) * r), Math.round(FEET - 40 + Math.sin(a) * r), 3, 3);
+                }
+            }
+            if (v.action === 'gift') {
+                // 差し入れの おにぎりが 先頭へ 飛ぶ
+                const k = Math.min(1, Math.max(0, (act - 0.2) / 0.35));
+                if (k > 0 && k < 1) A.drawItem(ctx, 'onigiri', 'food', Math.round(v.x - (v.x - LEAD_X) * k) - 8, Math.round(FEET - 44 - Math.sin(k * Math.PI) * 18));
+            }
+            if (v.action === 'wave') {
+                ctx.fillStyle = '#ffe680';
+                ctx.fillRect(Math.round(v.x) - 18 - (Math.floor(now / 150) % 2) * 3, FEET - 44, 5, 5);
+            }
+            if (act < 0.55) bubble(ctx, v.line, v.x, FEET - 50);
+            else bubble(ctx, REPLY[v.action], LEAD_X, FEET - 50);
+        }
+
         function drawTown(ctx, now, W, H) {
             const grd = ctx.createLinearGradient(0, 0, 0, H);
             grd.addColorStop(0, '#7ac8f0');
@@ -1979,9 +2142,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                 ctx.globalAlpha = 1;
             });
             ctx.textAlign = 'left';
-            // 主人公と仲間
-            const bob = Math.floor(now / 400) % 2;
-            [p(), ...state.allies].forEach((u, i) => drawChar(ctx, u.kind, bob, 150 + i * 22, 162));
+            drawStreet(ctx, now, W);
             // 上の帯: 日・借金・お金・BP
             ctx.fillStyle = 'rgba(0,0,0,.6)';
             ctx.fillRect(0, 0, W, 14);

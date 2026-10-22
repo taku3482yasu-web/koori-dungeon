@@ -183,3 +183,20 @@ test('ストーリーデモ: はじめて 行く ダンジョンと、ボスを 
     assert.equal(s.town.cleared, 1);
     assert.ok([...s.allies, ...s.roster].some(a => a.kind === 'yasu'));
 });
+
+test('町の道: 探検隊が 歩き、向かい側から 仲間や ふるカワたちが 来て あいさつする (吹き出し)', () => {
+    const { s, game } = newGame();
+    s.roster.push(game.makeAlly('haribaby', 2));
+    const said = [];
+    const rec = new Proxy({ measureText: t => ({ width: t.length * 9 }), createLinearGradient: () => ({ addColorStop() {} }), fillText: t => said.push(t) }, {
+        get: (t, k) => (k in t ? t[k] : () => {}), set: (t, k, v) => { t[k] = v; return true; }
+    });
+    for (let i = 0; i < 60 * 40; i++) {
+        fakeNow += 16;
+        game.town.draw(rec, fakeNow, 384, 240);
+    }
+    const lines = ['クエスト、がんばってね！', '今日も いい天気だね！', 'ギルドに 新しい 依頼が 来てるよ！', 'いいもの 入ったよ！', 'おにぎり 持った？', '帰りに 寄ってってね！',
+        'おーい！ 今度は つれてってね！', '広場で 待ってるよ～', 'いっしょに 冒険したいな！', '修行してたんだ！'];
+    assert.ok(said.some(t => lines.includes(t)), '40 秒の あいだに だれかが 来て 話す');
+    assert.ok(said.some(t => ['やあ！', 'イェーイ！', 'わーい！', 'どうも！', 'ありがとう！'].includes(t)), '探検隊が 返事をする');
+});
