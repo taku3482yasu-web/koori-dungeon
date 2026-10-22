@@ -290,7 +290,7 @@
             const rivals = st.last ? storyLines(DG.STORY.rivalsQuest) : [];
             if (st.last) {
                 return cutscene([...withScenes([...lines, ...(st.clear || [])], ['asoDown', 'asoDown', 'asoSeal', 'townParty', 'stillDebt', 'stillDebt', 'clearCard']),
-                    ...withScenes(rivals, ['rivalsQuest'])], () => menu());
+                    ...withScenes(rivals, ['rivalsQuest'])], () => menu(), { song: 'ending' });
             }
             storyCut([...lines, ...(st.clear || []), ...((version().lines || {}).clear || []), ...rivals], d, 'clear', () => menu());
         }
@@ -302,17 +302,21 @@
             state.run = null;
             save();
             if (!first) return g.talk([...lines, ...storyLines(DG.STORY.bonusAgain)], () => menu());
-            cutscene(withScenes([...lines, ...d.story.clear], ['shinDown', 'shinDown', 'shinFade', 'rivalsCheer', 'rivalsCheer', 'rivalsCheer', 'oniPraise', 'allParade', 'trueEnd']), () => menu());
+            cutscene(withScenes([...lines, ...d.story.clear], ['shinDown', 'shinDown', 'shinFade', 'rivalsCheer', 'rivalsCheer', 'rivalsCheer', 'oniPraise', 'allParade', 'trueEnd']), () => menu(), { song: 'ending' });
         }
 
         // 場面の絵つきの話 (エンディング。2026-10-22 ユーザー指定)。items: [{ text, scene }]。「スキップ」で 最後まで飛ばす
-        function cutscene(items, done) {
+        //   song: この あいだの 曲。overlay: ダンジョンの中で 出す (phase は play の まま。state.demo の あいだ game.js が 町の絵を 描く)
+        function cutscene(items, done, { song = null, overlay = false } = {}) {
+            if (song) bgm(song);
             const go = i => {
                 if (i >= items.length) {
                     view = 'town';
+                    state.demo = false;
                     return done();
                 }
-                state.phase = 'title';   // 町の画面として描く
+                if (overlay) state.demo = true;
+                else state.phase = 'title';   // 町の画面として描く
                 view = 'opening';
                 opening = { scene: items[i].scene, at: performance.now() };
                 ask(items[i].text, ['つぎへ', 'スキップ'], j => go(j === 0 ? i + 1 : items.length), { place: 'bottom', list: false });
@@ -329,8 +333,10 @@
         // ----- ストーリーデモ (2026-10-22 ユーザー指定: 途中の ストーリーも オープニングのように 絵を付ける) -----
         // ダンジョンに はじめて行くとき (intro) と、ボスを たおしたあと (clear) の 台詞に、1 行ずつ 場面の絵を 付ける。
         // 場面は 台詞から 決める: だれが 話しているか・「仲間になった」・「新しいダンジョン」など。絵は drawStory
+        //   phase: intro / clear / boss (ボスに 会ったとき。ダンジョンの中で 出す。曲は ボスの 曲の まま)
         function storyCut(lines, d, phase, done) {
-            cutscene(storyScenes(lines, d, phase), done);
+            if (phase === 'boss') return cutscene(storyScenes(lines, d, phase), done, { overlay: true });
+            cutscene(storyScenes(lines, d, phase), done, { song: 'story' });
         }
         let speakerMap = null;
         function speakerId(name, d) {
@@ -368,6 +374,7 @@
                 }
                 const id = name && speakerId(name, d);
                 if (id && id === d.boss && phase === 'clear') return { text, scene: { ...base, type: 'bossDown', who: id } };
+                if (id && id === d.boss && phase === 'boss') return { text, scene: { ...base, type: 'bossAppear', who: id } };
                 if (id === 'furukawa' && phase === 'intro') return { text, scene: { ...base, type: 'gate', who: id } };
                 if (id) return { text, scene: { ...base, type: 'talk', who: id } };
                 return { text, scene: { ...base, type: phase === 'intro' ? 'gate' : 'cleared' } };
@@ -425,7 +432,7 @@
             const news = town.news.splice(0);
             const done = town.quests.filter(questDone).length;
             const vl = version().lines;
-            const head = [`${TW.NAME}　${town.day}日目　借金 ${money(town.debt)}　お金 ${money(p().money)}　BP ${town.bp}`,
+            const head = [`${TW.NAME}　${town.day}日目（${weather()[1]}）　借金 ${money(town.debt)}　お金 ${money(p().money)}　BP ${town.bp}`,
                 ...(vl ? [vl.town[town.day % vl.town.length]] : []),   // バージョンの ひとこと (日がわり)
                 ...news, ...(done ? [`達成したクエストが ${done} 件ある。ギルドで報告しよう。`] : [])];
             // 建物の あとに 図鑑・設定 (町から すぐ 開ける。2026-10-22 ユーザー指定)
@@ -561,7 +568,7 @@
             const end = DG.STORY.ending;
             const lines = storyLines([...end.before, ...((version().lines || {}).ending || []), ...end.after]);
             const vEnd = ((version().lines || {}).ending || []).map(() => 'townParty');
-            cutscene(withScenes(lines, ['paid', 'paidJoy', 'townParty', ...vEnd, 'endCard', 'hole', 'hole']), () => menu());
+            cutscene(withScenes(lines, ['paid', 'paidJoy', 'townParty', ...vEnd, 'endCard', 'hole', 'hole']), () => menu(), { song: 'ending' });
         }
 
         // ----- バトルツリー (仕様書 6.4) -----
@@ -1839,6 +1846,14 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                     if (party.includes(sc.who)) party.filter(k => k !== sc.who).slice(0, 4).forEach((k, i) => portrait(ctx, k, (bob + i) % 2, 30 + i * 30, GROUND + 2, 36));
                     label(enemyName(sc.who), x, 22, 14, '#ffffff');
                 }
+            } else if (sc.type === 'bossAppear') {
+                // ボスが 立ちはだかる (赤い 光・ゆれる・名前)
+                dim(0.35);
+                rays(W / 2 + 40, 110, 'rgba(255,80,60,.16)', 14);
+                const shake = t < 0.6 ? Math.sin(now / 25) * 4 : 0;
+                portrait(ctx, sc.who, bob, W / 2 + 40 + shake, GROUND + 4, bigH(sc.who) + 16);
+                drawParty();
+                label(enemyName(sc.who), W / 2 + 40, 22, Math.round(18 * Math.min(1, t * 3)) || 1, '#ff9a8a');
             } else if (sc.type === 'bossDown') {
                 // ボスが まいった (ゆれて、頭の上を 星が まわる)
                 const x = W / 2 + 40;
@@ -1922,17 +1937,34 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
         const ROAD_Y = 156, ROAD_H = 46, FEET = 196;   // 道の 上・高さ、キャラの 足元
         const SCALE = 2;                              // キャラは 2 倍で 描く (スマホでも 見えるように)
         const WALK_SPEED = 18, VISITOR_SPEED = 22;    // 1 秒に 進む ドット
-        // 先頭 (主人公) の 位置・ならぶ間・あいさつで 止まる 間 (PC では まんなかに メニューが 重なるので 左に 寄せる)
-        const LEAD_X = 52, GAP = 30, MEET = 36;
+        // 先頭 (主人公) の 位置・ならぶ間・あいさつで 止まる 間
+        const LEAD_X = 110, GAP = 30, MEET = 36;
         const ACT_TIME = 2600;                        // あいさつの 長さ (ミリ秒)
         const SUBS = {
             furukawa: { name: 'ふるカワ', lines: ['クエスト、がんばってね！', '今日も いい天気だね！', 'ギルドに 新しい 依頼が 来てるよ！'] },
             // ともいしは こおりくんの お母さん。台詞は 前作 (スロット・パチンコ) から
             tomoishi: { name: 'ともいし', lines: ['お金返しなさい！', '内定はまだなの？', 'こおり、がんばって！', '内定とりなさい！'] }
         };
+        // ライバル探検隊 (月の迷宮で 会ったあと。仲間に なっていなければ)。台詞は Claude の 案
+        const RIVAL_WALKERS = {
+            yahami: ['お宝の においが するわね♪', '美しさに 磨きを かけてるの'],
+            maechokkin: ['チョッキン♪ 前髪 そろえてあげる？', 'お宝も 前髪も きれいに ね'],
+            norahan: ['ニャハッ。お財布 ちょうだい♪', 'ダンジョンで また 会おうね♪'],
+            ishii: ['ブヒッ！ 次は 負けないぞ！', 'ダンジョンは おれたちの 家だ！'],
+            mazuda: ['……修行が 足りんな', '迷宮の 奥で 待っている'],
+            naitoon: ['ワォーン！', '夜の 迷宮は おれたちの もの'],
+        };
+        // 仲間どうしの おしゃべり (2 番目の 仲間が 話して、先頭が 返す)
+        const CHATS = [['おなか すいたね', 'おにぎり 食べよう！'], ['次は どこへ 行く？', 'ギルドを 見てみよう！'], ['あの お店 気になる！', 'あとで 寄ろうね'],
+            ['借金、あと どれくらい？', 'か、考えたくない……']];
+        const ONI_CHATS = [['借金、忘れてないだろうな', 'わ、わかってるよ～'], ['金返せ！', 'ダンジョンで かせぐから～']];
+        // 天気 (日ごとに かわる)
+        const WEATHERS = [['sunny', 'はれ'], ['sunny', 'はれ'], ['cloudy', 'くもり'], ['rain', '雨'], ['sunny', 'はれ'], ['evening', '夕やけ'], ['snow', '雪']];
+        const weather = () => WEATHERS[Math.floor(hash(t().day * 13.37 + 1) * WEATHERS.length)];
+        const FURUKAWA_WEATHER = { sunny: '今日も いい天気だね！', cloudy: 'くもってきたね……', rain: '雨の日は 足もとに 気をつけてね！', snow: '雪だ！ 雪だるま 作りたいな～', evening: '夕やけ、きれいだね' };
         const ACTIONS = ['wave', 'highfive', 'jump', 'bow', 'gift'];
         const ALLY_LINES = ['おーい！ 今度は つれてってね！', '広場で 待ってるよ～', 'いっしょに 冒険したいな！', '修行してたんだ！'];
-        const REPLY = { wave: 'やあ！', highfive: 'イェーイ！', jump: 'わーい！', bow: 'どうも！', gift: 'ありがとう！' };
+        const REPLY = { wave: 'やあ！', highfive: 'イェーイ！', jump: 'わーい！', bow: 'どうも！', gift: 'ありがとう！', collect: 'とほほ……' };
         const street = { scroll: 0, last: 0, visitor: null, nextAt: 0 };
         // ふるカワ・ともいし (前作の絵) は 2 コマめが 口を開けた絵。歩くときは 1 コマめで はねる
         const TALKERS = ['furukawa', 'tomoishi'];
@@ -1969,11 +2001,67 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
         function newVisitor(now) {
             const going = [p(), ...state.allies].map(u => u.kind);   // いっしょに 歩いている キャラは 来ない
             const allies = state.roster.filter(a => !going.includes(a.kind)).map(a => ({ kind: a.kind, name: a.name, lines: ALLY_LINES }));
-            const subs = Object.entries(SUBS).map(([kind, s]) => ({ kind, ...s }));
-            const pool = [...subs, ...allies, ...allies];   // 仲間が いれば 仲間が 多め
-            const v = pool[Math.floor(Math.random() * pool.length)];
-            return { ...v, x: 384 + 16, phase: 'come', at: now, action: ACTIONS[Math.floor(Math.random() * ACTIONS.length)],
-                line: v.lines[Math.floor(Math.random() * v.lines.length)] };
+            const pick = list => list[Math.floor(Math.random() * list.length)];
+            // ときどき 仲間どうしの おしゃべり (仲間が いるとき)
+            if (going.length > 1 && Math.random() < 0.3) {
+                const [line, reply] = pick(going[1] === 'onioni' ? ONI_CHATS : CHATS);
+                return { chat: true, phase: 'act', at: now, line, reply };
+            }
+            const w = weather()[0];
+            const subs = Object.entries(SUBS).map(([kind, s]) => ({ kind, ...s, lines: kind === 'furukawa' ? [...s.lines.slice(0, 1), FURUKAWA_WEATHER[w], ...s.lines.slice(2)] : s.lines }));
+            const have = [...going, ...state.roster.map(a => a.kind)];
+            const rivals = t().seen.moon ? Object.entries(RIVAL_WALKERS).filter(([k]) => !have.includes(k) && KD.BigArt.has(k)).map(([kind, lines]) => ({ kind, lines })) : [];
+            // おにおにの 取り立て (いっしょに 歩いていなくて、借金が あるとき)
+            const oni = !going.includes('onioni') && t().debt > 0 ? [{ kind: 'onioni', lines: ['金返せ！', '利子が ついてるぞ！'], action: 'collect' }] : [];
+            const pool = [...subs, ...allies, ...allies, ...rivals, ...oni];   // 仲間が いれば 仲間が 多め
+            const v = pick(pool);
+            return { ...v, x: 384 + 16, phase: 'come', at: now, action: v.action || pick(ACTIONS), line: pick(v.lines) };
+        }
+        // 天気。back: 空 (建物の 前に 描く)、front: 雨・雪 (いちばん 上に)
+        function drawWeather(ctx, now, W, H, layer) {
+            const w = weather()[0];
+            const sec = now / 1000;
+            if (layer === 'back') {
+                if (w === 'evening') {
+                    const g2 = ctx.createLinearGradient(0, 0, 0, H * 0.45);
+                    g2.addColorStop(0, 'rgba(255,110,60,.75)');
+                    g2.addColorStop(1, 'rgba(255,190,120,.55)');
+                    ctx.fillStyle = g2;
+                    ctx.fillRect(0, 0, W, H * 0.45);
+                }
+                if (w === 'cloudy' || w === 'rain' || w === 'snow') {
+                    ctx.fillStyle = 'rgba(90,100,120,.35)';
+                    ctx.fillRect(0, 0, W, H * 0.45);
+                }
+                // 雲 (ゆっくり 流れる)
+                const n = w === 'sunny' || w === 'evening' ? 2 : 5;
+                for (let i = 0; i < n; i++) {
+                    const x = ((hash(i + 40) * W + sec * (6 + i * 2)) % (W + 80)) - 40;
+                    const y = 18 + hash(i + 50) * 30;
+                    ctx.fillStyle = w === 'sunny' ? 'rgba(255,255,255,.85)' : w === 'evening' ? 'rgba(255,220,200,.7)' : 'rgba(200,205,215,.9)';
+                    ctx.fillRect(Math.round(x), Math.round(y), 40, 8);
+                    ctx.fillRect(Math.round(x) + 8, Math.round(y) - 6, 22, 8);
+                }
+                return;
+            }
+            if (w === 'rain') {
+                ctx.fillStyle = 'rgba(20,30,60,.15)';
+                ctx.fillRect(0, 14, W, H);
+                ctx.fillStyle = 'rgba(170,200,255,.7)';
+                for (let i = 0; i < 50; i++) {
+                    const x = (hash(i) * W + sec * 40) % W, y = (hash(i + 7) * H + sec * 260) % H;
+                    ctx.fillRect(Math.round(x), Math.round(y), 1, 6);
+                }
+            } else if (w === 'snow') {
+                ctx.fillStyle = '#ffffff';
+                for (let i = 0; i < 40; i++) {
+                    const x = (hash(i) * W + Math.sin(sec + i) * 8 + W) % W, y = (hash(i + 7) * H + sec * 30) % H;
+                    ctx.fillRect(Math.round(x), Math.round(y), 2, 2);
+                }
+            } else if (w === 'evening') {
+                ctx.fillStyle = 'rgba(255,140,60,.12)';
+                ctx.fillRect(0, 14, W, H);
+            }
         }
         function drawStreet(ctx, now, W) {
             const dt = street.last ? Math.min(100, now - street.last) / 1000 : 0;
@@ -2016,7 +2104,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             const step = stopped ? 0 : Math.floor(now / 250) % 2;
             const act = v && v.phase === 'act' ? (now - v.at) / ACT_TIME : -1;
             const lift = (i, base) => {
-                if (act < 0) return step && (i % 2) ? 1 : 0;
+                if (act < 0 || v.chat) return step && (i % 2) ? 1 : 0;
                 if (v.action === 'jump') return Math.round(Math.abs(Math.sin(act * Math.PI * 4)) * 14);
                 if (v.action === 'highfive' && i === 0 && act > 0.25 && act < 0.45) return 6;
                 if (v.action === 'bow' && i === 0) return 0;
@@ -2024,6 +2112,16 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             };
             party.forEach((u, i) => walker(ctx, u.kind, (step + i) % 2, LEAD_X - i * GAP, lift(i, 0)));
             if (!v) return;
+            if (v.chat) {
+                if (now - v.at >= ACT_TIME) {
+                    street.visitor = null;
+                    street.nextAt = now + 5000 + Math.random() * 7000;
+                    return;
+                }
+                if (act < 0.55) bubble(ctx, v.line, LEAD_X - GAP, FEET - 50);
+                else bubble(ctx, v.reply, LEAD_X, FEET - 50);
+                return;
+            }
             // 向かい側から 来る人
             if (v.phase === 'come') {
                 v.x -= (VISITOR_SPEED + WALK_SPEED) * dt;
@@ -2066,6 +2164,10 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                 const k = Math.min(1, Math.max(0, (act - 0.2) / 0.35));
                 if (k > 0 && k < 1) A.drawItem(ctx, 'onigiri', 'food', Math.round(v.x - (v.x - LEAD_X) * k) - 8, Math.round(FEET - 44 - Math.sin(k * Math.PI) * 18));
             }
+            if (v.action === 'collect') {
+                const k = Math.min(1, Math.max(0, (act - 0.3) / 0.35));
+                if (k > 0 && k < 1) A.drawItem(ctx, 'money', 'money', Math.round(LEAD_X + (v.x - LEAD_X) * k) - 8, Math.round(FEET - 44 - Math.sin(k * Math.PI) * 18));
+            }
             if (v.action === 'wave') {
                 ctx.fillStyle = '#ffe680';
                 ctx.fillRect(Math.round(v.x) - 18 - (Math.floor(now / 150) % 2) * 3, FEET - 44, 5, 5);
@@ -2082,6 +2184,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             grd.addColorStop(1, '#4a8f38');
             ctx.fillStyle = grd;
             ctx.fillRect(0, 0, W, H);
+            drawWeather(ctx, now, W, H, 'back');
             // 建物 (5 × 2)
             PLACES.forEach((pl, i) => {
                 const x = 12 + (i % 5) * 74, y = 30 + Math.floor(i / 5) * 62;
@@ -2117,6 +2220,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             });
             ctx.textAlign = 'left';
             drawStreet(ctx, now, W);
+            drawWeather(ctx, now, W, H, 'front');
             // 上の帯: 日・借金・お金・BP
             ctx.fillStyle = 'rgba(0,0,0,.6)';
             ctx.fillRect(0, 0, W, 14);
@@ -2230,7 +2334,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
         // この階で待っている ライバルのリーダー (受けている duel のクエスト)
         const duelsHere = (n, id) => TW.duelsAt(t().quests, id, n);
 
-        return { title, enter, menu, draw, storyScenes, onKill, onFloor, onClear, duelsHere, bonusRest, save, load, newTown, giveItem, countHave, questDone, seen, beat, noteItem, stat, check, repay };
+        return { title, enter, menu, draw, storyScenes, bossTalk: (lines, d, done) => storyCut(lines, d, 'boss', done), soundSettings, onKill, onFloor, onClear, duelsHere, bonusRest, save, load, newTown, giveItem, countHave, questDone, seen, beat, noteItem, stat, check, repay };
     }
 
     KD.createTown = createTown;

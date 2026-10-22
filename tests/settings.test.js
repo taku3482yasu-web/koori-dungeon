@@ -207,3 +207,53 @@ test('ストーリーの 書き出し (docs/story.md) が ゲームの データ
     const r = spawnSync(process.execPath, [fileURLToPath(new URL('../tools/export-story.mjs', import.meta.url)), '--check']);
     assert.equal(r.status, 0, 'node tools/export-story.mjs で 書き出しなおす');
 });
+
+test('町の道: 天気が 日ごとに かわり、ライバル・おにおにの 取り立て・仲間の おしゃべりも ある', () => {
+    const { s, game, asks } = newGame();
+    const names = new Set();
+    for (let d = 1; d <= 30; d++) {
+        s.town.day = d;
+        game.town.menu();
+        names.add(/日目（(.+?)）/.exec(asks[asks.length - 1].message)[1]);
+    }
+    assert.ok(names.size >= 4, [...names].join('・'));
+    // おにおにを 広場で 待たせて、ライバルに 会ったことにする
+    s.roster.push(...s.allies.splice(0));
+    s.allies.push(game.makeAlly('haribaby', 2));
+    s.town.seen.moon = true;
+    const said = [];
+    const rec = new Proxy({ measureText: t => ({ width: t.length * 9 }), createLinearGradient: () => ({ addColorStop() {} }), fillText: t => said.push(t) }, {
+        get: (t, k) => (k in t ? t[k] : () => {}), set: (t, k, v) => { t[k] = v; return true; }
+    });
+    for (let i = 0; i < 60 * 600; i++) {
+        fakeNow += 16;
+        game.town.draw(rec, fakeNow, 384, 240);
+    }
+    assert.ok(said.some(t => ['金返せ！', '利子が ついてるぞ！'].includes(t)), 'おにおにの 取り立て');
+    assert.ok(said.includes('とほほ……'));
+    assert.ok(said.some(t => ['ブヒッ！ 次は 負けないぞ！', 'お宝の においが するわね♪', 'ワォーン！', '……修行が 足りんな', 'チョッキン♪ 前髪 そろえてあげる？', 'ニャハッ。お財布 ちょうだい♪',
+        'ダンジョンは おれたちの 家だ！', '美しさに 磨きを かけてるの', 'お宝も 前髪も きれいに ね', 'ダンジョンで また 会おうね♪', '迷宮の 奥で 待っている', '夜の 迷宮は おれたちの もの'].includes(t)), 'ライバル');
+    assert.ok(said.some(t => ['おなか すいたね', '次は どこへ 行く？', 'あの お店 気になる！', '借金、あと どれくらい？'].includes(t)), '仲間の おしゃべり');
+});
+
+test('ボスに 会ったときの 台詞は ダンジョンの中で 絵つき (phase は play の まま)', () => {
+    const { s, game, asks, choose, run } = newGame();
+    choose('ダンジョンへ');
+    choose('ハリーの森');
+    choose('スキップ');
+    run(1300);
+    asks.length = 0;
+    const d = DG.byId('forest');
+    let done = false;
+    game.town.bossTalk(d.story.boss, d, () => { done = true; });
+    assert.equal(s.phase, 'play');
+    assert.ok(s.demo);
+    const sc = game.town.storyScenes(d.story.boss, d, 'boss').map(x => x.scene.type);
+    assert.deepEqual(sc, ['bossAppear', 'talk']);
+    drawn = 0;
+    run(300);
+    assert.ok(drawn > 0);
+    choose('つぎへ');
+    choose('つぎへ');
+    assert.ok(done && !s.demo && s.phase === 'play');
+});

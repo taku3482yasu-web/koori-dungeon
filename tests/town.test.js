@@ -285,6 +285,7 @@ test('クエスト: 受けて、ダンジョンで敵をたおすと達成。ギ
     choose('やめる');   // ギルド
     choose('ダンジョンへ');
     choose('ハリーの森');
+    if (asks[0] && asks[0].options[1] === 'スキップ') choose('スキップ');   // はじめて 行くときの 話
     run(1300);
     assert.equal(s.phase, 'play');
     // となりにハリベビーを置いて たおす
@@ -340,6 +341,7 @@ test('ダンジョンで倒れると町へ。お金はなくなり、借金に�
     s.town.storage.push({ id: 'big_onigiri', n: 1 });
     choose('ダンジョンへ');
     choose('ハリーの森');
+    if (asks[0] && asks[0].options[1] === 'スキップ') choose('スキップ');   // はじめて 行くときの 話
     run(1300);
     const p = s.player;
     p.money = 999;
@@ -361,9 +363,10 @@ test('ダンジョンで倒れると町へ。お金はなくなり、借金に�
 });
 
 test('敵をたおすと ときどき素材を落とす', () => {
-    const { s, game, run, choose } = newGame({ enemies: true, partner: false });
+    const { s, game, run, asks, choose } = newGame({ enemies: true, partner: false });
     choose('ダンジョンへ');
     choose('ハリーの森');
+    if (asks[0] && asks[0].options[1] === 'スキップ') choose('スキップ');   // はじめて 行くときの 話
     run(1300);
     const p = s.player;
     let drops = 0;
@@ -400,6 +403,7 @@ test('セーブして、つづきから遊べる。ダンジョンの中なら�
     // ダンジョンの B2F で やめた
     b.choose('ダンジョンへ');
     b.choose('ハリーの森');
+    if (b.asks[0] && b.asks[0].options[1] === 'スキップ') b.choose('スキップ');   // はじめて 行くときの 話
     b.run(1300);
     b.s.player.money = 50;
     const stairs = b.s.map.stairs;

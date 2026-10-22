@@ -137,6 +137,14 @@
             return [Math.sign(dx), Math.sign(dy)];
         }
 
+        // 聞く画面の 場所 (2026-10-22 ユーザー指定: PC では 町の メニューが 町の 絵に 重なる)。
+        // ダンジョンの外では ゲーム画面の 外 (横長なら 右の 列、縦長なら 下) の #ask-slot に 移す。ダンジョンでは ゲーム画面に 重ねる。
+        // スマホの 縦向きは どちらでも 画面の 下に 出る (style.css)
+        const askBox = document.getElementById('ask'), stage = document.querySelector('.stage'), slot = document.getElementById('ask-slot');
+        function placeAsk(phase) {
+            const home = phase === 'play' || !slot ? stage : slot;
+            if (askBox.parentNode !== home) home.appendChild(askBox);
+        }
         // 最初の操作で 音を鳴らせるようにする
         const unlock = () => KD.Sound && KD.Sound.unlock();
         window.addEventListener('pointerdown', unlock);
@@ -259,7 +267,7 @@
         tap('btn-item', () => (ask.asking() ? ask.key('back') : game.itemMenu()));
         tap('btn-tactic', () => (ask.asking() ? ask.key('back') : game.tacticMenu()));
         tap('btn-switch', () => (ask.asking() ? ask.key('back') : game.switchMenu()));
-        tap('btn-sound', () => game.toggleSound());
+        tap('btn-sound', () => game.soundMenu());
 
         // ----- わざのボタン (変わったときだけ作り直す) -----
         const skillBox = document.getElementById('skills');
@@ -318,6 +326,7 @@
                 // いまの 場面 (title / select / town / play) を body に 書く。スマホでは ダンジョンの外で 操作ボタンを かくす (style.css)
                 const phase = (game.state && game.state.phase) || '';
                 if (document.body.dataset.phase !== phase) document.body.dataset.phase = phase;
+                placeAsk(phase);
                 game.draw(now);
                 renderSkills();
             } catch (e) {

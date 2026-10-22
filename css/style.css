@@ -254,6 +254,25 @@ h1 .howto:hover { border-color: var(--hot); }
     .ask.long .ask-choices button { text-align: left; padding: 8px 12px; }
 }
 
+/* ダンジョンの外の 聞く画面 (#ask-slot。main.js が 移す): ゲーム画面に 重ねず、下に ならべる (2026-10-22 ユーザー指定) */
+.ask-slot:empty { display: none; }
+.ask-slot { margin-top: 10px; }
+/*   (スマホの 縦向きは 今までどおり 画面の 下に 固定した 板) */
+@media (min-width: 521px) {
+    .ask-slot .ask, .ask-slot .ask.bottom, .ask-slot .ask.bottom.list {
+        position: static;
+        transform: none;
+        width: auto;
+        max-height: none;
+        margin: 0 auto;
+        max-width: var(--stage-max);
+    }
+    .ask-slot .ask-choices { justify-content: flex-start; }
+}
+body:not([data-phase="play"]) .pad,
+body:not([data-phase="play"]) .skills,
+body:not([data-phase="play"]) .keys { display: none; }
+
 /* パソコン (マウス) では十字ボタンを小さく */
 @media (hover: hover) and (pointer: fine) {
     .app { --ui: 330px; }
@@ -279,6 +298,11 @@ h1 .howto:hover { border-color: var(--hot); }
     .dpad { align-self: center; }
     .acts { grid-template-columns: repeat(2, 1fr); max-width: none; }
     .keys { grid-column: 1 / -1; }
+    .ask-slot { grid-column: 2; grid-row: 2 / span 2; margin-top: 0; }
+    /* 右の 列は せまいので 1 列に。多ければ 列の 中で スクロール */
+    .ask-slot .ask { max-height: calc(100dvh - 90px); padding: 12px 14px; }
+    .ask-slot .ask-choices { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 6px; overflow-y: auto; min-height: 0; }
+    .ask-slot .ask-choices button { text-align: left; }
 }
 /* 横長で 低い画面 (スマホの横向きなど): 見出しを小さく */
 @media (min-aspect-ratio: 4/3) and (max-height: 520px) {

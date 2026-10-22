@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>こおりくんの大冒険～ダンジョンドタバタ大道中～</title>
-<link rel="stylesheet" href="css/style.css?v=c03b2cdd">
+<link rel="stylesheet" href="css/style.css?v=257401ed">
 </head>
 <body>
 <main class="app">
@@ -16,6 +16,8 @@
             <div class="ask-choices"></div>
         </div>
     </div>
+    <!-- ダンジョンの外 (タイトル・町・ストーリー) では、聞く画面を ここへ 移す (ゲーム画面に 重ねない。main.js) -->
+    <div id="ask-slot" class="ask-slot"></div>
     <!-- わざ (キーボードは 1〜4)。main.js が作る -->
     <div id="skills" class="skills" aria-label="わざ"></div>
     <!-- スマホの操作 (仕様書 15章)。十字ボタンは長押しでダッシュ -->
@@ -41,7 +43,7 @@
             <button type="button" id="btn-sound">音</button>
         </div>
     </div>
-    <p class="keys">移動：矢印キー・テンキー（斜めは矢印を2つ同時か、Shift を押しながら）／ダッシュ：B を押しながら移動／向きだけ変える：R を押しながら方向／攻撃・決定：Z・Enter（階段の上なら降りる）／わざ：1〜4／道具：X／仲間の作戦：T／操作するキャラの交代：C／足ぶみ：Space／戻る：X・Esc／ミニマップ：M／音のオン・オフ：S</p>
+    <p class="keys">移動：矢印キー・テンキー（斜めは矢印を2つ同時か、Shift を押しながら）／ダッシュ：B を押しながら移動／向きだけ変える：R を押しながら方向／攻撃・決定：Z・Enter（階段の上なら降りる）／わざ：1〜4／道具：X／仲間の作戦：T／操作するキャラの交代：C／足ぶみ：Space／戻る：X・Esc／ミニマップ：M／音のオン・オフ：S（「音」ボタンで 音量）</p>
 </main>
 <!-- ファイルを直接開いても動くように、モジュールではなく順に読むスクリプトにしている -->
 <script src="js/rng.js?v=d477476e"></script>
@@ -49,7 +51,7 @@
 <script src="js/units.js?v=c51766bd"></script>
 <script src="js/enemies.js?v=7eed88a2"></script>
 <script src="js/items.js?v=2dc93420"></script>
-<script src="js/dungeons.js?v=0a148748"></script>
+<script src="js/dungeons.js?v=0c2e12b8"></script>
 <script src="js/collection.js?v=90df7459"></script>
 <script src="js/allies.js?v=e19c60c5"></script>
 <script src="js/enemies9.js?v=e898c34f"></script>
@@ -62,11 +64,11 @@
 <script src="js/enemyart9.js?v=9ce94360"></script>
 <script src="js/enemyart10.js?v=462eb5f0"></script>
 <script src="js/enemyart11.js?v=959ce57f"></script>
-<script src="js/sound.js?v=1e59ee79"></script>
+<script src="js/sound.js?v=dc6ed54d"></script>
 <script src="js/config.js?v=3f3ca9fb"></script>
 <script src="js/market.js?v=d35a16b0"></script>
-<script src="js/townui.js?v=67869771"></script>
-<script src="js/game.js?v=c12f4d22"></script>
-<script src="js/main.js?v=a4ad8353"></script>
+<script src="js/townui.js?v=ad38aa63"></script>
+<script src="js/game.js?v=78b7501c"></script>
+<script src="js/main.js?v=76fd3bcf"></script>
 </body>
 </html>

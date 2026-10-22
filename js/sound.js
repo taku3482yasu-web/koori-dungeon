@@ -37,7 +37,22 @@
         forest: { tempo: 120, lead: [0, 3, 7, 3, 5, 3, 0, null, -2, 0, 3, 0, -2, -5, -2, null], bass: [-24, -24, -21, -19], wave: 'triangle' },
         cave: { tempo: 104, lead: [0, null, 3, 5, 3, null, 0, -2, -5, null, -2, 0, -2, null, -5, null], bass: [-24, -26, -29, -26], wave: 'sine' },
         deep: { tempo: 112, lead: [0, 1, 0, -2, 0, 3, 1, null, 0, -2, -4, -2, 0, null, -5, null], bass: [-24, -23, -24, -26], wave: 'square' },
-        boss: { tempo: 168, lead: [0, 0, 3, 0, 6, 5, 3, 1, 0, 0, 3, 0, 7, 6, 5, 3], bass: [-24, -24, -21, -18], wave: 'sawtooth' }
+        boss: { tempo: 168, lead: [0, 0, 3, 0, 6, 5, 3, 1, 0, 0, 3, 0, 7, 6, 5, 3], bass: [-24, -24, -21, -18], wave: 'sawtooth' },
+        // ダンジョンごとの 曲 (2026-10-22 ユーザー指定: 曲を 増やす。名前は ダンジョンの id。曲は Claude が 作った)
+        coast: { tempo: 110, lead: [7, 9, 12, 9, 7, 4, 7, null, 5, 7, 9, 7, 5, 2, 4, null], bass: [-17, -19, -22, -20], wave: 'triangle' },
+        temple: { tempo: 96, lead: [0, 3, 5, 7, 10, 7, 5, null, 3, 5, 3, 0, -2, 0, null, null], bass: [-24, -24, -19, -21], wave: 'square' },
+        mansion: { tempo: 150, lead: [12, 8, 7, 5, 7, 8, 7, null, 5, 1, 0, 1, 5, null, 0, null], bass: [-24, -19, -23, -24], wave: 'square' },
+        moon: { tempo: 92, lead: [12, null, 15, 14, 12, null, 10, 7, 8, null, 10, 12, 7, null, null, null], bass: [-19, -24, -22, -17], wave: 'sine' },
+        mountain: { tempo: 140, lead: [0, 0, 7, 0, 10, 0, 7, 5, 3, 3, 5, 7, 5, 3, 0, null], bass: [-24, -24, -26, -21], wave: 'square' },
+        aso: { tempo: 100, lead: [0, 1, 0, null, -1, 0, 3, 1, 0, null, -4, -5, -4, null, -5, null], bass: [-24, -23, -25, -24], wave: 'sawtooth' },
+        code: { tempo: 176, lead: [12, 19, 24, 19, 12, 19, 22, 19, 10, 17, 22, 17, 10, 17, 20, 17], bass: [-12, -14, -16, -17], wave: 'square' },
+        alley: { tempo: 120, lead: [7, 10, 12, null, 10, 7, 5, 7, null, 3, 5, 7, 10, null, 7, null], bass: [-17, -12, -14, -19], wave: 'triangle' },
+        kingdom: { tempo: 128, lead: [12, 12, 14, 16, 12, 16, 14, 7, 12, 12, 14, 16, 12, null, 11, null], bass: [-12, -17, -12, -19], wave: 'square' },
+        glacier: { tempo: 104, lead: [19, 24, 22, 19, 17, 19, 15, null, 17, 19, 22, 24, 22, null, 19, null], bass: [-12, -14, -17, -15], wave: 'sine' },
+        onijo: { tempo: 132, lead: [0, null, 0, 3, 5, null, 7, 5, 3, null, 0, -2, 0, null, null, null], bass: [-24, -24, -19, -24], wave: 'sawtooth' },
+        // ストーリーデモ・エンディング
+        story: { tempo: 100, lead: [4, 7, 12, 11, 9, 7, 9, null, 5, 9, 12, 11, 12, null, null, null], bass: [-20, -15, -17, -15], wave: 'triangle' },
+        ending: { tempo: 120, lead: [12, 16, 19, 24, 23, 19, 21, null, 17, 21, 24, 23, 24, null, 19, null], bass: [-12, -17, -15, -19], wave: 'square' }
     };
 
     // 音量は 0〜10 の目もり。BGM は 前の 3 倍くらいを ふつうにした (2026-10-22 ユーザー指定: BGM が 小さい)
@@ -194,5 +209,8 @@
         applyVolume();
     }
 
-    KD.Sound = { unlock, play, bgm, toggle, isOn: () => enabled, setVolume, volume: () => ({ ...vol }), VOL_MAX, SFX, SONGS };
+    // いまの ようす (ブラウザの テストが 使う): 止めているか・BGM を 鳴らしているか
+    const status = () => ({ paused, playing: Boolean(timer), running: Boolean(ctx) && ctx.state === 'running', current });
+
+    KD.Sound = { unlock, play, bgm, toggle, isOn: () => enabled, setVolume, volume: () => ({ ...vol }), VOL_MAX, SFX, SONGS, status };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);

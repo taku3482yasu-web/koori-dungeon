@@ -133,6 +133,7 @@ test('ボスをたおして突破すると ストーリーが進む: 仲間が�
     choose('ダンジョンへ');
     assert.deepEqual(asks[0].options.slice(0, -1).map(o => o.trim()), ['ハリーの森（5 階）']);
     choose('ハリーの森');
+    if (asks[0] && asks[0].options[1] === 'スキップ') choose('スキップ');   // はじめて 行くときの 話
     run(1300);
     // ボスをたおしたことにして 突破
     s.bossDown = true;

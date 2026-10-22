@@ -41,8 +41,9 @@
     const has = (u, trait) => Boolean(u.traits && u.traits.includes(trait));
     const C = KD.Collection;
     const sfx = name => KD.Sound && KD.Sound.play(name);
-    // ダンジョンの BGM (ボスが起きたら boss)
-    const DUNGEON_BGM = { forest: 'forest', coast: 'cave', temple: 'deep', mansion: 'forest', moon: 'cave', mountain: 'deep', aso: 'deep' };
+    // ダンジョンの BGM (ボスが起きたら boss)。曲は ダンジョンごと (sound.js の SONGS。名前は ダンジョンの id)。
+    //   ドタバタ大迷宮は その階の 見た目の ダンジョン (segment) の 曲
+    const songOf = d => [d.segment, d.id, d.bgm].find(n => n && KD.Sound && KD.Sound.SONGS[n]) || 'forest';
 
     // opts (テスト用): enemies: false で敵を出さない・things: false で道具とワナを置かない・partner: false で最初の仲間なし・
     //   recruit: false で敵が仲間にならない (数なら その確率)・seed で同じ階にする・
@@ -261,7 +262,7 @@
                 else maybeHappen();
                 if (state.town && town.duelsHere) town.duelsHere(n, state.dungeon.id).forEach(spawnDuel);
             }
-            if (KD.Sound) KD.Sound.bgm(DUNGEON_BGM[state.dungeon.bgm || state.dungeon.id] || 'forest');
+            if (KD.Sound) KD.Sound.bgm(songOf(state.dungeon));
             say(`${state.dungeon.name} B${n}F に着いた。`);
             // ドタバタ大迷宮の 休憩の階 (50 階は ライバルを たおしてから)
             if (state.dungeon.rest && !state.dungeon.rivalFloor) later(() => restStop(n));
@@ -527,7 +528,7 @@
             state.phase = 'play';
             state.run = { dungeon: snap.dungeon, floor: snap.floor, seed: snap.seed };
             look();
-            if (KD.Sound) KD.Sound.bgm(DUNGEON_BGM[state.dungeon.bgm || state.dungeon.id] || 'forest');
+            if (KD.Sound) KD.Sound.bgm(songOf(state.dungeon));
             say(`${state.dungeon.name} B${state.floor}F の 続きから。`);
             savedTurn = state.turn;
             return true;
@@ -896,9 +897,10 @@
                 if (KD.Sound) KD.Sound.bgm('boss');
                 if (state.town) town.seen(e.kind);
                 const lines = state.dungeon.story && state.dungeon.story.boss;
-                // カットインが終わってから 台詞
+                // カットインが終わってから 台詞。ストーリーの 台詞は 絵つき (2026-10-22 ユーザー指定)
                 state.queue.push(() => 1300, () => {
-                    talk(lines || [`${e.name}「${U.ENEMIES[e.kind].line}」`]);
+                    if (lines && state.town) town.bossTalk(lines, state.dungeon, () => {});
+                    else talk(lines || [`${e.name}「${U.ENEMIES[e.kind].line}」`]);
                     return 0;
                 });
             } else if (e.duel && e.big && !e.met) {
@@ -2143,7 +2145,8 @@
         function draw(now) {
             update(now);
             if (state.phase === 'play' && state.map && !state.over && !state.done) autosave();
-            if (state.phase === 'title' || state.phase === 'town') {
+            // state.demo: ダンジョンの中の ストーリーデモ (ボスに 会ったとき)。phase は play の まま
+            if (state.phase === 'title' || state.phase === 'town' || state.demo) {
                 town.draw(ctx, now, W, H);
                 if (state.fade) drawFade(now);
                 drawToasts(now);
@@ -2655,6 +2658,10 @@
             state, town, draw, moveInput, wait, confirm, attack: attackFront, useSkill, itemMenu, tacticMenu, busy, makeEnemy, makeAlly, evolve, startDungeon, switchTo, switchMenu, heroUnit, snapshot, autosave, spawnBoss,
             skills: () => (state.player && state.phase === 'play' ? state.player.skills.map(skillLabel) : []),
             toggleMinimap() { state.mini = !state.mini; },
+            // 「音」ボタン: 音の設定 (音量・オン・オフ。2026-10-22 ユーザー指定)。S キーは これまでどおり オン・オフだけ
+            soundMenu() {
+                if (!ui.asking()) town.soundSettings(() => {});
+            },
             toggleSound() {
                 const on = KD.Sound ? KD.Sound.toggle() : false;
                 toast(on ? '音: オン' : '音: オフ');

@@ -136,10 +136,14 @@ try {
     for (let i = 0; i < 5; i++) await press('.ask-choices button', { text: 'つぎへ' });
     check(await phase() === 'town' && /日目/.test(await asking()), 'オープニングのあと 町へ');
     check(/仲間の広場/.test(await evaluate('[...document.querySelectorAll(".ask-choices button")].map(b => b.textContent).join(" ")')), '仲間の広場は はじめから使える');
+    // PC の 町: メニューは ゲーム画面に 重ならない (2026-10-22 ユーザー指定)
+    check(await evaluate(`(() => { const st = document.querySelector('.stage').getBoundingClientRect(), box = document.getElementById('ask').getBoundingClientRect();
+        return box.top >= st.bottom - 1 || box.left >= st.right - 1; })()`), 'PC の 町: メニューが ゲーム画面に 重ならない');
 
     // ダンジョンへ
     await press('.ask-choices button', { text: 'ダンジョンへ' });
     await press('.ask-choices button', { text: 'ハリーの森' });
+    await press('.ask-choices button', { text: 'スキップ' });   // はじめて 行くときの 話 (絵つき)
     await sleep(2500);
     check(await phase() === 'play', 'ダンジョンに入る');
 
@@ -216,6 +220,8 @@ try {
     check(await evaluate('window.kdGame.state.player.kind') === 'koori', 'C キーで 主人公に もどす');
     await press('#btn-map');
     await press('#btn-sound');
+    check(/音の設定/.test(await asking()), '「音」ボタンで 音の設定');
+    await press('.ask-choices button', { text: 'もどる' });
     await sleep(800);
     check(await phase() === 'play', '最後まで 画面が止まらない');
     // ページを 開きなおすと、やめた場所から 続く (オートセーブ)
@@ -301,6 +307,34 @@ try {
     await sleep(1500);
     check(/つながらなかった/.test(await asking()) && await evaluate('Boolean(localStorage.getItem("koori-dungeon-save-onioni"))'),
         '引き継ぎ: つながらないときは そう 言って、セーブは そのまま');
+
+    // BGM の 重なり (2026-10-22 ユーザー指定: 開きなおすと BGM が 重なる)。
+    // 2 つ目の タブで 開いて 押すと 前の タブの BGM は 止まり、前の タブに もどって 押すと そちらだけ 鳴る
+    await press('h1 small');
+    const sound = ev => ev('JSON.stringify(KD.Sound.status())').then(JSON.parse);
+    const s1 = await sound(evaluate);
+    const { targetId } = await send('Target.createTarget', { url: pathToFileURL(join(ROOT, 'index.html')).href });
+    await sleep(2500);
+    const page2 = (await (await fetch(`http://127.0.0.1:${port}/json`)).json()).find(t => t.id === targetId);
+    const ws2 = new WebSocket(page2.webSocketDebuggerUrl);
+    await new Promise(r => ws2.addEventListener('open', r, { once: true }));
+    let id2 = 0;
+    const pend2 = new Map();
+    ws2.addEventListener('message', e => { const m = JSON.parse(e.data); if (m.id && pend2.has(m.id)) { pend2.get(m.id)(m.result || {}); pend2.delete(m.id); } });
+    const send2 = (method, params = {}) => new Promise(r => { const n = ++id2; pend2.set(n, r); ws2.send(JSON.stringify({ id: n, method, params })); });
+    const evaluate2 = async e => (await send2('Runtime.evaluate', { expression: e, returnByValue: true })).result.value;
+    await send('Target.activateTarget', { targetId });
+    for (const type of ['mousePressed', 'mouseReleased']) await send2('Input.dispatchMouseEvent', { type, x: 200, y: 20, button: 'left', clickCount: 1, buttons: 1 });
+    await sleep(800);
+    const a1 = await sound(evaluate), a2 = await sound(evaluate2);
+    check(s1.playing && !a1.playing && a2.playing, `BGM: 2 つ目の タブで 鳴らすと 前の タブは 止まる（前 ${s1.playing}→${a1.playing}・2 つ目 ${a2.playing}）`);
+    const first = (await (await fetch(`http://127.0.0.1:${port}/json`)).json()).find(t => t.type === 'page' && t.id !== targetId);
+    await send('Target.activateTarget', { targetId: first.id });
+    await press('h1 small');
+    await sleep(800);
+    const b1 = await sound(evaluate), b2 = await sound(evaluate2);
+    check(b1.playing && !b2.playing, `BGM: 前の タブに もどって 押すと そちらだけ 鳴る（前 ${b1.playing}・2 つ目 ${b2.playing}）`);
+    ws2.close();
 } catch (e) {
     check(false, `止まった: ${e.message}`);
 } finally {
