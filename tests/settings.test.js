@@ -500,3 +500,74 @@ test('必殺技の 十字 (取り消しの二撃): 上下左右に つらぬい�
     assert.ok(foes.every(e => e.hp < 9999), '上下左右 ぜんぶに 当たった');
     assert.equal(hits, foes.length * 2, '2 回ずつ');
 });
+
+test('わざを ふやした: 役職ごとに 10 個・属性の わざ。仲間に なれる キャラ みんなに 割り当てる', () => {
+    const { Allies: AL, Units: U } = globalThis.KD;
+    for (const [role, list] of Object.entries(AL.GENERIC)) {
+        assert.equal(list.length, 10, role);
+        list.forEach(id => assert.ok(U.SKILLS[id], id));
+    }
+    for (const el of U.ELEMENTS) assert.ok(AL.ELEMENT_SKILLS[el].every(id => U.SKILLS[id]), el);
+    for (const kind of Object.keys(AL.ALLIES)) {
+        const ids = AL.learnList(kind).map(([, id]) => id);
+        assert.ok(ids.every(id => U.SKILLS[id]), kind);
+        assert.ok(ids.some(id => Object.values(AL.GENERIC).flat().slice(0).includes(id)), kind);
+    }
+    assert.ok(AL.learnList('koori').some(([, id]) => id === 'el_tsurara'));
+    assert.ok(AL.learnList('yasu').some(([, id]) => id === 'iyashi_hadou'));
+});
+
+test('新しい わざの 効果: つらぬく・ドレイン・ふきとばし・れんぞく・部屋の 敵 みんな・仲間 みんなに きあい', () => {
+    const { s, game, choose, run, asks } = newGame({ partner: true });
+    choose('ダンジョンへ');
+    choose('ハリーの森');
+    choose('スキップ');
+    run(1300);
+    asks.length = 0;
+    const p = s.player;
+    const D = globalThis.KD.Dungeon;
+    const dir = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dx, dy]) => [1, 2, 3, 4].every(k => D.canMove(s.map, p.x + dx * (k - 1), p.y + dy * (k - 1), dx, dy)));
+    assert.ok(dir, 'まっすぐ 4 マス 歩ける 向き');
+    const [dx, dy] = dir;
+    s.allies.forEach(a => { a.x = p.x - dx; a.y = p.y - dy; });
+    const foe = (k, hp = 9999) => { const e = game.makeEnemy('donguriko', 1, p.x + dx * k, p.y + dy * k); e.hp = e.stats.hp = hp; e.awake = true; s.visible[e.y * s.map.w + e.x] = 1; return e; };
+    const useNew = id => {
+        globalThis.KD.Units.SKILLS[id].acc = 1;   // テストでは よけない
+        p.skills[0] = { id, pp: 10, max: 10 };
+        p.dir = [dx, dy];
+        game.useSkill(0);
+        run(1500);
+        asks.length = 0;
+    };
+    // つらぬく: 2 体 とも
+    let a = foe(1), b = foe(3);
+    s.enemies.splice(0, s.enemies.length, a, b);
+    useNew('tsuranuki');
+    assert.ok(a.hp < 9999 && b.hp < 9999, 'つらぬいて 2 体');
+    // ドレイン
+    p.hp = 1;
+    p.stats.hp = 999;
+    useNew('drain_atk');
+    assert.ok(p.hp > 1, 'ドレインで 回復');
+    // ふきとばし
+    a = foe(1);
+    s.enemies.splice(0, s.enemies.length, a);
+    useNew('fukitobashi');
+    assert.ok(Math.abs(a.x - p.x) + Math.abs(a.y - p.y) >= 2, 'ふきとばした');
+    // れんぞくぎり: 2 回
+    a = foe(1);
+    s.enemies.splice(0, s.enemies.length, a);
+    let hits = 0, hp = a.hp;
+    Object.defineProperty(a, 'hp', { get: () => hp, set: v => { if (v < hp) hits++; hp = v; }, configurable: true });
+    useNew('renzoku');
+    assert.ok(hits >= 2, '2 回 当たる');
+    // 部屋の 敵 みんな
+    a = foe(2); b = foe(4);
+    s.enemies.splice(0, s.enemies.length, a, b);
+    useNew('panic');
+    assert.ok(a.hp < 9999 && b.hp < 9999, '見えている 敵 みんな');
+    // 仲間 みんなに きあい
+    s.enemies.length = 0;
+    useNew('ouendan');
+    assert.ok(p.buffs.kiai && s.allies.every(x => x.buffs.kiai), '近くの 仲間 みんな');
+});

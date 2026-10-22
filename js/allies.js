@@ -19,12 +19,18 @@
     const f = (name, element, range, power, extra = {}) => ({ name, element, range, power, acc: 0.9, pp: 15, ...extra });
 
     // ----- 役職の汎用わざ (どのキャラも覚えられる。ふつうは その役職のキャラが覚える) -----
+    //   2026-10-22 ユーザー指定: 役職ごとに 10 個ずつに ふやして 戦い方の はばを 広げる (ふやした わざの 中身は Claude の 案)
     const GENERIC = {
-        attacker: ['mouda', 'tosshin', 'senpu', 'hissatsu'],
-        defender: ['tate', 'teppeki', 'jinarashi'],
-        healer: ['shizuku', 'megumi'],
-        jammer: ['shibirekona', 'dokubari', 'mekuramashi'],
-        supporter: ['tsubute', 'tankenkan']
+        attacker: ['mouda', 'tosshin', 'senpu', 'hissatsu', 'renzoku', 'drain_atk', 'tsuranuki', 'fukitobashi', 'abaremawaru', 'todome'],
+        defender: ['tate', 'teppeki', 'jinarashi', 'mamori_wa', 'counter', 'shield_bash', 'jiware', 'body_press', 'iwaotoshi', 'tetsu_kabe'],
+        healer: ['shizuku', 'megumi', 'iyashi_hadou', 'refresh', 'drain_kiss', 'seinaru', 'negai_hoshi', 'inori_guard', 'genki_uta', 'hikari_tama'],
+        jammer: ['shibirekona', 'dokubari', 'mekuramashi', 'saimin', 'konran_mai', 'kumo_ito', 'yowarase', 'yakedo_kona', 'kori_ibuki', 'panic'],
+        supporter: ['tsubute', 'tankenkan', 'ouendan', 'warp_jutsu', 'kaze_fuki', 'michishirube', 'boomerang', 'teate', 'kemuridama', 'neraiuchi']
+    };
+    // 属性の 汎用わざ (その 属性の キャラが 覚える。2026-10-22 ユーザー指定)
+    const ELEMENT_SKILLS = {
+        'こおり': ['el_tsurara', 'el_fubuki'], 'ほのお': ['hinoko', 'fire_punch'], 'みず': ['mizudeppou', 'uzushio'], 'しぜん': ['happa_cutter', 'tsuru_muchi'],
+        'かぜ': ['kamaitachi', 'el_tatsumaki'], 'ふしぎ': ['psycho_wave', 'yumekui'], 'ふつう': ['megaton_kick', 'speed_star']
     };
     Object.assign(U.SKILLS, {
         // アタッカー
@@ -46,6 +52,66 @@
         // サポーター
         tsubute: f('つぶてなげ', 'ふつう', 'line', 0.9, { pp: 20, note: '小石を まっすぐ投げる' }),
         tankenkan: { name: 'たんけんのカン', range: 'self', pp: 2, reveal: 'map', note: '階の地図と、道具の場所がわかる' },
+
+        // ----- ふやした 役職の 汎用わざ (2026-10-22。新しい 効果: hits 何回も 当たる / drain 与えた ダメージで 回復 / knock 後ろへ ふきとばす /
+        //   execute HP が 少ない 敵に 2 倍 / useDef ぼうぎょで 攻撃 / warp どこかへ 飛ばす / team 仲間 みんな (近くの 4 マス) /
+        //   cure 状態異常を 治す / buff counter となりからの 攻撃を はね返す。range: pierce 直線で つらぬく / room 見えている 敵 みんな)
+        // アタッカー
+        renzoku: f('れんぞくぎり', 'ふつう', 'front', 0.85, { hits: 2, pp: 12, note: '正面の敵を 2 回 切る' }),
+        drain_atk: f('ドレインアタック', 'ふつう', 'front', 1.3, { drain: 0.5, pp: 10, note: '与えた ダメージの 半分 HP を 回復' }),
+        tsuranuki: f('つらぬき', 'ふつう', 'pierce', 1.1, { pp: 10, note: 'まっすぐ 何体でも つらぬく' }),
+        fukitobashi: f('ふきとばし', 'ふつう', 'front', 1.2, { knock: 3, pp: 12, note: '正面の敵を 3 マス ふきとばす（間合いを とる）' }),
+        abaremawaru: f('あばれまわる', 'ふつう', 'around', 1.6, { acc: 0.8, pp: 6, note: '周りの敵に 強い攻撃。当たりにくい' }),
+        todome: f('とどめのいちげき', 'ふつう', 'front', 1.3, { execute: 0.3, pp: 10, note: 'HP が 3 割より 少ない 敵には 2 倍' }),
+        // ディフェンダー
+        mamori_wa: { name: 'まもりのわ', range: 'self', pp: 4, buff: 'guard', turns: 5, team: true, note: '近くの 仲間 みんなが 5 ターン ダメージ半分' },
+        counter: { name: 'カウンター', range: 'self', pp: 6, buff: 'counter', turns: 6, note: '6 ターン、となりから 受けた ダメージの 半分を はね返す' },
+        shield_bash: f('シールドバッシュ', 'ふつう', 'front', 1.2, { knock: 2, status: 'flinch', chance: 0.3, pp: 12, note: 'たてで おして 2 マス ふきとばす' }),
+        jiware: f('じわれ', 'しぜん', 'around', 1.3, { status: 'flinch', chance: 0.3, pp: 8, note: '周りの 地面を 割って ひるませる' }),
+        body_press: f('ボディプレス', 'ふつう', 'front', 1.6, { useDef: true, pp: 10, note: 'ぼうぎょの 高さで ダメージが 決まる' }),
+        iwaotoshi: f('いわおとし', 'しぜん', 'line', 1.2, { status: 'flinch', chance: 0.3, pp: 12, note: 'まっすぐ 岩を 落とす' }),
+        tetsu_kabe: { name: 'てつのかべ', range: 'self', pp: 3, buff: 'guard', turns: 15, note: '15 ターン、受けるダメージが半分' },
+        // ヒーラー
+        iyashi_hadou: { name: 'いやしのはどう', range: 'self', pp: 6, heal: 0.3, team: true, note: '近くの 仲間 みんなの HP を 3 割 回復' },
+        refresh: { name: 'リフレッシュ', range: 'self', pp: 8, heal: 0.1, cure: true, team: true, note: '近くの 仲間 みんなの 状態異常を 治す' },
+        drain_kiss: f('ドレインキッス', 'ふしぎ', 'front', 1.0, { special: true, drain: 1, pp: 10, note: '与えた ダメージぶん HP を 回復' }),
+        seinaru: f('せいなるひかり', 'ふしぎ', 'line', 1.2, { special: true, pp: 12, note: 'まっすぐ 光の 攻撃' }),
+        negai_hoshi: { name: 'ねがいぼし', range: 'self', pp: 2, heal: 0.7, team: true, note: '近くの 仲間 みんなの HP を 7 割 回復' },
+        inori_guard: { name: 'まもりのいのり', range: 'self', pp: 4, buff: 'guard', turns: 4, team: true, note: '近くの 仲間 みんなが 4 ターン ダメージ半分' },
+        genki_uta: { name: 'げんきのうた', range: 'self', pp: 4, buff: 'kiai', team: true, note: '近くの 仲間 みんなの つぎの 攻撃が 2 倍' },
+        hikari_tama: f('ひかりのたま', 'ふしぎ', 'room', 0.6, { special: true, status: 'blind', chance: 0.3, pp: 6, note: '見えている 敵 みんなに 光の たま' }),
+        // ジャマー
+        saimin: f('さいみんじゅつ', 'ふしぎ', 'front', 0, { acc: 0.75, status: 'sleep', chance: 1, pp: 10, note: '正面の敵を ねむらせる' }),
+        konran_mai: f('こんらんのまい', 'ふしぎ', 'around', 0, { acc: 0.8, status: 'confuse', chance: 1, pp: 8, note: '周りの敵を こんらんさせる' }),
+        kumo_ito: f('くものいと', 'しぜん', 'pierce', 0.4, { status: 'bind', chance: 0.7, pp: 10, note: 'まっすぐ つらぬいて しばる' }),
+        yowarase: f('よわらせのこな', 'しぜん', 'around', 0, { acc: 0.85, status: 'weak', chance: 1, pp: 8, note: '周りの敵を よわきにする（こうげきが 下がる）' }),
+        yakedo_kona: f('やけどのこな', 'ほのお', 'line', 0.4, { status: 'burn', chance: 0.8, pp: 10, note: 'まっすぐ 飛んで やけどにする' }),
+        kori_ibuki: f('こおりのいぶき', 'こおり', 'front', 0.6, { status: 'freeze', chance: 0.6, pp: 8, note: '正面の敵を こおらせる' }),
+        panic: f('ドタバタパニック', 'ふつう', 'room', 0.3, { status: 'confuse', chance: 0.4, pp: 4, note: '見えている 敵 みんなを こんらんさせる' }),
+        // サポーター
+        ouendan: { name: 'おうえんだん', range: 'self', pp: 4, buff: 'kiai', team: true, note: '近くの 仲間 みんなの つぎの 攻撃が 2 倍' },
+        warp_jutsu: f('ワープのじゅつ', 'ふしぎ', 'front', 0, { acc: 0.9, warp: true, pp: 6, note: '正面の敵を どこかへ 飛ばす' }),
+        kaze_fuki: f('ふきとばしかぜ', 'かぜ', 'line', 0.6, { knock: 3, pp: 10, note: 'まっすぐ 風で 3 マス ふきとばす' }),
+        michishirube: { name: 'みちしるべ', range: 'self', pp: 6, reveal: 'stairs', note: '階段の 場所が わかる' },
+        boomerang: f('ブーメラン', 'かぜ', 'pierce', 0.9, { pp: 12, note: 'まっすぐ つらぬいて 戻ってくる' }),
+        teate: { name: 'すばやいてあて', range: 'self', pp: 10, heal: 0.3, note: '自分と となりの仲間の HP を 3 割 回復' },
+        kemuridama: f('けむりだま', 'ふつう', 'around', 0, { acc: 0.9, status: 'blind', chance: 1, pp: 8, note: '周りの敵を 目つぶしにする' }),
+        neraiuchi: f('ねらいうち', 'ふつう', 'line', 1.5, { acc: 1, pp: 8, note: 'まっすぐ。かならず 当たる' }),
+        // ----- 属性の 汎用わざ -----
+        el_tsurara: f('つららおとし', 'こおり', 'line', 1.2, { status: 'freeze', chance: 0.2, pp: 12, note: 'まっすぐ つららを 落とす' }),
+        el_fubuki: f('ふぶき', 'こおり', 'around', 1.1, { special: true, status: 'freeze', chance: 0.2, pp: 8, note: '周りに ふぶき' }),
+        hinoko: f('ひのこ', 'ほのお', 'line', 1.0, { special: true, status: 'burn', chance: 0.3, pp: 15, note: 'まっすぐ 火の粉を 飛ばす' }),
+        fire_punch: f('ほのおのパンチ', 'ほのお', 'front', 1.4, { status: 'burn', chance: 0.2, pp: 12, note: '燃える こぶし' }),
+        mizudeppou: f('みずでっぽう', 'みず', 'line', 1.0, { special: true, pp: 15, note: 'まっすぐ 水を 飛ばす' }),
+        uzushio: f('うずしお', 'みず', 'around', 1.0, { special: true, status: 'bind', chance: 0.3, pp: 8, note: '周りに うずしお。しばることも ある' }),
+        happa_cutter: f('はっぱカッター', 'しぜん', 'pierce', 0.9, { pp: 12, note: 'まっすぐ つらぬく はっぱ' }),
+        tsuru_muchi: f('つるのムチ', 'しぜん', 'front', 1.3, { status: 'bind', chance: 0.2, pp: 12, note: 'つるで たたく' }),
+        kamaitachi: f('かまいたち', 'かぜ', 'line', 1.1, { status: 'flinch', chance: 0.2, pp: 12, note: 'まっすぐ 風の 刃' }),
+        el_tatsumaki: f('たつまき', 'かぜ', 'around', 1.0, { special: true, status: 'confuse', chance: 0.2, pp: 8, note: '周りに たつまき' }),
+        psycho_wave: f('サイコウェーブ', 'ふしぎ', 'line', 1.1, { special: true, status: 'confuse', chance: 0.2, pp: 12, note: 'まっすぐ ふしぎな 波' }),
+        yumekui: f('ゆめくい', 'ふしぎ', 'front', 1.3, { special: true, drain: 0.5, pp: 8, note: '与えた ダメージの 半分 HP を 回復' }),
+        megaton_kick: f('メガトンキック', 'ふつう', 'front', 1.7, { acc: 0.8, pp: 8, note: '当たりにくいが 強い けり' }),
+        speed_star: f('スピードスター', 'ふつう', 'line', 0.9, { acc: 1, pp: 15, note: 'まっすぐ。かならず 当たる' }),
 
         // ----- 固有わざ (そのキャラだけ) -----
         // ストーリーの仲間
@@ -186,8 +252,30 @@
         return x;
     }
     Object.values(ALLIES).forEach(prepare);
+    // ふやした わざを 足す (2026-10-22 ユーザー指定)。役職の 新しい わざ (GENERIC の 5 番目から) から 2 つ、属性の わざから 1 つ。
+    //   どれを えらぶかは キャラの 名前で 決まる (いつも 同じ)。もう 覚える わざは 足さない
+    const NEW_FROM = { attacker: 4, defender: 3, healer: 2, jammer: 3, supporter: 2 };
+    const pickBy = (list, seed, n) => {
+        const out = [], pool = [...list];
+        for (let i = 0; i < n && pool.length; i++) out.push(pool.splice((seed + i * 7) % pool.length, 1)[0]);
+        return out;
+    };
+    function enrich(kind) {
+        const x = ALLIES[kind];
+        const e = U.ENEMIES[kind];
+        if (!x || !e || x.enriched) return;
+        x.enriched = true;
+        const role = x.role || e.role || 'attacker';
+        const seed = [...kind].reduce((n, ch) => n + ch.charCodeAt(0), 0);
+        const have = new Set(x.learn.map(([, id]) => id));
+        const roleNew = (GENERIC[role] || GENERIC.attacker).slice(NEW_FROM[role] || 0).filter(id => !have.has(id));
+        const picks = [...pickBy(roleNew, seed, 2), ...pickBy((ELEMENT_SKILLS[e.element] || []).filter(id => !have.has(id)), seed, 1)];
+        [12, 24, 36].forEach((lv, i) => { if (picks[i]) x.learn.push([lv, picks[i]]); });
+        x.learn.sort((p, q) => p[0] - q[0]);
+    }
+    Object.keys(ALLIES).forEach(enrich);
     // あとから足す (段階 9 の敵。enemies9.js)。list: { kind: [star, w, learn, role?] }
-    const add = list => Object.entries(list).forEach(([kind, [star, w, learn, role]]) => { ALLIES[kind] = prepare(a(star, w, learn, role)); });
+    const add = list => Object.entries(list).forEach(([kind, [star, w, learn, role]]) => { ALLIES[kind] = prepare(a(star, w, learn, role)); enrich(kind); });
 
     // ----- ★ -----
     const HERO_STARS = { koori: 5, onioni: 5, yasu: 4, tamu: 4, dake: 4 };
@@ -226,11 +314,15 @@
 
     U.enemyAllySkillsOld = U.enemyAllySkills;
     Object.assign(U, { allyStats, enemyAllySkills, learnedBetween });
-    KD.Allies = { ALLIES, GENERIC, LEADERS, HERO_STARS, STAR_K, RECRUIT_RATE, recruitRate, star, roleOf, learnList, signature, add };
+    KD.Allies = { ALLIES, GENERIC, ELEMENT_SKILLS, LEADERS, HERO_STARS, STAR_K, RECRUIT_RATE, recruitRate, star, roleOf, learnList, signature, add };
 
     // ストーリーの仲間の わざを足す (役職の汎用わざ・固有わざ)
-    U.HEROES.yasu.learn.push([6, 'shizuku'], [14, 'yasu_aid'], [24, 'tsubute'], [36, 'megumi']);
-    U.HEROES.tamu.learn.push([6, 'shibirekona'], [14, 'tamu_trap'], [24, 'mouda'], [36, 'mekuramashi']);
-    U.HEROES.dake.learn.push([6, 'tate'], [14, 'dake_buster'], [24, 'teppeki'], [36, 'jinarashi']);
+    U.HEROES.yasu.learn.push([6, 'shizuku'], [14, 'yasu_aid'], [18, 'iyashi_hadou'], [24, 'tsubute'], [30, 'refresh'], [36, 'megumi'], [44, 'negai_hoshi']);
+    U.HEROES.tamu.learn.push([6, 'shibirekona'], [14, 'tamu_trap'], [18, 'saimin'], [24, 'mouda'], [30, 'kumo_ito'], [36, 'mekuramashi'], [44, 'panic']);
+    U.HEROES.dake.learn.push([6, 'tate'], [14, 'dake_buster'], [18, 'mamori_wa'], [24, 'teppeki'], [30, 'counter'], [36, 'jinarashi'], [44, 'body_press']);
+    // こおりくん・おにおにも (2026-10-22 ユーザー指定: わざを ふやす)
+    U.HEROES.koori.learn.push([10, 'el_tsurara'], [16, 'renzoku'], [22, 'el_fubuki'], [30, 'todome'], [40, 'tsuranuki']);
+    U.HEROES.onioni.learn.push([10, 'fire_punch'], [16, 'fukitobashi'], [22, 'hinoko'], [30, 'abaremawaru'], [40, 'drain_atk']);
+    Object.values(U.HEROES).forEach(h => h.learn.sort((p, q) => p[0] - q[0]));
     void C;
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);

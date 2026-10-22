@@ -33,7 +33,7 @@
     const TACTICS = { fight: 'みんなで戦う', follow: 'ついてきて', flee: 'にげて' };
     const DIRS8 = [[0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]];
     const FONT = '"BIZ UDPGothic", "Yu Gothic", sans-serif';
-    const RANGE_NAMES = { front: '正面', line: '直線', around: '周り', self: '自分' };
+    const RANGE_NAMES = { front: '正面', line: '直線', around: '周り', self: '自分', pierce: 'つらぬく', room: '部屋の敵みんな' };
     const ELEMENT_COLORS = { 'こおり': '#bff0ff', 'ほのお': '#ff9a4a', 'みず': '#6ab8ff', 'しぜん': '#9ae07a', 'かぜ': '#e8f4ff', 'ふしぎ': '#d8a8ff', 'ふつう': '#ffffff' };
 
     // ダンジョン 7 つ (仕様書 12章。dungeons.js)。床の道具・ワナの種類は どこも同じ
@@ -1089,7 +1089,18 @@
 
         // まっすぐ届く敵に、直線のわざを撃つ
         function shootLine(a, foes) {
-            const sk = usable(a, m => m.range === 'line');
+            // つらぬく わざは 2 体 以上 ならんでいたら 先に
+            const pierce = usable(a, m => m.range === 'pierce' && m.power > 0);
+            if (pierce) {
+                const lined = foes.filter(e => lineTo(a, e));
+                const t = lined.find(e => foes.filter(f => f !== e && Math.sign(f.x - a.x) === Math.sign(e.x - a.x) && Math.sign(f.y - a.y) === Math.sign(e.y - a.y) && lineTo(a, f)).length);
+                if (t) {
+                    face(a, t.x - a.x, t.y - a.y);
+                    state.queue.push(() => allySkill(a, pierce, t));
+                    return true;
+                }
+            }
+            const sk = usable(a, m => m.range === 'line' || m.range === 'pierce');
             const t = sk && foes.find(e => lineTo(a, e));
             if (!t) return false;
             face(a, t.x - a.x, t.y - a.y);
@@ -1107,9 +1118,32 @@
                 return true;
             };
             // 回復: いちばん たくさん回復するわざから
-            const heals = a.skills.filter(k => k.pp > 0 && U.SKILLS[k.id].heal).sort((x, y) => U.SKILLS[y.id].heal - U.SKILLS[x.id].heal);
+            const heals = a.skills.filter(k => k.pp > 0 && U.SKILLS[k.id].heal && !U.SKILLS[k.id].cure).sort((x, y) => U.SKILLS[y.id].heal - U.SKILLS[x.id].heal);
             const hurt = party().filter(u => cheb(u, a) <= 1 && u.hp > 0 && u.hp < u.stats.hp * 0.5);
+            // 近くの 仲間 みんなを 回復する わざ: 2 人 以上 けがを していたら
+            const teamHeal = heals.find(k => U.SKILLS[k.id].team);
+            const hurtNear = party().filter(u => cheb(u, a) <= 4 && u.hp > 0 && u.hp < u.stats.hp * 0.5);
+            if (teamHeal && hurtNear.length >= 2) return use(teamHeal);
             if (heals.length && hurt.length) return use(hurt.some(u => u.hp < u.stats.hp * 0.25) ? heals[0] : heals[heals.length - 1]);
+            // 状態異常を 治す
+            const cure = has(m => m.cure);
+            if (cure && party().filter(u => cheb(u, a) <= 4 && u.hp > 0 && u.status).length >= 1 && rng.chance(0.6)) return use(cure);
+            // 部屋の 敵 みんなへの わざ: 3 体 以上 見えていたら
+            const room = has(m => m.range === 'room');
+            if (room && foes.length >= 3 && rng.chance(0.4)) return use(room);
+            // カウンター・仲間 みんなの まもり／きあい
+            const counter = has(m => m.buff === 'counter');
+            if (counter && adj.length >= 2 && !a.buffs.counter && rng.chance(0.4)) return use(counter);
+            const teamBuff = has(m => m.team && m.buff);
+            if (teamBuff && foes.length >= 2 && party().filter(u => cheb(u, a) <= 4).length >= 2 && rng.chance(0.2)) return use(teamBuff);
+            // あぶない ときは 敵を ふきとばす・どこかへ 飛ばす
+            const away = has(m => (m.warp || m.knock) && m.range === 'front');
+            if (away && adj.length && a.hp < a.stats.hp * 0.35) {
+                const t = adj[0];
+                face(a, t.x - a.x, t.y - a.y);
+                state.queue.push(() => allySkill(a, away, t));
+                return true;
+            }
             const guard = has(m => m.buff === 'guard');
             if (guard && adj.length && !a.buffs.guard && a.hp < a.stats.hp * 0.7) return use(guard);
             const jam = has(m => m.range === 'around' && m.status && !m.power);
@@ -1126,7 +1160,7 @@
         function allySkill(a, k, t) {
             const mv = U.SKILLS[k.id];
             if (a.hp <= 0 || k.pp <= 0 || state.over) return 0;
-            if (t && (t.hp <= 0 || (mv.range === 'front' && !canHit(a, t)) || (mv.range === 'line' && !lineTo(a, t)))) return 0;
+            if (t && (t.hp <= 0 || (mv.range === 'front' && !canHit(a, t)) || ((mv.range === 'line' || mv.range === 'pierce') && !lineTo(a, t)))) return 0;
             k.pp--;
             return useMove(a, k.id, t ? [Math.sign(t.x - a.x), Math.sign(t.y - a.y)] : a.dir);
         }
@@ -1273,6 +1307,7 @@
                     if (u.hp <= 0) continue;
                 }
                 if (u.buffs.guard && --u.buffs.guard === 0 && u.side === 'party') say(`${u.name}の まもりのかまえが 切れた。`);
+                if (u.buffs.counter) u.buffs.counter--;
                 if (!u.status) continue;
                 if (u.status.id === 'poison' || u.status.id === 'burn') {
                     const n = Math.max(1, Math.floor(u.stats.hp / (u.status.id === 'poison' ? 16 : 20)));
@@ -1304,8 +1339,8 @@
         }
 
         // a が t に与えるダメージ (属性の相性・同じ属性・きあいため・まもりのかまえ・やけど・よわき・凶暴)
-        function deal(a, t, { power = 1, element = null, special = false } = {}) {
-            let atk = special ? a.stats.spa : a.stats.atk;
+        function deal(a, t, { power = 1, element = null, special = false, useDef = false } = {}) {
+            let atk = useDef ? a.stats.def : special ? a.stats.spa : a.stats.atk;
             const def = special ? t.stats.spd : t.stats.def;
             if (hasStatus(a, 'weak')) atk *= 0.7;
             if (hasStatus(a, 'burn') && !special) atk *= 0.8;
@@ -1364,6 +1399,19 @@
                 return [];
             }
             if (range === 'around') return [...party(), ...state.enemies].filter(t => foe(t) && canHit(u, t));
+            // つらぬく: 壁まで まっすぐ、何体でも (2026-10-22)
+            if (range === 'pierce') {
+                const out = [];
+                for (let i = 0, x = u.x, y = u.y; i < LINE_RANGE && D.canMove(state.map, x, y, dx, dy); i++) {
+                    x += dx;
+                    y += dy;
+                    const t = unitAt(x, y);
+                    if (t && foe(t)) out.push(t);
+                }
+                return out;
+            }
+            // 部屋の 敵 みんな: 見えていて 6 マス以内 (仲間が 使うとき)。敵が 使うときは 探検隊
+            if (range === 'room') return u.side === 'party' ? state.enemies.filter(e => e.hp > 0 && state.visible[idx(e.x, e.y)] && cheb(e, u) <= 6) : party().filter(t => t.hp > 0 && cheb(t, u) <= 6);
             return [];
         }
 
@@ -1394,7 +1442,9 @@
             const targets = targetsOf(u, mv.range, u.dir);
             const color = ELEMENT_COLORS[mv.element] || '#ffffff';
             if (mv.range === 'line') state.shots.push({ from: [u.x, u.y], to: targets[0] ? [targets[0].x, targets[0].y] : lineEnd(u, u.dir), at: performance.now(), ms: SHOOT_MS, color });
+            if (mv.range === 'pierce') state.shots.push({ from: [u.x, u.y], to: pierceEnd(u, u.dir), at: performance.now(), ms: SHOOT_MS, color });
             if (mv.range === 'around') state.rings.push({ x: u.x, y: u.y, at: performance.now(), color });
+            if (mv.range === 'room') targets.forEach(t => state.rings.push({ x: t.x, y: t.y, at: performance.now(), color }));
             if (!targets.length) say('しかし だれにも 当たらなかった。');
             for (const t of targets) {
                 if (t.hp <= 0) continue;
@@ -1403,8 +1453,22 @@
                     popup(t, 'MISS', '#c8d8e8');
                     continue;
                 }
+                if (mv.warp) {
+                    warpUnit(t);
+                    say(`${t.name}は どこかへ 飛ばされた！`);
+                    continue;
+                }
+                // 何回も 当たる (れんぞくぎり など)
+                for (let n = 1; n < (mv.hits || 1) && mv.power > 0 && t.hp > 0; n++) {
+                    const { dmg } = deal(u, t, mv);
+                    say(`${t.name}に ${dmg} のダメージ！`);
+                    hurt(t, dmg, u);
+                    if (mv.drain) drainHeal(u, dmg, mv.drain);
+                }
+                if (t.hp <= 0) continue;
                 if (mv.power > 0) {
-                    const { dmg, eff } = deal(u, t, mv);
+                    // とどめ: HP が 少ない 敵には 2 倍
+                    const { dmg, eff } = deal(u, t, mv.execute && t.hp < t.stats.hp * mv.execute ? { ...mv, power: mv.power * 2 } : mv);
                     // ミラーマッスル: わざを はね返すことがある
                     if (has(t, 'reflect') && rng.chance(0.3)) {
                         const back = Math.max(1, Math.round(dmg / 2));   // はね返すのは 半分
@@ -1415,14 +1479,57 @@
                     }
                     say(`${t.name}に ${dmg} のダメージ！${effText(eff)}`);
                     hurt(t, dmg, u);
+                    if (mv.drain) drainHeal(u, dmg, mv.drain);
                 }
                 if (t.hp > 0 && mv.status && rng.chance(mv.chance)) inflict(t, mv.status, mv.power === 0);
+                if (t.hp > 0 && mv.knock) knockBack(t, u.dir, mv.knock);
             }
-            return mv.range === 'line' ? SHOOT_MS : ATTACK_MS;
+            return mv.range === 'line' || mv.range === 'pierce' ? SHOOT_MS : ATTACK_MS;
         }
+
+        // 与えた ダメージで 回復 (ドレイン)
+        function drainHeal(u, dmg, rate) {
+            const n = Math.min(u.stats.hp - u.hp, Math.max(1, Math.round(dmg * rate)));
+            if (n <= 0) return;
+            u.hp += n;
+            popup(u, `+${n}`, '#7ae07a');
+            say(`${u.name}の HP が ${n} 回復した！`);
+        }
+        // ふきとばす: 向きの ほうへ n マス (壁・ほかの キャラで 止まる)
+        function knockBack(t, [dx, dy], n) {
+            let k = 0;
+            while (k < n && D.canMove(state.map, t.x, t.y, dx, dy) && !occupied(t.x + dx, t.y + dy)) {
+                moveUnit(t, dx, dy, 60);
+                k++;
+            }
+            if (k) say(`${t.name}は ふきとばされた！`);
+        }
+        // つらぬく わざの 止まる マス
+        function pierceEnd(u, [dx, dy]) {
+            let x = u.x, y = u.y;
+            for (let i = 0; i < LINE_RANGE && D.canMove(state.map, x, y, dx, dy); i++) {
+                x += dx;
+                y += dy;
+            }
+            return [x, y];
+        }
+        // team の わざが 届く 仲間 (自分と 4 マス以内)。team で なければ 自分と となり
+        const helpRange = (u, mv) => (u.side === 'party' ? party().filter(t => t.hp > 0 && cheb(t, u) <= (mv.team ? 4 : 1)) : [u]);
 
         // 自分に使うわざ (役職のわざ)
         function selfMove(u, mv) {
+            if (mv.team && mv.buff) {
+                // 仲間 みんなに (まもりのわ・げんきのうた など)
+                helpRange(u, mv).forEach(t => {
+                    if (mv.buff === 'kiai') t.buffs.kiai = true;
+                    else t.buffs.guard = Math.max(t.buffs.guard || 0, mv.turns || GUARD_TURNS);
+                });
+                return say(mv.buff === 'kiai' ? '近くの 仲間 みんなの つぎの 攻撃が 2 倍に なった！' : '近くの 仲間 みんなが まもりを かためた！');
+            }
+            if (mv.buff === 'counter') {
+                u.buffs.counter = mv.turns || 6;
+                return say(`${u.name}は カウンターの かまえ！`);
+            }
             if (mv.buff === 'kiai') {
                 u.buffs.kiai = true;
                 say(`${u.name}は きあいを ためた！ つぎの攻撃は 2 倍だ。`);
@@ -1430,8 +1537,8 @@
                 u.buffs.guard = mv.turns || GUARD_TURNS;
                 say(`${u.name}は まもりを かためた！`);
             } else if (mv.heal) {
-                // 自分と、となりの仲間 (ヒーラーのわざ)
-                const list = u.side === 'party' ? party().filter(t => t.hp > 0 && cheb(t, u) <= 1) : [u];
+                // 自分と、となりの仲間 (ヒーラーのわざ)。team なら 近くの 仲間 みんな
+                const list = helpRange(u, mv);
                 list.forEach(t => {
                     const n = Math.min(t.stats.hp - t.hp, Math.round(t.stats.hp * mv.heal));
                     t.hp += n;
@@ -1468,6 +1575,12 @@
 
         function hurt(t, n, from) {
             t.hp = Math.max(0, t.hp - n);
+            if (t.buffs && t.buffs.counter && from && from !== t && from.hp > 0 && cheb(t, from) <= 1 && t.hp > 0) {
+                const back = Math.max(1, Math.round(n / 2));
+                say(`${t.name}の カウンター！ ${from.name}に ${back} のダメージ！`);
+                t.buffs.counter = 0;   // 1 回 はね返したら おわり (はね返しあいに ならないように)
+                hurt(from, back, t);
+            }
             t.hurtAt = performance.now();
             popup(t, String(n), t.side === 'party' ? '#ff8a8a' : '#ffffff');
             if (hasStatus(t, 'freeze') && rng.chance(0.5)) {

@@ -66,7 +66,7 @@
     <h1>キャラ図鑑</h1>
     <p>ゲームに出るキャラの絵です。ゲームと同じ絵を大きくして描いています（動いているのは待機のアニメーション）。</p>
     <p>仲間になれるキャラには、仲間のときの ★・役職・能力の振り分け（Lv30 のとき。<span style="color:#ffd84a">黄色</span>は とくに高い能力）・覚えるわざ を出しています。
-        わざは <span style="color:#ffb0c8;font-weight:bold">ピンク＝そのキャラだけの わざ</span>・<span style="color:#9ad8ff">水色＝役職の汎用わざ</span>（かっこの中は その役職）・白＝敵のときの わざ。</p>
+        わざは <span style="color:#ffb0c8;font-weight:bold">ピンク＝そのキャラだけの わざ</span>・<span style="color:#9ad8ff">水色＝役職・属性の汎用わざ</span>（かっこの中は その役職・属性）・白＝敵のときの わざ。</p>
     <p>前作（スロット・パチンコ）に 出た キャラには、前作の 図鑑の 説明を もとにした 説明を のせています（js/profiles.js）。</p>
     <nav id="nav"></nav>
     <div id="sections"></div>
@@ -79,7 +79,7 @@
 <script src="../js/items.js?v=2dc93420"></script>
 <script src="../js/dungeons.js?v=87bf375c"></script>
 <script src="../js/collection.js?v=60fb5715"></script>
-<script src="../js/allies.js?v=e19c60c5"></script>
+<script src="../js/allies.js?v=705b2a4c"></script>
 <script src="../js/enemies9.js?v=9dffc81b"></script>
 <script src="../js/enemies10.js?v=5cfe54c6"></script>
 <script src="../js/enemies11.js?v=4cd5c7ea"></script>
@@ -111,6 +111,8 @@
     const skillName = id => (U.SKILLS[id] ? U.SKILLS[id].name : id);
     const AL = KD.Allies;
     const GENERIC_ROLE = Object.fromEntries(Object.entries(AL.GENERIC).flatMap(([role, ids]) => ids.map(id => [id, role])));
+    // 属性の 汎用わざ (2026-10-22)
+    const GENERIC_ELEMENT = Object.fromEntries(Object.entries(AL.ELEMENT_SKILLS || {}).flatMap(([el, ids]) => ids.map(id => [id, el])));
     // 敵のときに使う わざ (白で出す)
     const ENEMY_MOVES = new Set(Object.values(U.ENEMIES).flatMap(e => (e.moves || []).map(([m]) => m)).concat(Object.values(U.ENEMIES).map(e => e.move).filter(Boolean)));
     // 仲間のときの ★・役職・能力 (Lv30)・覚えるわざ
@@ -121,8 +123,9 @@
         const st = U.allyStats(kind, 30, role);
         const learn = AL.learnList(kind).map(([lv, id]) => {
             const g = GENERIC_ROLE[id];
-            const cls = g ? 'gen' : ENEMY_MOVES.has(id) && !U.HEROES[kind] ? '' : 'own';
-            return { lv, name: skillName(id) + (g && g !== role ? `（${U.ROLES[g].name}）` : ''), cls };
+            const el = GENERIC_ELEMENT[id];
+            const cls = g || el ? 'gen' : ENEMY_MOVES.has(id) && !U.HEROES[kind] ? '' : 'own';
+            return { lv, name: skillName(id) + (g && g !== role ? `（${U.ROLES[g].name}）` : el ? `（${el}）` : ''), cls };
         });
         return { star, role, st, learn };
     }
