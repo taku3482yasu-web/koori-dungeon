@@ -218,6 +218,10 @@ try {
     await key('KeyC', 67);
     await press('.ask-choices button', { text: 'こおりくん' });
     check(await evaluate('window.kdGame.state.player.kind') === 'koori', 'C キーで 主人公に もどす');
+    // 必殺技 (2026-10-22): ボタンで だれが 使うか えらぶ 画面
+    await press('#btn-special');
+    check(/必殺技（チームで あと 3 回/.test(await asking()), '「必殺技」ボタンで 必殺技の 画面');
+    await press('.ask-choices button', { text: 'やめる' });
     await press('#btn-map');
     await press('#btn-sound');
     check(/音の設定/.test(await asking()), '「音」ボタンで 音の設定');

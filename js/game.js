@@ -23,6 +23,7 @@
     const STEP_MS = 110, DASH_MS = 45;            // 1 マス動くのにかける時間 (ふつう・ダッシュ)
     const FADE_MS = 1100;                         // 階が変わるときの暗転
     const ATTACK_MS = 240, SHOOT_MS = 300;        // 攻撃 1 回を見せる時間
+    const SPECIAL_CUTIN_MS = 1400, SPECIAL_FX_MS = 1100;   // 必殺技: カットインと エフェクトを 見せる時間
     const PASS_MS = 380;                          // 動けないターン (ねむり・まひ など) を見せる時間
     const SPAWN_EVERY = 36, MAX_ENEMIES = 10;     // 敵が増える間かく (ターン)・1 つの階にいる敵の最大
     const SHOOT_RANGE = 6;                        // 「撃つ」敵の届くマス数
@@ -43,6 +44,13 @@
     const sfx = name => KD.Sound && KD.Sound.play(name);
     // ダンジョンの BGM (ボスが起きたら boss)。曲は ダンジョンごと (sound.js の SONGS。名前は ダンジョンの id)。
     //   ドタバタ大迷宮は その階の 見た目の ダンジョン (segment) の 曲
+    // ダンジョンの中の 決まり文句 (dungeons.js の DUNGEON_LINES)。vars で {item} などを うめる
+    function dline(key, vars = {}) {
+        let s = DG.DUNGEON_LINES[key];
+        if (typeof s !== 'string') s = s[(heroUnitRef() || {}).kind] || s.koori;
+        return Object.entries(vars).reduce((t, [k, v]) => t.split(`{${k}}`).join(v), s);
+    }
+    let heroUnitRef = () => null;   // createGame の 中で 主人公を 返すように する
     const songOf = d => [d.segment, d.id, d.bgm].find(n => n && KD.Sound && KD.Sound.SONGS[n]) || 'forest';
 
     // opts (テスト用): enemies: false で敵を出さない・things: false で道具とワナを置かない・partner: false で最初の仲間なし・
@@ -90,6 +98,8 @@
             house: -1,        // モンスターハウスの部屋 (入ると 敵がいっせいに起きる)
             shots: [],        // 飛んでいくわざ
             rings: [],        // 周りに当たるわざ
+            bigfx: [],        // 必殺技の エフェクト: { type, range, x, y, to, targets, at, ms, color }
+            specials: { used: {}, count: 0 },   // この ダンジョンで 使った 必殺技 (used: キャラの 種類 → true。count: チームで 使った 回数)
             fade: null,       // { at, label, then }
             mini: true,
             seed: opts.seed || (Date.now() ^ (Math.random() * 1e9)) >>> 0,
@@ -156,6 +166,7 @@
         // ----- 操作するキャラの切りかえ (2026-10-22 ユーザー指定) -----
         // state.player は「いま操作しているキャラ」。主人公は hero: true のキャラ (操作していないときは state.allies の中で 自分で考えて動く)。
         // 道具袋・お金・満腹度は チームで共有 (主人公のものを使う)。主人公がたおれたら 失敗なのは そのまま
+        heroUnitRef = () => heroUnit();
         const heroUnit = () => (state.player && state.player.hero ? state.player : state.allies.find(a => a.hero) || state.fallen.find(a => a.hero) || state.player);
         // 仲間が 主人公の 道具袋・お金・満腹度を 使えるようにする
         function shareTeam(u, hero) {
@@ -305,7 +316,7 @@
                     e.team = team;
                     state.enemies.push(e);
                 });
-                say(`ハプニング！ ライバル探検隊「${team}」が この階に いるらしい……`);
+                say(dline('rivalNear', { team }));
             } else if (id === 'treasure') {
                 for (let i = rng.int(6, 9); i > 0; i--) {
                     const spot = free();
@@ -321,20 +332,20 @@
                 say('ハプニング！ ふるカワから 通信だ。');
                 if (p.bag.length < I.BAG_MAX) {
                     p.bag.push({ id: gift, n: 1 });
-                    say(`ふるカワ「がんばってね！ ${I.ITEMS[gift].name}を 送るよ！」`);
+                    say(dline('furukawaGift', { item: I.ITEMS[gift].name }));
                 } else {
                     state.explored[idx(state.map.stairs.x, state.map.stairs.y)] = 1;
-                    say('ふるカワ「荷物が いっぱいだね。かわりに 階段の場所を 教えるよ！」');
+                    say(dline('furukawaFull'));
                 }
             } else if (id === 'collect') {
                 // おにおにの取り立て: 持っているお金の 2 割を、借金の返済に
                 const n = Math.floor(p.money * 0.2);
-                say('ハプニング！ おにおにの声「金返せ！」');
+                say(dline('oniCall'));
                 if (n > 0) {
                     p.money -= n;
                     town.repay(n);
                     say(`${n}えん 借金の返済に 取られた……（借金は 減った）`);
-                } else say('おにおに「……なんだ、持ってないのか」');
+                } else say(dline('oniEmpty'));
             } else if (id === 'house') {
                 // モンスターハウス (仕様書 4.3): 入るまで ねむっている
                 for (let i = rng.int(6, 9); i > 0; i--) {
@@ -453,6 +464,7 @@
         function startDungeon(id, floor = 1) {
             state.dungeon = DUNGEONS.find(d => d.id === id) || DUNGEONS[0];
             refresh();
+            state.specials = { used: {}, count: 0 };   // 必殺技は ダンジョンごとに 1 人 1 回・チームで 3 回
             state.seed = (Date.now() ^ (Math.random() * 1e9) ^ state.seed) >>> 0;
             if (opts.seed) state.seed = (opts.seed + (state.town ? state.town.day - 1 : 0)) >>> 0;
             state.phase = 'play';
@@ -476,7 +488,7 @@
             const base = state.dungeon.base || state.dungeon;
             return {
                 v: 1, dungeon: base.id, floor: state.floor, seed: state.seed, turn: state.turn, shiftAt: state.shiftAt || 0,
-                house: state.house, bossDown: Boolean(state.bossDown),
+                house: state.house, bossDown: Boolean(state.bossDown), specials: state.specials,
                 map: { w: state.map.w, h: state.map.h, tiles: Array.from(state.map.tiles), roomAt: Array.from(state.map.roomAt), rooms: state.map.rooms, start: state.map.start, stairs: state.map.stairs },
                 explored: Array.from(state.explored).join(''),
                 enemies: plain(state.enemies.map(e => ({ ...e, anim: null, lunge: null }))),
@@ -504,6 +516,8 @@
             state.shiftAt = snap.shiftAt;
             state.house = snap.house;
             state.bossDown = snap.bossDown;
+            state.specials = snap.specials || { used: {}, count: 0 };
+            state.bigfx = [];
             state.queue = [];
             state.dying = [];
             state.bubbles = [];
@@ -671,7 +685,7 @@
         function restStop(n) {
             if (state.over || state.floor !== n) return;
             if (state.town) town.bonusRest(n);
-            const lines = (state.dungeon.story.rest || {})[n] || ['ふるカワ「休憩の階だよ。ここで ひと休みしよう！」'];
+            const lines = (state.dungeon.story.rest || {})[n] || [dline('restDefault')];
             talk(lines, () => ui.ask(`休憩の階（B${n}F）。次は ここから 始められる。どうする？`, ['先へ進む', '町に帰る'], i => {
                 if (i === 1) backToTown('rest', { floor: n });
             }));
@@ -701,7 +715,7 @@
                 const c = addNear(SHITENNO[e.called], Math.max(1, e.lv - 4), e.x, e.y);
                 e.called++;
                 if (!c) continue;
-                say(`${e.name}「出でよ、四天王！」 ${c.name}が よみがえった！`);
+                say(dline('shinSummon', { boss: e.name, name: c.name }));
                 state.rings.push({ x: c.x, y: c.y, at: performance.now(), color: '#d8a8ff' });
                 // カットイン: よみがえった四天王
                 state.cutin = { kind: c.kind, name: c.name, sub: '四天王 よみがえる！', color: '#d8a8ff', at: performance.now() };
@@ -970,7 +984,7 @@
             const kind = U.ENEMIES[e.kind].summon || rng.pick(DG.tableFor(state.dungeon, state.floor));
             const c = addNear(kind, Math.max(1, e.lv - 2), e.x, e.y);
             if (!c) return 0;
-            say(`${e.name}「${e.boss ? '出でよ！' : U.ENEMIES[e.kind].line}」 ${c.name}が 現れた！`);
+            say(`${e.name}「${e.boss ? dline('bossSummon') : U.ENEMIES[e.kind].line}」 ${c.name}が 現れた！`);
             state.rings.push({ x: c.x, y: c.y, at: performance.now(), color: '#d8a8ff' });
             return ATTACK_MS;
         }
@@ -1538,7 +1552,7 @@
             }
             // ライバル探検隊: みんな たおしたら
             if (e.team && !state.enemies.some(o => o.team === e.team)) {
-                say(`${e.team}「覚えてろ～！」 ライバル探検隊を やっつけた！`);
+                say(dline('rivalDown', { team: e.team }));
                 if (state.town) town.stat('rivals');
             }
             // ドタバタ大迷宮の 50 階: 2 チームとも たおしたら 休憩の階に
@@ -1843,7 +1857,7 @@
             } else if (tr.id === 'debt') {
                 const n = Math.min(p.money, Math.max(10, Math.floor(p.money * 0.1)));
                 p.money -= n;
-                say(n ? `おにおにの声「金返せ！」 ${n}えん 取られた…` : 'おにおにの声「金返せ！」 …でも、お金を持っていなかった。');
+                say(n ? dline('oniTake', { money: n }) : dline('oniTakeEmpty'));
             }
             return PASS_MS;
         }
@@ -2095,6 +2109,248 @@
             });
         }
 
+// ----- 必殺技 (2026-10-22 ユーザー指定。js/specials.js) -----
+        // ダンジョンで 1 人 1 回・チームで 3 回。えらんだ 仲間が その場から 放つ (ターンを 使う)
+        function specialFor(u) {
+            const e = U.ENEMIES[u.kind];
+            return KD.Specials.of(u.kind, { element: u.element, role: u.role, line: e ? e.line : '' });
+        }
+        function specialMenu() {
+            if (busy() || !KD.Specials) return;
+            const left = KD.Specials.MAX_TEAM - state.specials.count;
+            if (left <= 0) return say(`必殺技は この ダンジョンでは もう 使えない！（チームで ${KD.Specials.MAX_TEAM} 回まで）`);
+            const list = party().filter(u => u.hp > 0);
+            ui.ask(`必殺技（チームで あと ${left} 回・1 人 1 回）\nだれが 使う？`,
+                [...list.map(u => `${u.name}：${specialFor(u).name}${state.specials.used[u.kind] ? '（使った）' : ''}`), 'やめる'], i => {
+                    if (i >= list.length) return;
+                    const u = list[i];
+                    if (state.specials.used[u.kind]) return say(`${u.name}は この ダンジョンで もう 必殺技を 使った。`);
+                    playerTurn(() => special(u));
+                }, { list: true });
+        }
+        // 放つ: カットインを 見せてから (specialHit)
+        function special(u) {
+            const sp = specialFor(u);
+            state.specials.used[u.kind] = true;
+            state.specials.count++;
+            // 正面・直線の 技は いちばん 近い 見えている 敵の ほうを 向く
+            const foes = state.enemies.filter(e => e.hp > 0 && state.visible[idx(e.x, e.y)]).sort((a, b) => cheb(a, u) - cheb(b, u));
+            if ((sp.range === 'front' || sp.range === 'pierce') && foes[0]) face(u, foes[0].x - u.x, foes[0].y - u.y);
+            say(`${u.name}の 必殺技！「${sp.name}」！`);
+            bubble(u, sp.shout);
+            state.cutin = { kind: u.kind, name: sp.name, sub: `${u.name}の 必殺技！`, shout: sp.shout, color: sp.color, at: performance.now(), special: true };
+            sfx('boss');
+            if (state.town) town.stat('specials');
+            state.queue.unshift(() => specialHit(u, sp));
+            return SPECIAL_CUTIN_MS;
+        }
+        function specialTargets(u, sp) {
+            const foes = state.enemies.filter(e => e.hp > 0 && state.visible[idx(e.x, e.y)]);
+            const [dx, dy] = u.dir;
+            if (sp.range === 'room') return { targets: foes.filter(e => cheb(e, u) <= 7), to: [u.x, u.y] };
+            if (sp.range === 'around2') return { targets: foes.filter(e => cheb(e, u) <= 2), to: [u.x, u.y] };
+            if (sp.range === 'front') {
+                const t = enemyAt(u.x + dx, u.y + dy) || foes.find(e => cheb(e, u) === 1);
+                return { targets: t ? [t] : [], to: t ? [t.x, t.y] : [u.x + dx, u.y + dy] };
+            }
+            // pierce: 壁まで まっすぐ (敵を つらぬく)
+            const hit = [];
+            let x = u.x, y = u.y;
+            for (let i = 0; i < 10 && D.canMove(state.map, x, y, dx, dy); i++) {
+                x += dx;
+                y += dy;
+                const e = enemyAt(x, y);
+                if (e && e.hp > 0) hit.push(e);
+            }
+            return { targets: hit, to: [x, y] };
+        }
+        function specialHit(u, sp) {
+            const { targets, to } = specialTargets(u, sp);
+            const now = performance.now();
+            state.bigfx.push({ type: sp.fx, range: sp.range, x: u.x, y: u.y, to, dir: u.dir, targets: targets.map(t => [t.x, t.y]), at: now, ms: SPECIAL_FX_MS, color: sp.color });
+            u.lunge = { at: now, dir: u.dir };
+            flash(sp.fx === 'flash' || sp.fx === 'moon' ? 'rgba(255,255,255,.7)' : 'rgba(255,240,180,.5)');
+            shake(sp.range === 'around2' || sp.fx === 'quake' || sp.range === 'front' ? 6 : 4);
+            sfx('skill');
+            if (!targets.length && sp.power) say('しかし だれにも 当たらなかった。');
+            for (const t of targets) {
+                if (t.hp <= 0) continue;
+                const { dmg, eff } = deal(u, t, { power: sp.power, element: sp.element, special: u.stats.spa >= u.stats.atk });
+                say(`${t.name}に ${dmg} のダメージ！${effText(eff)}`);
+                hurt(t, dmg, u);
+                if (t.hp > 0 && sp.status && rng.chance(sp.chance)) inflict(t, sp.status, false);
+            }
+            // おまけ: 仲間 みんなを 回復・まもりの かまえ・きあいため
+            const team = party().filter(t => t.hp > 0);
+            if (sp.heal) team.forEach(t => {
+                const n = Math.min(t.stats.hp - t.hp, Math.round(t.stats.hp * sp.heal));
+                t.hp += n;
+                t.status = null;
+                popup(t, `+${n}`, '#7ae07a');
+            });
+            if (sp.heal) say('仲間 みんなの HP が 回復した！');
+            if (sp.guard) {
+                team.forEach(t => { t.buffs.guard = sp.guard; });
+                say('仲間 みんなが まもりを かためた！');
+            }
+            if (sp.kiai) {
+                team.forEach(t => { t.buffs.kiai = true; });
+                say('仲間 みんなの つぎの 攻撃が 2 倍に なった！');
+            }
+            return SPECIAL_FX_MS;
+        }
+
+        // 必殺技の カットイン (1.4 秒): 色の 帯と 集中線、キャラの 絵、技の 名前
+        function drawSpecialCutin(now, k) {
+            const c = state.cutin;
+            const a = k < 0.12 ? k / 0.12 : k > 0.88 ? (1 - k) / 0.12 : 1;
+            ctx.globalAlpha = a;
+            ctx.fillStyle = 'rgba(0,0,0,.6)';
+            ctx.fillRect(0, 0, W, H);
+            // ななめの 帯
+            ctx.save();
+            ctx.translate(W / 2, H / 2);
+            ctx.rotate(-0.12);
+            ctx.fillStyle = c.color;
+            ctx.globalAlpha = a * 0.85;
+            ctx.fillRect(-W, -48, W * 2, 96);
+            ctx.fillStyle = 'rgba(0,0,0,.35)';
+            ctx.fillRect(-W, -48, W * 2, 4);
+            ctx.fillRect(-W, 44, W * 2, 4);
+            // 集中線 (流れる)
+            ctx.globalAlpha = a * 0.6;
+            ctx.fillStyle = '#ffffff';
+            for (let i = 0; i < 14; i++) {
+                const y = -44 + ((i * 37) % 88);
+                const x = ((i * 97 + now * 0.9) % (W * 2)) - W;
+                ctx.fillRect(x, y, 40 + (i % 3) * 20, 2);
+            }
+            ctx.restore();
+            ctx.globalAlpha = a;
+            // キャラ (横から 入って 大きく)
+            const slide = Math.min(1, k / 0.2);
+            const cx = Math.round(W + 60 - slide * (W / 2 - 30));
+            if (A.SPRITES[c.kind]) {
+                const rows = A.SPRITES[c.kind].frames[0];
+                const s = Math.max(2, Math.floor(84 / rows.length));
+                A.drawSprite(ctx, c.kind, Math.floor(now / 160) % 2, cx - rows[0].length * s / 2, H / 2 + 44 - rows.length * s, { scale: s });
+            } else if (KD.BigArt.has(c.kind)) KD.BigArt.drawBig(ctx, c.kind, Math.floor(now / 160) % 2, cx, H / 2 + 46, { height: 92, alpha: a });
+            // 技の 名前 (大きく ぽんっと)
+            const pop = Math.min(1, Math.max(0, (k - 0.15) / 0.15));
+            ctx.textBaseline = 'middle';
+            ctx.font = `bold 10px ${FONT}`;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(c.sub, 18, H / 2 - 30);
+            ctx.font = `bold ${Math.round(10 + 12 * pop)}px ${FONT}`;
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = 'rgba(0,0,0,.8)';
+            ctx.strokeText(c.name, 18, H / 2);
+            ctx.fillStyle = '#ffe680';
+            ctx.fillText(c.name, 18, H / 2);
+            ctx.lineWidth = 1;
+            ctx.font = `9px ${FONT}`;
+            ctx.fillStyle = '#ffffff';
+            if (k > 0.35) ctx.fillText(`「${c.shout}」`, 18, H / 2 + 26);
+            ctx.globalAlpha = 1;
+        }
+
+        // 必殺技の エフェクト (技ごと。マスの 上に 描く)
+        function drawSpecialFx(camX, camY, now) {
+            state.bigfx = state.bigfx.filter(f => now - f.at < f.ms);
+            const X = x => x * T - camX + T / 2, Y = y => y * T - camY + T / 2;
+            for (const f of state.bigfx) {
+                const k = (now - f.at) / f.ms, fade = 1 - k;
+                const ux = X(f.x), uy = Y(f.y), ex = X(f.to[0]), ey = Y(f.to[1]);
+                const tg = f.targets.map(([x, y]) => [X(x), Y(y)]);
+                const dot = (x, y, s, c, al = 1) => { ctx.globalAlpha = al; ctx.fillStyle = c; ctx.fillRect(Math.round(x - s / 2), Math.round(y - s / 2), s, s); };
+                const ring = (x, y, r, c, w = 2, al = 1) => { ctx.globalAlpha = al; ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.arc(x, y, Math.max(0.1, r), 0, Math.PI * 2); ctx.stroke(); };
+                const line = (x1, y1, x2, y2, c, w, al = 1) => { ctx.globalAlpha = al; ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); };
+                // 範囲の 形
+                if (f.range === 'room') ring(ux, uy, k * T * 8, f.color, 6 * fade + 1, 0.7 * fade);
+                if (f.range === 'around2') { ring(ux, uy, k * T * 2.8, f.color, 8 * fade + 2, fade); ring(ux, uy, k * T * 2, '#ffffff', 2, fade); }
+                if (f.range === 'pierce') { line(ux, uy, ex, ey, f.color, 14 * fade + 2, 0.8); line(ux, uy, ex, ey, '#ffffff', 4 * fade + 1, 0.9); }
+                if (f.range === 'front') {
+                    for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; line(ex, ey, ex + Math.cos(a) * (8 + k * 22), ey + Math.sin(a) * (8 + k * 22), f.color, 3, fade); }
+                    dot(ex, ey, 14 * fade + 4, '#ffffff', fade);
+                }
+                // 技ごとの 飾り
+                const each = fn => tg.forEach(([x, y], i) => fn(x, y, i));
+                switch (f.type) {
+                    case 'colitis':   // ぐるぐる 大腸炎の 渦
+                        each((x, y) => { for (let j = 0; j < 3; j++) ring(x, y, 4 + j * 4 + Math.sin(now / 60 + j) * 2, j % 2 ? '#8a5a2a' : f.color, 2, fade); });
+                        for (let j = 0; j < 12; j++) { const a = j / 12 * Math.PI * 2 + k * 6; dot(ux + Math.cos(a) * k * 60, uy + Math.sin(a) * k * 60, 4, '#bff0ff', fade); }
+                        break;
+                    case 'ice':
+                        each((x, y) => { for (let j = 0; j < 5; j++) dot(x - 10 + j * 5, y - 24 + ((k * 40 + j * 7) % 30), 3, '#e8f8ff', fade); });
+                        break;
+                    case 'fire':
+                        each((x, y) => { for (let j = 0; j < 8; j++) dot(x - 8 + (j * 5) % 16, y + 6 - ((k * 50 + j * 9) % 26), 4, j % 2 ? '#ffd84a' : '#ff4a2a', fade); });
+                        ctx.globalAlpha = 0.18 * fade; ctx.fillStyle = '#ff3a1a'; ctx.fillRect(0, 0, W, H);
+                        break;
+                    case 'moon':   // 月の 光が 降る
+                        ctx.globalAlpha = fade; ctx.fillStyle = '#fff4c0'; ctx.beginPath(); ctx.arc(W - 50, 40, 22, 0, Math.PI * 2); ctx.fill();
+                        each((x, y) => line(x, 0, x, y, '#fff4c0', 6 * fade + 2, 0.7 * fade));
+                        break;
+                    case 'sound':
+                        for (let j = 0; j < 3; j++) ring(ux, uy, ((k + j / 3) % 1) * T * 7, f.color, 3, fade);
+                        break;
+                    case 'smoke':
+                        each((x, y) => { for (let j = 0; j < 4; j++) { ctx.globalAlpha = 0.6 * fade; ctx.fillStyle = '#e8e8f0'; ctx.beginPath(); ctx.arc(x - 8 + j * 5, y - 4 + (j % 2) * 6, 5 + k * 10, 0, Math.PI * 2); ctx.fill(); } });
+                        break;
+                    case 'flash':
+                        for (let j = 0; j < 16; j++) { const a = j / 16 * Math.PI * 2 + k; line(ux, uy, ux + Math.cos(a) * 300, uy + Math.sin(a) * 300, f.color, 3, 0.4 * fade); }
+                        break;
+                    case 'leaf':
+                        each((x, y) => { for (let j = 0; j < 6; j++) { const a = j + now / 120; dot(x + Math.cos(a) * 12, y + Math.sin(a) * 12, 3, j % 2 ? '#7ad85a' : '#3f8a3a', fade); } });
+                        break;
+                    case 'wind':
+                        each((x, y) => { for (let j = 0; j < 4; j++) line(x - 16 + k * 20, y - 10 + j * 6, x + k * 30, y - 14 + j * 6, '#ffffff', 2, fade); });
+                        break;
+                    case 'wave':
+                        for (let j = 0; j < 3; j++) ring(ux, uy, k * T * (3 + j * 2), '#4fa0ff', 4, fade);
+                        each((x, y) => dot(x, y - 6, 10 * fade + 2, '#bfe8ff', fade));
+                        break;
+                    case 'kunai':   // 影分身の クナイが 飛ぶ
+                        each((x, y, i) => { for (let j = 0; j < 3; j++) { const kk = (k * 3 + j / 3 + i * 0.1) % 1; line(ux + (x - ux) * kk - 4, uy + (y - uy) * kk - 4, ux + (x - ux) * kk + 4, uy + (y - uy) * kk + 4, '#c8ccd8', 2, fade); } });
+                        for (let j = 0; j < 3; j++) dot(ux - 14 + j * 14, uy - 10, 8, 'rgba(60,60,90,.6)', fade);
+                        break;
+                    case 'tempo':
+                        ctx.font = `bold 12px ${FONT}`;
+                        each((x, y, i) => { ctx.globalAlpha = fade; ctx.fillStyle = '#ffe680'; ctx.fillText('♪', x - 6 + Math.sin(now / 90 + i) * 4, y - 8 - k * 20); });
+                        break;
+                    case 'bone':
+                        for (let j = 0; j < 6; j++) { const a = j / 6 * Math.PI * 2 + k * 10; line(ux + Math.cos(a) * 24, uy + Math.sin(a) * 24, ux + Math.cos(a) * 34, uy + Math.sin(a) * 34, '#f4f0e0', 4, fade); }
+                        break;
+                    case 'needles':
+                        for (let j = 0; j < 16; j++) { const a = j / 16 * Math.PI * 2; line(ux + Math.cos(a) * 8, uy + Math.sin(a) * 8, ux + Math.cos(a) * (10 + k * 34), uy + Math.sin(a) * (10 + k * 34), '#d8a8ff', 2, fade); }
+                        break;
+                    case 'quake':   // 地割れ
+                        each((x, y) => { line(x - 10, y + 6, x, y, '#3a2a1a', 3, fade); line(x, y, x + 9, y + 8, '#3a2a1a', 3, fade); });
+                        for (let j = 0; j < 8; j++) { const a = j / 8 * Math.PI * 2; dot(ux + Math.cos(a) * k * 40, uy + 6 + Math.sin(a) * k * 14, 4, '#a8946a', fade); }
+                        break;
+                    case 'punch': case 'bite':
+                        dot(ex, ey, 22 * fade, f.color, 0.6 * fade);
+                        break;
+                    case 'chop': case 'drop':
+                        line(ex, ey - 30 + k * 10, ex, ey + 10, '#ffffff', 6 * fade + 1, fade);
+                        break;
+                    case 'slash':
+                        each((x, y) => { line(x - 12, y - 12, x + 12, y + 12, '#ffffff', 3, fade); line(x + 12, y - 12, x - 12, y + 12, f.color, 2, fade); });
+                        break;
+                    case 'dash':   // 残像
+                        for (let j = 1; j <= 4; j++) dot(ux + (ex - ux) * (j / 5) * k * 1.5, uy + (ey - uy) * (j / 5) * k * 1.5, 10, f.color, 0.4 * fade);
+                        break;
+                    case 'kick':
+                        each((x, y) => ring(x, y, 10 + k * 8, '#9ad8ff', 3, fade));
+                        break;
+                    default:
+                        break;
+                }
+                ctx.globalAlpha = 1;
+                ctx.lineWidth = 1;
+            }
+        }
+
         // わざのえらび方 (画面のボタン・キーボード 1〜4) に出す説明
         function skillLabel(s) {
             const mv = U.SKILLS[s.id];
@@ -2218,6 +2474,7 @@
             units.forEach(u => drawUnit(u, camX, camY, now));
             drawRings(camX, camY, now);
             drawShots(camX, camY, now);
+            drawSpecialFx(camX, camY, now);
             drawPopups(camX, camY, now);
             drawBubbles(camX, camY, now);
             drawFlash(now);
@@ -2263,6 +2520,7 @@
             if (!state.cutin) return;
             const k = (now - state.cutin.at) / 1400;
             if (k >= 1) return void (state.cutin = null);
+            if (state.cutin.special) return drawSpecialCutin(now, k);
             const a = k < 0.15 ? k / 0.15 : k > 0.85 ? (1 - k) / 0.15 : 1;
             ctx.globalAlpha = a;
             ctx.fillStyle = 'rgba(30,0,0,.75)';
@@ -2664,7 +2922,7 @@
             });
         } else town.title();
         return {
-            state, town, draw, moveInput, wait, confirm, attack: attackFront, useSkill, itemMenu, tacticMenu, busy, makeEnemy, makeAlly, evolve, startDungeon, switchTo, switchMenu, heroUnit, snapshot, autosave, spawnBoss,
+            state, town, draw, moveInput, wait, confirm, attack: attackFront, useSkill, itemMenu, tacticMenu, specialMenu, specialFor, busy, makeEnemy, makeAlly, evolve, startDungeon, switchTo, switchMenu, heroUnit, snapshot, autosave, spawnBoss,
             skills: () => (state.player && state.phase === 'play' ? state.player.skills.map(skillLabel) : []),
             toggleMinimap() { state.mini = !state.mini; },
             // 「音」ボタン: 音の設定 (音量・オン・オフ。2026-10-22 ユーザー指定)。S キーは これまでどおり オン・オフだけ

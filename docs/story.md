@@ -473,3 +473,523 @@
 - 〔quest.rare.naitei〕 ？？？「内定が ほしければ、月の迷宮の B14F まで 来るがいい」（シーシャ・ナイテイ・ナイナイ）
 - 〔quest.rare.aruaru〕 ？？？「内定の理を 知りたくば、ASOの壺の底の B24F へ」（シーシャ・ナイテイ・アルアル）
 - 〔quest.rare.nadi〕 ？？？「オンライン面接の ご案内です。コード塔の B15F に ログインしてください」（ナイテイ・ナナッシャ・ナディ）
+
+## 9. ダンジョンの中の 台詞
+
+### 9.1 ハプニング・決まり文句
+
+`{item}` 道具の名前・`{boss}` ボスの名前・`{team}` ライバル探検隊の名前・`{name}` よみがえった 四天王の名前・`{money}` 取られた お金
+
+（ハプニング：ライバル探検隊が いる階）
+- 〔dungeon.rivalNear〕 ハプニング！ ライバル探検隊「{team}」が この階に いるらしい……
+（ハプニング：ふるカワから 通信（道具を 送ってくれる））
+- 〔dungeon.furukawaGift〕 ふるカワ「がんばってね！ {item}を 送るよ！」
+（ふるカワから 通信（持ち物が いっぱい））
+- 〔dungeon.furukawaFull〕 ふるカワ「荷物が いっぱいだね。かわりに 階段の場所を 教えるよ！」
+（ハプニング：おにおにの 取り立て）
+- 〔dungeon.oniCall〕 ハプニング！ おにおにの声「金返せ！」
+（取り立てで お金が なかった）
+- 〔dungeon.oniEmpty〕 おにおに「……なんだ、持ってないのか」
+（ワナ「借金取り」を 踏んだ）
+- 〔dungeon.oniTake〕 おにおにの声「金返せ！」 {money}えん 取られた…
+（ワナ「借金取り」で お金が なかった）
+- 〔dungeon.oniTakeEmpty〕 おにおにの声「金返せ！」 …でも、お金を持っていなかった。
+（ドタバタ大迷宮の 休憩の階（台詞が ない 階））
+- 〔dungeon.restDefault〕 ふるカワ「休憩の階だよ。ここで ひと休みしよう！」
+（大魔王ASO・真が 四天王を 呼ぶ）
+- 〔dungeon.shinSummon〕 {boss}「出でよ、四天王！」 {name}が よみがえった！
+（ボスが 手下を 呼ぶ）
+- 〔dungeon.bossSummon〕 出でよ！
+（ライバル探検隊を たおした）
+- 〔dungeon.rivalDown〕 {team}「覚えてろ～！」 ライバル探検隊を やっつけた！
+
+### 9.2 口ぐせ（吹き出しで ひとこと）
+
+**こおりくん**
+
+（攻撃したとき）
+
+- 〔catch.koori.attack.1〕 えいっ！
+- 〔catch.koori.attack.2〕 こおりの力だ！
+- 〔catch.koori.attack.3〕 ていっ！
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.koori.pinch.1〕 こおり生きていけないよ～～！！
+- 〔catch.koori.pinch.2〕 ひえ～～！
+- 〔catch.koori.pinch.3〕 ひどいちゃむ～～！
+
+（Lv が 上がったとき）
+
+- 〔catch.koori.levelup.1〕 やったー！ 強くなったよ！
+
+（敵を たおしたとき）
+
+- 〔catch.koori.win.1〕 借金返済に 一歩前進！
+- 〔catch.koori.win.2〕 よーし！
+
+**おにおに**
+
+（攻撃したとき）
+
+- 〔catch.onioni.attack.1〕 オラァ！
+- 〔catch.onioni.attack.2〕 鬼の力を 見せてやる！
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.onioni.pinch.1〕 金返してもらうまで 倒れるか！
+
+（Lv が 上がったとき）
+
+- 〔catch.onioni.levelup.1〕 フン、当然だ。
+
+（敵を たおしたとき）
+
+- 〔catch.onioni.win.1〕 金返せ！
+- 〔catch.onioni.win.2〕 ちょろいな。
+
+**やすさん**
+
+（攻撃したとき）
+
+- 〔catch.yasu.attack.1〕 それっ！
+- 〔catch.yasu.attack.2〕 やすパンチ！
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.yasu.pinch.1〕 回復しないと…！
+- 〔catch.yasu.pinch.2〕 え！？ ピンチですの！？
+
+（Lv が 上がったとき）
+
+- 〔catch.yasu.levelup.1〕 ぼくも 強くなったよ。
+
+（敵を たおしたとき）
+
+- 〔catch.yasu.win.1〕 よかった～
+
+**たむさん**
+
+（攻撃したとき）
+
+- 〔catch.tamu.attack.1〕 止めたるわ！
+- 〔catch.tamu.attack.2〕 これで終わりや！ たむキック！
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.tamu.pinch.1〕 しゃーないな…ちょっと まずいわ
+
+（Lv が 上がったとき）
+
+- 〔catch.tamu.levelup.1〕 ええ感じやん
+
+（敵を たおしたとき）
+
+- 〔catch.tamu.win.1〕 ちゃちゃっと 片づけたわ
+- 〔catch.tamu.win.2〕 暇つぶしには なったな
+
+**だけさん**
+
+（攻撃したとき）
+
+- 〔catch.dake.attack.1〕 私の 後ろに 下がっていなさい！
+- 〔catch.dake.attack.2〕 この鍛え上げたこぶしで…だけチョップ！
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.dake.pinch.1〕 まだまだぁ！
+
+（Lv が 上がったとき）
+
+- 〔catch.dake.levelup.1〕 鍛えた こぶしが 喜んでいる！
+
+（敵を たおしたとき）
+
+- 〔catch.dake.win.1〕 なにが こようと 私が たたきつぶしてあげよう！
+
+### 9.3 敵の ひとこと
+
+会ったとき（ボス・決闘）・化けていたのが ばれたとき・仲間を 呼ぶ／回復する・お金や 道具を 取る・爆発・復活 のときに 出る。図鑑にも のる
+
+**ハリーの森**
+
+- 〔enemy.haribaby〕 ハリベビー「ハリ…！」
+- 〔enemy.mumenbachi〕 ムメンキョバチ「メンキョナイー！」
+- 〔enemy.donguriko〕 ドングリコ「コロコロ～」
+- 〔enemy.nemuridake〕 ネムリダケ「ふぁ～…」
+- 〔enemy.pekorisu〕 ペコリス「いただきっ！」
+- 〔enemy.tsutankobu〕 ツタンコブ「からまっちゃえ」
+- 〔enemy.yofukashi〕 ヨフカシフクロウ「まだ寝ないホー」
+- 〔enemy.harry〕 ハリー「ハリー！メンキョナイー！」
+
+**浦の島の海岸どうくつ**
+
+- 〔enemy.kogame〕 コガメ「…（こもる）」
+- 〔enemy.tamatebakogani〕 タマテバコガニ「ケムッ！」
+- 〔enemy.tsuribariuo〕 ツリバリウオ「つれた～！」
+- 〔enemy.isoginchakku〕 イソギンチャック「ジジジ…」
+- 〔enemy.otohimedai〕 オトヒメダイ「踊りましょ♪」
+- 〔enemy.wasurekurage〕 ワスレクラゲ「なんだっけ…」
+- 〔enemy.umibozun〕 ウミボウズン「ぼうず～ん」
+- 〔enemy.urashima〕 浦の島重蔵「わしの家に 何の用じゃ…はて、何だったかのう」
+
+**ネット寺**
+
+- 〔enemy.spamdama〕 スパムダマ「おめでとうございます！当選しました！」
+- 〔enemy.netkozou〕 ネットコゾウ「ご視聴ありがとうございます」
+- 〔enemy.mokugyoro〕 モクギョロ「ポクポクポク…」
+- 〔enemy.rousokubi〕 ロウソクビ「ゆら～り」
+- 〔enemy.enjoubouzu〕 エンジョウボウズ「炎上上等！」
+- 〔enemy.burakrasher〕 ブラクラッシャー「ブツン」
+- 〔enemy.hannyamen〕 ハンニャメン「仏の顔も三度まで」
+- 〔enemy.daishi〕 ダイシ「よくぞ参られた。拙僧が相手いたそう。」
+
+**忍びの屋敷**
+
+- 〔enemy.geninman〕 ゲニンマン「あ、まだいたんですね～」
+- 〔enemy.makibishimushi〕 マキビシムシ「チクチク」
+- 〔enemy.kunaisuzume〕 クナイスズメ「チュンッ！」
+- 〔enemy.kawarimidanuki〕 カワリミダヌキ「ドロン！」
+- 〔enemy.shinobigaeru〕 シノビガエル「ゲロッと参上」
+- 〔enemy.shurikenbo〕 シュリケンボー「シュルルル！」
+- 〔enemy.bakudanjirou〕 バクダンジロウ「あとはまかせた～！」
+- 〔enemy.makibikon〕 マキビコンMk-4「挑戦者を確認したであります。」
+- 〔enemy.zumitani〕 ズミタニ「やっほー、78代目だよ！ ついてこられるかな♪」
+
+**月の迷宮**
+
+- 〔enemy.tsukiusagi〕 ツキウサギ「ぺったん！」
+- 〔enemy.hoshikuzun〕 ホシクズン「キラッ☆」
+- 〔enemy.mikazukibat〕 ミカヅキバット「キキッ」
+- 〔enemy.yukimidango〕 ユキミダンゴ「おつきみ～」
+- 〔enemy.lunashadow〕 ルナシャドウ「…………」
+- 〔enemy.nandomoslime〕 ナンドモスライム「言ったっけ？言ったっけ？」
+- 〔enemy.mangetsuwolf〕 マンゲツウルフ「ワォーン！」
+- 〔enemy.runaya〕 ルナヤ「よく来たわね。…よく来たわね。あら、もう言ったかしら？」
+
+**筋肉の山**
+
+- 〔enemy.asedakku〕 アセダック「あせあせ！」
+- 〔enemy.yoroinukegara〕 ヨロイヌケガラ「ガシャン、ガシャン」
+- 〔enemy.dumbbellkong〕 ダンベルコング「ウホッ（ナイスバルク）」
+- 〔enemy.mirrormuscle〕 ミラーマッスル「キレてるよ！」
+- 〔enemy.magmatcho〕 マグマッチョ「アツい筋肉！」
+- 〔enemy.yukidarumuscle〕 ユキダルマッスル「冷えた筋肉も最高だ」
+- 〔enemy.proteingolem〕 プロテインゴーレム「タンパク…シツ…」
+- 〔enemy.nozoema〕 ノゾエマ「その前に、この筋肉を見よ！」
+
+**ASOの壺の底**
+
+- 〔enemy.asohei〕 アソヘイ「アソ！アソ！」
+- 〔enemy.tsubomajin〕 ツボマジン「出でよ！」
+- 〔enemy.fusaiyougaikotsu〕 フサイヨウガイコツ「今回はご縁がなかったということで」
+- 〔enemy.shakkinbourei〕 シャッキンボウレイ「…かえせ…かえせ…」
+- 〔enemy.makibikonmk3〕 マキビコンMk-3「計算中であります…エラーであります」
+- 〔enemy.takaramimic〕 タカラミミック「あけたな？」
+- 〔enemy.nakatadraco〕 ナカタドラコ「ガオー（加減中）」
+- 〔enemy.koorimodoki〕 コオリモドキ「ぼくがほんもののこおりくんだよ」
+- 〔enemy.nakata〕 奈架多ドラゴン「グオオオ…（力加減…力加減…）」
+- 〔enemy.maou〕 大魔王ASO「よみがえったぞ……今度こそ すべてを 無に返してやる！」
+
+**バグだらけのコード塔**
+
+- 〔enemy.bugmushi〕 バグムシ「ジジッ…エラー…」
+- 〔enemy.htmlmokkun〕 HTMLモックン「<モックン>こんにちは</モックン>」
+- 〔enemy.popupn〕 ポップアップン「おめでとうございます！！」
+- 〔enemy.csspakkun〕 CSSパックン「パックン！ スタイル いただき！」
+- 〔enemy.nullpon〕 ヌルポン「ぬるぽ」
+- 〔enemy.semicolombo〕 セミコロンボ「うちのカミさんがね…；」
+- 〔enemy.loadingu〕 ローディン「しょうしょう おまちください…」
+- 〔enemy.c〕 C「すべての はじまりは わたし」
+- 〔enemy.phppp〕 PHPPP「echo "ペペペ";」
+- 〔enemy.virusn〕 ウイルスン「ぞうしょく します」
+- 〔enemy.python〕 パイソン「インデントは 4 マスで おねがいします」
+- 〔enemy.javan〕 ジャーバン「コーヒー 一杯 いかがですか」
+- 〔enemy.crawlergumo〕 クローラーグモ「ぜんぶ 見てまわるよ」
+- 〔enemy.cplus〕 Cプラス「C より ちょっと プラス」
+- 〔enemy.csharpn〕 Cシャープン「半音 あげて いきましょう♯」
+- 〔enemy.notfound〕 ノットファウンド「404……ここには なにも ない」
+- 〔enemy.darts〕 ダーツ・ノリノリコ「ノリノリで いくよ～！」
+- 〔enemy.mugenloop〕 ムゲンループ「もういちど もういちど もういちど」
+- 〔enemy.spaghettin〕 スパゲッティン「どこが どこに つながってるの…」
+- 〔enemy.compiler〕 コンパイラー「ビルド 成功まで あと 99%」
+- 〔enemy.firewall〕 ファイアウォール「ここは とおしません」
+- 〔enemy.triplec〕 トリプルC「C・C++・C#……すべてを 統べる者！」
+
+**ツモツモ横丁**
+
+- 〔enemy.hakupai〕 ハクパイ「……（なにも 書いてない）」
+- 〔enemy.saikoron〕 サイコロン「ころころ～ 何が出るかな」
+- 〔enemy.richibou〕 リーチボウ「リーチ！」
+- 〔enemy.yopparaigarasu〕 ヨッパライガラス「カァ～～ もう一軒！」
+- 〔enemy.chouchinbura〕 チョウチンブラ「ゆら～り ぶら～り」
+- 〔enemy.mitsushiro〕 蜜シロー「はちみつ いかが？」
+- 〔enemy.umehayashi〕 ウメハヤシ「すっぱいのは がまん」
+- 〔enemy.neonkurage〕 ネオンクラゲ「ピカピカ…ビリビリ」
+- 〔enemy.yataiman〕 ヤタイマン「へい らっしゃい！」
+- 〔enemy.maikumbo〕 マイクンボー「もう一曲 いきます！」
+- 〔enemy.gomibakon〕 ゴミバコン「もえるゴミは 火曜日」
+- 〔enemy.yoshibook〕 ヨシブック「ヨシ！ 読んだ！」
+- 〔enemy.taxinu〕 タクシーヌ「どちらまで？ ワン！」
+- 〔enemy.ikolaboo〕 イコラブー「ラブ～～♡」
+- 〔enemy.neontanuki〕 ネオンタヌキ「ここは いい お店ですよ～」
+- 〔enemy.pachinkodaman〕 パチンコダマン「ジャラジャラ～！」
+- 〔enemy.dradora〕 ドラドラ「ドラ ドラ ドラ！」
+- 〔enemy.chipguma〕 チップグマ「全部 賭ける！」
+- 〔enemy.slotton〕 スロットン「7・7・7 そろえ！」
+- 〔enemy.manekinyan〕 マネキニャン「いらっしゃいニャン」
+- 〔enemy.tsumonyan〕 ツモニャン「ツモ！ ニャン！」
+- 〔enemy.ronnyan〕 ロンニャン「それ ロンだニャン」
+- 〔enemy.gachapon〕 ガチャポン「今日は SSR かも！？」
+- 〔enemy.kokushinyan〕 国士無双ニャン「十三面待ちだニャ……」
+
+**ハリー王国**
+
+- 〔enemy.koharry〕 コハリー「ちびでも ハリー！」
+- 〔enemy.kuriharry〕 クリハリー「いがいが～」
+- 〔enemy.harryhei〕 ハリーヘイ「王国を まもれ！」
+- 〔enemy.uniharry〕 ウニハリー「うにうに」
+- 〔enemy.saboharry〕 サボハリー「水は 月に 1 回で いいの」
+- 〔enemy.harryyumi〕 ハリーユミ「ねらい うつ！」
+- 〔enemy.harytate〕 ハリタテ「とおさないハリ！」
+- 〔enemy.harysouryo〕 ハリソウリョ「トゲの かみさま…」
+- 〔enemy.harrychef〕 ハリーシェフ「今日の まかないは トゲ料理」
+- 〔enemy.harrybird〕 ハリーバード「トゲの つばさ！」
+- 〔enemy.goldharry〕 ゴールドハリー「きんぴか ハリ！」
+- 〔enemy.harryknight〕 ハリーナイト「騎士の ほこりに かけて！」
+- 〔enemy.harrymage〕 ハリーメイジ「トゲトゲの 呪文！」
+- 〔enemy.gargoharry〕 ガーゴハリー「……（いしの ふり）」
+- 〔enemy.iwaharry〕 イワハリー「ゴロゴロ…ハリ」
+- 〔enemy.haridaijin〕 ハリダイジン「大帝さまの おなりである」
+- 〔enemy.harrymimic〕 ハリーミミック「あけたハリ？」
+- 〔enemy.haridora〕 ハリドラ「トゲの ドラゴンだハリ！」
+- 〔enemy.kingharry〕 キングハリー「余が キングハリーである！」
+- 〔enemy.metalharry〕 メタルハリー「キーン」
+- 〔enemy.metalkingharry〕 メタルキングハリー「キィィィン……」
+- 〔enemy.harryemperor〕 ハリー大帝「余の 王国へ ようこそ。そして さらばだ！」
+
+**雪どけの氷河**
+
+- 〔enemy.yukiusapon〕 ユキウサポン「ぴょん！ ゆきだま ぶつけるぴょん」
+- 〔enemy.tsurarabo〕 ツララボウ「ぽたっ……ぽたっ……」
+- 〔enemy.kakigoora〕 カキゴーラ「キーンと するよ～」
+- 〔enemy.penguinknight〕 ペンギンナイト「騎士の すべりを 見よ！」
+- 〔enemy.shirokumatcho〕 シロクマッチョ「さむいほど 筋肉が よろこぶ」
+- 〔enemy.yukionnan〕 ユキオンナン「こおりつけ……」
+- 〔enemy.sakurarisu〕 サクラリス「もうすぐ 春ですよ～」
+- 〔enemy.harukazedori〕 ハルカゼドリ「ピューイ！ 春いちばん！」
+- 〔enemy.fukinoton〕 フキノトン「ゆきの したから こんにちは」
+- 〔enemy.harukirin〕 ハル麒麟「氷は とけ、春が 来る。それが さだめ」
+
+**金色のSE城**
+
+- 〔enemy.konin〕 コオニン「オニ！ オニ！」
+- 〔enemy.aoonibo〕 アオオニボ「あおくて わるいか」
+- 〔enemy.kanabone〕 カナボーン「鬼に かなぼう だ！」
+- 〔enemy.tsunodaruma〕 ツノダルマ「ころんでも おきあがる」
+- 〔enemy.onibin〕 オニビン「ゆら……ゆら……」
+- 〔enemy.hyoutanoni〕 ヒョウタンオニ「ひっく……もう いっぱい……」
+- 〔enemy.taikooni〕 タイコオニ「ドドン！ カッ！」
+- 〔enemy.onigirin〕 オニギリン「のりは パリパリ派」
+- 〔enemy.setsubunmame〕 セツブンマメ「おには そと！ ……あれ？」
+- 〔enemy.kinmetsuki〕 金滅鬼「金色の 鬼に ひれ伏せ！」
+
+**どこにでも 出る**
+
+- 〔enemy.daichouenkin〕 ダイチョウエンキン「おなか、ぐるぐる～」
+- 〔enemy.kinmenkoinu〕 キンメンコイヌ「ワン！（得意げ）」
+- 〔enemy.goldDog〕 ゴールド金面犬「ワン！（自信ありげ）」
+
+**ライバル探検隊「5DX」**
+
+- 〔enemy.okagappa〕 おかがっぱ「ま～だまだ戦わねバ！ イェア！」
+- 〔enemy.hibikimakuri〕 ひびきまくり「響きです。」
+- 〔enemy.yamamou〕 やまもぅ「牛の力を見せてやる！ モォー！」
+
+**ライバル探検隊「ASK-3」**
+
+- 〔enemy.sasaki〕 Mr.SASAKI「どうも、しご出来です。」
+- 〔enemy.kotani〕 Mr.KOTANI「勝率は計算済みです。」
+- 〔enemy.asahara〕 KING.ASAHARA「CS城の主の力、見せてやろう！ ひれ伏せ！」
+
+**ライバル探検隊「お願いマッスル」**
+
+- 〔enemy.shibata〕 シバター「ぶんぶん！ 撮れ高いただき！ んなああ～」
+- 〔enemy.ueno〕 マッスルウエノーブル「我が筋肉の前にひれ伏すがよい！」
+- 〔enemy.ikekimu〕 イケキム「チッ…邪魔だ。」
+
+**ライバル探検隊「チームバータス」**
+
+- 〔enemy.yahami〕 ヤーハミー「お宝も 視線も、ぜんぶ いただくわ」
+- 〔enemy.maechokkin〕 マエチョッキン「チョッキン♪ 前髪も お宝も 切りそろえて あげる」
+- 〔enemy.norahan〕 ノラハン「ニャハッ。盗むのは お宝だけじゃないかもね♪」
+
+**ライバル探検隊「チーム・ケモノミチ」**
+
+- 〔enemy.ishii〕 イシイー「ブヒッ！ 迷宮は おれたちの 家だ！」
+- 〔enemy.mazuda〕 マズダ「ダンジョン育ちを なめるなよ」
+- 〔enemy.naitoon〕 NAITOON「ワォーン……夜の迷宮で おれに 勝てると 思うなよ」
+
+**ドタバタ大迷宮**
+
+- 〔enemy.maoushin〕 大魔王ASO・真「まだだ……真の力を 見せてやろう！」
+- 〔enemy.harigeneral〕 ハリジェネラル「突撃ハリ！」
+- 〔enemy.joubachi〕 ジョオウバチ「免許？ 女王には いらないの」
+- 〔enemy.oodonguriko〕 オオドングリコ「ゴロゴロゴロ～！」
+- 〔enemy.nemuridakeou〕 ネムリダケオウ「おやすみ…みんな…」
+- 〔enemy.pekorisuking〕 ペコリスキング「ぜんぶ いただきっ！」
+- 〔enemy.tsutankobuju〕 ツタンコブジュ「からめとる…」
+- 〔enemy.yoakefukurou〕 ヨアケフクロウ「もう朝だホー」
+- 〔enemy.hyougame〕 ヒョウガメ「…（ひえひえ）」
+- 〔enemy.ryuuguudai〕 リュウグウダイ「竜宮へ ご案内♪」
+- 〔enemy.umibozuou〕 ウミボウズオウ「ぼうず～～ん！！」
+- 〔enemy.daienjou〕 ダイエンジョウ「大炎上 上等！」
+- 〔enemy.spamking〕 スパムキング「100万人目の お客様です！」
+- 〔enemy.hitodamaou〕 ヒトダマオウ「めら～り」
+- 〔enemy.jouninman〕 ジョウニンマン「もう いましたよ～」
+- 〔enemy.kagebunshin〕 カゲブンシンダヌキ「ドロロン！」
+- 〔enemy.daibakudanjirou〕 ダイバクダンジロウ「あとは まかせた～～！！」
+- 〔enemy.kaguyausagi〕 カグヤウサギ「月に 帰りますね」
+- 〔enemy.shingetsuwolf〕 シンゲツウルフ「アオーーン！」
+- 〔enemy.yukimidaifuku〕 ユキミダイフク「ひんやり おつきみ～」
+- 〔enemy.muscletitan〕 マッスルタイタン「タンパク…シツ…ゴールド…」
+- 〔enemy.kazanmatcho〕 カザンマッチョ「噴火する 筋肉！」
+- 〔enemy.hyouzanmuscle〕 ヒョウザンマッスル「冷えきった 筋肉こそ 最強」
+- 〔enemy.asoshougun〕 アソショウグン「アソ！ アソ！ 全軍 かかれ！」
+- 〔enemy.kinkomimic〕 キンコミミック「あけたな？ 暗証番号は？」
+- 〔enemy.koorimodokishin〕 コオリモドキ・真「ぼくこそ ほんもののこおりくんだよ」
+- 〔enemy.rishitoribourei〕 リシトリボウレイ「…利子も かえせ…」
+- 〔enemy.daichouenou〕 ダイチョウエンオウ「おなか、ぐるぐるぐる～！」
+- 〔enemy.fubukipenguin〕 フブキペンギン「ペンペン！」
+- 〔enemy.tsuraracomori〕 ツララコウモリ「キキーン」
+- 〔enemy.koorinokagami〕 コオリノカガミ「うつってるよ…きみが」
+- 〔enemy.hinotorin〕 ヒノトリン「ピヨッ（ぼうぼう）」
+- 〔enemy.kaendaruma〕 カエンダルマ「七転び 八起き 大爆発！」
+- 〔enemy.youganworm〕 ヨウガンワーム「ズズズ…」
+- 〔enemy.mandoragon〕 マンドラゴン「ギャアアア！（抜かないで）」
+- 〔enemy.obakekabocha〕 オバケカボチャ「トリック オア トリート！」
+- 〔enemy.haetorigusan〕 ハエトリグサーン「パクッ」
+- 〔enemy.kokemusha〕 コケムシャ「百年 こけむして 待っておった」
+- 〔enemy.tatsumakitsune〕 タツマキツネ「コーン！（ぐるぐる）」
+- 〔enemy.kaminarigumo〕 カミナリグモ「ゴロゴロ…ピシャーン！」
+- 〔enemy.watageboushi〕 ワタゲボウシ「ふわふわ～」
+
+**クエストで 待っている**
+
+- 〔enemy.naitei〕 シーシャ・ナイテイ・ナイナイ「お前に内定はない！」
+- 〔enemy.aruaru〕 シーシャ・ナイテイ・アルアル「内定の理を 見せてやろう」
+- 〔enemy.nadi〕 ナイテイ・ナナッシャ・ナディ「オンライン面接、はじめます」
+- 〔enemy.hyougaryu〕 ヒョウガリュウ「氷河の 底で 眠っていた……」
+- 〔enemy.harukirin_q〕 ハル麒麟「もう一度、春を かけて」
+- 〔enemy.goukioni〕 ゴウキオニ「鬼鬼団の 一番槍は おれだ！」
+- 〔enemy.kinmetsuki_q〕 金滅鬼「次は 本気だ！」
+
+### 9.4 必殺技（名前と 放つときの ひとこと）
+
+1 人 1 回・チームで 3 回まで（ダンジョンごと）。名前の 行と ひとことの 行の 両方を 書き換えられる
+
+**こおりくん**（見えている 敵 みんな）
+- 〔special.koori.name〕 大腸炎アタック
+- 〔special.koori.shout〕 こおりくん「くらえ！ 大腸炎アタック！」
+
+**おにおに**（周り 2 マス）
+- 〔special.onioni.name〕 鬼鬼の金棒
+- 〔special.onioni.shout〕 おにおに「鬼鬼の金棒、くらえ！」
+
+**やすさん**（正面の 1 体）
+- 〔special.yasu.name〕 やすパンチ・極
+- 〔special.yasu.shout〕 やすさん「いくよ！ やすパンチ・極！」
+
+**たむさん**（前に まっすぐ つらぬく）
+- 〔special.tamu.name〕 たむキック・極
+- 〔special.tamu.shout〕 たむさん「これで終わりや！ たむキック・極！」
+
+**だけさん**（正面の 1 体）
+- 〔special.dake.name〕 だけチョップ・極
+- 〔special.dake.shout〕 だけさん「この鍛え上げたこぶしで…だけチョップ・極！」
+
+**おかがっぱ**（前に まっすぐ つらぬく）
+- 〔special.okagappa.name〕 おかピポっと光線
+- 〔special.okagappa.shout〕 おかがっぱ「おかピポ！ イェア！」
+
+**ひびきまくり**（見えている 敵 みんな）
+- 〔special.hibikimakuri.name〕 大音響4DX
+- 〔special.hibikimakuri.shout〕 ひびきまくり「これが４DXだ！」
+
+**やまもぅ**（周り 2 マス）
+- 〔special.yamamou.name〕 おちょくりボーンフィーバー
+- 〔special.yamamou.shout〕 やまもぅ「おちょくるなー！ モォー！」
+
+**Mr.SASAKI**（前に まっすぐ つらぬく）
+- 〔special.sasaki.name〕 ASAスラッシュ
+- 〔special.sasaki.shout〕 Mr.SASAKI「締め切り厳守です。」
+
+**Mr.KOTANI**（見えている 敵 みんな）
+- 〔special.kotani.name〕 NABIテンポ
+- 〔special.kotani.shout〕 Mr.KOTANI「数字は うそを つきません。」
+
+**KING.ASAHARA**（正面の 1 体）
+- 〔special.asahara.name〕 DOPAPANCHI
+- 〔special.asahara.shout〕 KING.ASAHARA「ひれ伏せ！ DOPAPANCHI！」
+
+**シバター**（正面の 1 体）
+- 〔special.shibata.name〕 シバタードライバー
+- 〔special.shibata.shout〕 シバター「バーイ！ んなああ～」
+
+**イケキム**（前に まっすぐ つらぬく）
+- 〔special.ikekimu.name〕 イケキムドライブ
+- 〔special.ikekimu.shout〕 イケキム「すきだらけだ。」
+
+**マッスルウエノーブル**（周り 2 マス）
+- 〔special.ueno.name〕 マッスルウエノクラッシュ
+- 〔special.ueno.shout〕 マッスルウエノーブル「妻への愛を受けてみよ！」
+
+**ハリー**（周り 2 マス）
+- 〔special.harry.name〕 メンキョナイ・ニードル
+- 〔special.harry.shout〕 ハリー「メンキョナイー！」
+
+**浦の島重蔵**（見えている 敵 みんな）
+- 〔special.urashima.name〕 玉手箱スモーク
+- 〔special.urashima.shout〕 浦の島重蔵「えい、けむりじゃ！」
+
+**マキビコンMk-4**（前に まっすぐ つらぬく）
+- 〔special.makibikon.name〕 ドリル・エクスキューション
+- 〔special.makibikon.shout〕 マキビコンMk-4「排除を開始するであります。」
+
+**奈架多ドラゴン**（前に まっすぐ つらぬく）
+- 〔special.nakata.name〕 アクアブレス
+- 〔special.nakata.shout〕 奈架多ドラゴン「グオオオオ！」
+
+**ゴールド金面犬**（正面の 1 体）
+- 〔special.goldDog.name〕 ゴールドかみまっくす
+- 〔special.goldDog.shout〕 ゴールド金面犬「ワン！（邪悪な笑み）」
+
+**ダイシ**（見えている 敵 みんな）
+- 〔special.daishi.name〕 鬼面説法
+- 〔special.daishi.shout〕 ダイシ「仏の顔も、ここまでです。」
+
+**ズミタニ**（見えている 敵 みんな）
+- 〔special.zumitani.name〕 影分身クナイ乱れ打ち
+- 〔special.zumitani.shout〕 ズミタニ「ついてこられるかな♪」
+
+**ルナヤ**（見えている 敵 みんな）
+- 〔special.runaya.name〕 ルナティック・ムーンビーム
+- 〔special.runaya.shout〕 ルナヤ「月の力よ…！ 月の力よ…あら、もう言ったかしら？」
+
+**ノゾエマ**（前に まっすぐ つらぬく）
+- 〔special.nozoema.name〕 鏡筋一刀斬り
+- 〔special.nozoema.shout〕 ノゾエマ「この刀を越えてみせよ！」
+
+**大魔王ASO**（見えている 敵 みんな）
+- 〔special.maou.name〕 亜祖宇激烈破
+- 〔special.maou.shout〕 大魔王ASO「消え去れ！」
+
+**前作に いない 仲間**（属性で 名前、役職で 範囲と おまけが 決まる。ひとことは その キャラの 敵の ときの ひとこと＋技の 名前）
+
+- 〔special.element.こおり〕 こおり：ブリザード・バースト
+- 〔special.element.ほのお〕 ほのお：フレイム・バースト
+- 〔special.element.みず〕 みず：タイダル・ウェーブ
+- 〔special.element.しぜん〕 しぜん：グリーン・ストーム
+- 〔special.element.かぜ〕 かぜ：ゲイル・ストーム
+- 〔special.element.ふしぎ〕 ふしぎ：ミラクル・フラッシュ
+- 〔special.element.ふつう〕 ふつう：ギガ・インパクト

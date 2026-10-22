@@ -176,5 +176,22 @@
         bonusAgain: ['ふるカワ「また 大魔王ASO・真を たおしたね！ すごい！」', '大魔王ASO・真「もうゆるしてほしい」']
     };
 
-    KD.Dungeons = { LIST, ANYWHERE, MATERIALS, tableFor, levelFor, byId, partyMax, STORY };
+    // ダンジョンの中の 決まり文句 (2026-10-22: 書き換えやすいように game.js から ここへ 移した。docs/story.md に 書き出す)
+    //   {item} 道具の名前・{boss} ボスの名前・{team} ライバル探検隊の名前・{name} よみがえった 四天王の名前・{money} 取られた お金。
+    //   { koori, onioni } は 主人公ごとに ちがう 台詞
+    const DUNGEON_LINES = {
+        rivalNear: 'ハプニング！ ライバル探検隊「{team}」が この階に いるらしい……',
+        furukawaGift: 'ふるカワ「がんばってね！ {item}を 送るよ！」',
+        furukawaFull: 'ふるカワ「荷物が いっぱいだね。かわりに 階段の場所を 教えるよ！」',
+        oniCall: 'ハプニング！ おにおにの声「金返せ！」',
+        oniEmpty: 'おにおに「……なんだ、持ってないのか」',
+        oniTake: 'おにおにの声「金返せ！」 {money}えん 取られた…',
+        oniTakeEmpty: 'おにおにの声「金返せ！」 …でも、お金を持っていなかった。',
+        restDefault: 'ふるカワ「休憩の階だよ。ここで ひと休みしよう！」',
+        shinSummon: '{boss}「出でよ、四天王！」 {name}が よみがえった！',
+        bossSummon: '出でよ！',
+        rivalDown: '{team}「覚えてろ～！」 ライバル探検隊を やっつけた！'
+    };
+
+    KD.Dungeons = { LIST, ANYWHERE, MATERIALS, tableFor, levelFor, byId, partyMax, STORY, DUNGEON_LINES };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);

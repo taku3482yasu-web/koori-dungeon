@@ -14,7 +14,7 @@ import vm from 'node:vm';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'docs', 'story.md');
 globalThis.KD = {};
-for (const f of ['rng', 'dungeon', 'units', 'enemies', 'items', 'dungeons', 'collection', 'allies', 'enemies9', 'enemies10', 'enemies11', 'town']) {
+for (const f of ['rng', 'dungeon', 'units', 'enemies', 'items', 'dungeons', 'collection', 'allies', 'enemies9', 'enemies10', 'enemies11', 'town', 'specials']) {
     vm.runInThisContext(readFileSync(join(ROOT, 'js', `${f}.js`), 'utf8'));
 }
 const { Dungeons: DG, Town: TW, Units: U } = globalThis.KD;
@@ -106,6 +106,67 @@ Object.entries(DG.VERSION_QUESTS).forEach(([v, list]) => {
 });
 w('### めったに 出ない クエスト（ナイテイの きょうだい）', '');
 Object.entries(DG.RARE_QUESTS).forEach(([kind, q]) => line(`quest.rare.${kind}`, q.text));
+w('');
+
+// ----- ダンジョンの中の 台詞 (2026-10-22 ユーザー指定: ダンジョン中の セリフも 書き出す) -----
+const C = globalThis.KD.Collection;
+w('## 9. ダンジョンの中の 台詞', '');
+w('### 9.1 ハプニング・決まり文句', '',
+    '`{item}` 道具の名前・`{boss}` ボスの名前・`{team}` ライバル探検隊の名前・`{name}` よみがえった 四天王の名前・`{money}` 取られた お金', '');
+const DL_WHERE = {
+    rivalNear: 'ハプニング：ライバル探検隊が いる階', furukawaGift: 'ハプニング：ふるカワから 通信（道具を 送ってくれる）', furukawaFull: 'ふるカワから 通信（持ち物が いっぱい）',
+    oniCall: 'ハプニング：おにおにの 取り立て', oniEmpty: '取り立てで お金が なかった', oniTake: 'ワナ「借金取り」を 踏んだ', oniTakeEmpty: 'ワナ「借金取り」で お金が なかった',
+    restDefault: 'ドタバタ大迷宮の 休憩の階（台詞が ない 階）', shinSummon: '大魔王ASO・真が 四天王を 呼ぶ', bossSummon: 'ボスが 手下を 呼ぶ', rivalDown: 'ライバル探検隊を たおした'
+};
+Object.entries(DG.DUNGEON_LINES).forEach(([k, t]) => {
+    w(`（${DL_WHERE[k] || k}）`);
+    line(`dungeon.${k}`, t);
+});
+w('');
+w('### 9.2 口ぐせ（吹き出しで ひとこと）', '');
+const WHEN = { attack: '攻撃したとき', pinch: 'ピンチ（HP が 少ない）', levelup: 'Lv が 上がったとき', win: '敵を たおしたとき' };
+Object.entries(C.LINES).forEach(([kind, set]) => {
+    w(`**${(U.HEROES[kind] || U.ENEMIES[kind] || {}).name || kind}**`, '');
+    Object.entries(set).forEach(([when, list]) => lines(`catch.${kind}.${when}`, list, WHEN[when] || when));
+});
+w('### 9.3 敵の ひとこと', '',
+    '会ったとき（ボス・決闘）・化けていたのが ばれたとき・仲間を 呼ぶ／回復する・お金や 道具を 取る・爆発・復活 のときに 出る。図鑑にも のる', '');
+const done = new Set();
+const enemyLine = kind => {
+    const e = U.ENEMIES[kind];
+    if (!e || !e.line || done.has(kind)) return;
+    done.add(kind);
+    line(`enemy.${kind}`, `${e.name}「${e.line}」`);
+};
+const group = (title, kinds) => {
+    const list = [...new Set(kinds)].filter(k => U.ENEMIES[k] && U.ENEMIES[k].line && !done.has(k));
+    if (!list.length) return;
+    w(`**${title}**`, '');
+    list.forEach(enemyLine);
+    w('');
+};
+[...DG.LIST, ...DG.EXTRA].forEach(d => group(d.name, [...(d.table ? [] : []), ...(d.enemies || []), ...(d.rare || []), d.boss]));
+group('森の 敵（はじめの 7 体）', Object.keys(U.ENEMIES).filter(k => Number(U.ENEMIES[k].no) >= 1 && Number(U.ENEMIES[k].no) <= 7));
+group('どこにでも 出る', DG.ANYWHERE.map(([k]) => k));
+Object.entries(C.RIVALS).forEach(([team, ids]) => group(`ライバル探検隊「${team}」`, ids));
+group('ドタバタ大迷宮', ['maoushin', ...Object.keys(U.ENEMIES).filter(k => Number(U.ENEMIES[k].no) >= 53 && Number(U.ENEMIES[k].no) <= 92)]);
+group('クエストで 待っている', [...Object.keys(DG.RARE_QUESTS), ...Object.values(DG.VERSION_QUESTS).flat().filter(q => q.ally).map(q => q.ally)]);
+group('そのほか', Object.keys(U.ENEMIES));
+
+// 必殺技 (js/specials.js)
+const SPx = globalThis.KD.Specials;
+const RANGE = { room: '見えている 敵 みんな', pierce: '前に まっすぐ つらぬく', around2: '周り 2 マス', front: '正面の 1 体' };
+w('### 9.4 必殺技（名前と 放つときの ひとこと）', '',
+    '1 人 1 回・チームで 3 回まで（ダンジョンごと）。名前の 行と ひとことの 行の 両方を 書き換えられる', '');
+Object.entries(SPx.LIST).forEach(([kind, sp]) => {
+    const who = (U.HEROES[kind] || U.ENEMIES[kind] || {}).name || kind;
+    w(`**${who}**（${RANGE[sp.range]}）`);
+    line(`special.${kind}.name`, sp.name);
+    line(`special.${kind}.shout`, `${who}「${sp.shout}」`);
+    w('');
+});
+w('**前作に いない 仲間**（属性で 名前、役職で 範囲と おまけが 決まる。ひとことは その キャラの 敵の ときの ひとこと＋技の 名前）', '');
+Object.entries(SPx.BY_ELEMENT).forEach(([el, sp]) => line(`special.element.${el}`, `${el}：${sp.name}`));
 w('');
 
 const text = out.join('\n');

@@ -184,6 +184,7 @@
             else if (k === 'KeyX' && !e.repeat) game.itemMenu();
             else if (k === 'KeyT' && !e.repeat) game.tacticMenu();
             else if (k === 'KeyC' && !e.repeat) game.switchMenu();   // 操作するキャラの 交代
+            else if (k === 'KeyV' && !e.repeat) game.specialMenu();   // 必殺技 (2026-10-22)
             else if (k === 'KeyS' && !e.repeat) game.toggleSound();
             else if (/^(Digit|Numpad)[1-4]$/.test(k) && !e.repeat && !NUMPAD[k]) game.useSkill(Number(k.slice(-1)) - 1);
         });
@@ -267,6 +268,7 @@
         tap('btn-item', () => (ask.asking() ? ask.key('back') : game.itemMenu()));
         tap('btn-tactic', () => (ask.asking() ? ask.key('back') : game.tacticMenu()));
         tap('btn-switch', () => (ask.asking() ? ask.key('back') : game.switchMenu()));
+        tap('btn-special', () => (ask.asking() ? null : game.specialMenu()));
         tap('btn-sound', () => game.soundMenu());
 
         // ----- わざのボタン (変わったときだけ作り直す) -----

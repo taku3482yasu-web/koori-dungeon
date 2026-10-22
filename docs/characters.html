@@ -77,8 +77,8 @@
 <script src="../js/units.js?v=61fa43f8"></script>
 <script src="../js/enemies.js?v=64281f04"></script>
 <script src="../js/items.js?v=2dc93420"></script>
-<script src="../js/dungeons.js?v=c421d5c4"></script>
-<script src="../js/collection.js?v=f621e235"></script>
+<script src="../js/dungeons.js?v=87bf375c"></script>
+<script src="../js/collection.js?v=a5ba0890"></script>
 <script src="../js/allies.js?v=e19c60c5"></script>
 <script src="../js/enemies9.js?v=9dffc81b"></script>
 <script src="../js/enemies10.js?v=5cfe54c6"></script>
@@ -88,6 +88,7 @@
 <script src="../js/enemyart.js?v=4369f873"></script>
 <script src="../js/enemyart9.js?v=9ce94360"></script>
 <script src="../js/enemyart10.js?v=462eb5f0"></script>
+<script src="../js/specials.js?v=55bf038f"></script>
 <script src="../js/profiles.js?v=ffed189e"></script>
 <script src="../js/enemyart11.js?v=959ce57f"></script>
 <script>
@@ -225,6 +226,13 @@
         const esc = t => t.replace(/[&<>]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch]);
         return `<div class="prof"><b>${esc(pr.title)}</b>${pr.text.split('\n\n').map(p => `<p>${esc(p)}</p>`).join('')}</div>`;
     }
+    // 必殺技 (js/specials.js。仲間に なれる キャラ・主人公たち)
+    function specialHtml(c) {
+        if (!KD.Specials || !(U.HEROES[c.id] || AL.star(c.id))) return '';
+        const e = U.ENEMIES[c.id] || U.HEROES[c.id];
+        const sp = KD.Specials.of(c.id, { element: e.element, role: (U.HEROES[c.id] && U.HEROES[c.id].role) || AL.roleOf(c.id), line: (U.ENEMIES[c.id] || {}).line });
+        return `<div class="evo">必殺技：${sp.name}</div>`;
+    }
     function allyHtml(info) {
         if (!info) return '';
         const max = { hp: 260, atk: 130, def: 130, spa: 130, spd: 130 };   // 棒の長さの目安 (Lv30。HP 以外は同じ基準)
@@ -265,6 +273,7 @@
                 ${baseName ? `<span class="tag plain">元: ${baseName}</span>` : ''}</div>
             <div class="desc">${c.desc || ''}</div>
             ${c.evo ? `<div class="evo">${c.evo}</div>` : ''}
+            ${specialHtml(c)}
             ${c.line ? `<div class="line">「${c.line}」</div>` : ''}
             ${allyHtml(info)}
             ${profileHtml(c.id)}`);

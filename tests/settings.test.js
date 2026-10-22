@@ -12,7 +12,7 @@ globalThis.performance = { now: () => fakeNow };
 const store = new Map();
 globalThis.localStorage = { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
 globalThis.KD = {};
-for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'enemies9.js', 'enemies10.js', 'enemies11.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'enemyart9.js', 'enemyart10.js', 'enemyart11.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
+for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'enemies9.js', 'enemies10.js', 'enemies11.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'enemyart9.js', 'enemyart10.js', 'enemyart11.js', 'sound.js', 'config.js', 'market.js', 'specials.js', 'townui.js', 'game.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
 const { Sound: S, Dungeons: DG } = globalThis.KD;
 
 // 描いた 回数を 数える canvas (こわれずに 描けるかを 見る)
@@ -320,4 +320,71 @@ test('ストーリー: 主人公ごとの 台詞 ({ koori, onioni }) と {hero} 
     assert.deepEqual(sc, [['bossAppear', 'harry'], ['talk', 'onioni']]);
     // 金色の SE城 (2026-10-22 ユーザー指定)
     assert.equal(DG.EXTRA.find(d => d.id === 'onijo').name, '金色のSE城');
+});
+
+test('必殺技: 1 人 1 回・チームで 3 回。カットインの あと キャラごとの エフェクトで 放つ', () => {
+    const { s, game, asks, choose, run } = newGame({ partner: true });
+    choose('ダンジョンへ');
+    choose('ハリーの森');
+    choose('スキップ');
+    run(1300);
+    asks.length = 0;
+    const SP = globalThis.KD.Specials;
+    assert.equal(game.specialFor(s.player).name, '大腸炎アタック');
+    assert.equal(game.specialFor(s.allies[0]).name, '鬼鬼の金棒');
+    // 前作に ない キャラは 属性と 役職で 決まる
+    const ally = game.makeAlly('haribaby', 3);
+    assert.ok(game.specialFor(ally).generic && game.specialFor(ally).name);
+    // 敵を 部屋に 置いて 放つ
+    const p = s.player;
+    const dx = [1, -1].find(d => globalThis.KD.Dungeon.canMove(s.map, p.x, p.y, d, 0));
+    const e = game.makeEnemy('donguriko', 1, p.x + dx, p.y);
+    e.hp = e.stats.hp = 999;
+    s.enemies.splice(0, s.enemies.length, e);
+    s.visible[e.y * s.map.w + e.x] = 1;
+    game.specialMenu();
+    assert.match(asks[0].message, /チームで あと 3 回/);
+    choose('大腸炎アタック');
+    drawn = 0;
+    run(400);
+    assert.ok(s.cutin && s.cutin.special && s.cutin.name === '大腸炎アタック', 'カットイン');
+    run(1500);
+    assert.ok(e.hp < 999, 'ダメージ');
+    assert.ok(drawn > 0);
+    run(1500);
+    assert.equal(s.specials.count, 1);
+    assert.ok(s.specials.used.koori);
+    // 同じ キャラは もう 使えない
+    game.specialMenu();
+    choose('大腸炎アタック');
+    assert.equal(s.specials.count, 1);
+    assert.match(s.messages[s.messages.length - 1].text, /もう 必殺技を 使った/);
+    // セーブの 続きにも 残る
+    const snap = game.snapshot();
+    assert.deepEqual(snap.specials, s.specials);
+    // チームで 3 回 使ったら もう 使えない
+    s.specials.count = SP.MAX_TEAM;
+    game.specialMenu();
+    assert.match(s.messages[s.messages.length - 1].text, /もう 使えない/);
+    // つぎの ダンジョンで また 使える
+    game.startDungeon('forest');
+    assert.equal(s.specials.count, 0);
+});
+
+test('必殺技: どの エフェクトも 描ける', () => {
+    const { s, game, choose, run } = newGame();
+    choose('ダンジョンへ');
+    choose('ハリーの森');
+    choose('スキップ');
+    run(1300);
+    const types = new Set([...Object.values(globalThis.KD.Specials.LIST), ...Object.values(globalThis.KD.Specials.BY_ELEMENT)].map(x => x.fx));
+    for (const type of types) {
+        for (const range of ['room', 'pierce', 'around2', 'front']) {
+            s.bigfx.push({ type, range, x: s.player.x, y: s.player.y, to: [s.player.x + 3, s.player.y], dir: [1, 0], targets: [[s.player.x + 1, s.player.y]], at: fakeNow, ms: 1000, color: '#ffffff' });
+        }
+    }
+    run(600);
+    assert.ok(s.bigfx.length > 0);
+    run(600);
+    assert.equal(s.bigfx.length, 0);
 });
