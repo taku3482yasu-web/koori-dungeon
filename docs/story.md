@@ -1572,7 +1572,9 @@
 
 ### 9.4 必殺技（名前と 放つときの ひとこと）
 
-1 人 1 回・チームで 3 回まで（ダンジョンごと）。名前の 行と ひとことの 行の 両方を 書き換えられる
+1 人 1 回・チームで 3 回まで（ダンジョンごと）。名前の 行と ひとことの 行の 両方を 書き換えられる。ボス・決闘の 相手は HP が 半分で 1 回 放つ
+
+【仮】は 前作に 技が ない ボス・決闘の 相手の 仮の 技（Claude の 案。書き換えてください。範囲を かえたいときも 書いてください）
 
 **こおりくん**（見えている 敵 みんな）
 - 〔special.koori.name〕 大腸炎アタック
@@ -1669,6 +1671,58 @@
 **大魔王ASO**（見えている 敵 みんな）
 - 〔special.maou.name〕 亜祖宇激烈破
 - 〔special.maou.shout〕 大魔王ASO「消え去れ！」
+
+**【仮】大魔王ASO・真**（見えている 敵 みんな）
+- 〔special.maoushin.name〕 亜祖宇激烈破・真
+- 〔special.maoushin.shout〕 大魔王ASO・真「真の力、思い知れ！ 亜祖宇激烈破・真！」
+
+**【仮】トリプルC**（前に まっすぐ つらぬく）
+- 〔special.triplec.name〕 トリプル・コンパイル
+- 〔special.triplec.shout〕 トリプルC「ビルド開始！ トリプル・コンパイル！」
+
+**【仮】国士無双ニャン**（見えている 敵 みんな）
+- 〔special.kokushinyan.name〕 国士無双・十三面ロン
+- 〔special.kokushinyan.shout〕 国士無双ニャン「十三面待ち……ロンだニャ！」
+
+**【仮】ハリー大帝**（周り 2 マス）
+- 〔special.harryemperor.name〕 インペリアル・ニードル
+- 〔special.harryemperor.shout〕 ハリー大帝「余の トゲを 受けよ！」
+
+**【仮】ハル麒麟**（見えている 敵 みんな）
+- 〔special.harukirin.name〕 春告げの嵐
+- 〔special.harukirin.shout〕 ハル麒麟「春よ、来たれ！」
+
+**【仮】金滅鬼**（周り 2 マス）
+- 〔special.kinmetsuki.name〕 金滅の金棒
+- 〔special.kinmetsuki.shout〕 金滅鬼「金色の 鬼に ひれ伏せ！」
+
+**【仮】シーシャ・ナイテイ・ナイナイ**（見えている 敵 みんな）
+- 〔special.naitei.name〕 内定取り消し
+- 〔special.naitei.shout〕 シーシャ・ナイテイ・ナイナイ「お前に内定はない！」
+
+**【仮】シーシャ・ナイテイ・アルアル**（見えている 敵 みんな）
+- 〔special.aruaru.name〕 内定の理
+- 〔special.aruaru.shout〕 シーシャ・ナイテイ・アルアル「内定の理を 見せてやろう！」
+
+**【仮】ナイテイ・ナナッシャ・ナディ**（見えている 敵 みんな）
+- 〔special.nadi.name〕 お祈りメール
+- 〔special.nadi.shout〕 ナイテイ・ナナッシャ・ナディ「お祈り 申し上げます」
+
+**【仮】ヒョウガリュウ**（前に まっすぐ つらぬく）
+- 〔special.hyougaryu.name〕 氷河の咆哮
+- 〔special.hyougaryu.shout〕 ヒョウガリュウ「凍てつけ！」
+
+**【仮】ゴウキオニ**（前に まっすぐ つらぬく）
+- 〔special.goukioni.name〕 豪鬼一番槍
+- 〔special.goukioni.shout〕 ゴウキオニ「一番槍、いくぞ！」
+
+**【仮】ヤーハミー**（見えている 敵 みんな）
+- 〔special.yahami.name〕 美しき大強奪
+- 〔special.yahami.shout〕 ヤーハミー「お宝も 視線も、ぜんぶ いただくわ！」
+
+**【仮】イシイー**（前に まっすぐ つらぬく）
+- 〔special.ishii.name〕 ケモノミチ大暴走
+- 〔special.ishii.shout〕 イシイー「ブヒッ！ 突撃だ！」
 
 **必殺技が ない キャラ（汎用の 必殺技）**：属性 × 役職で 名前が 決まる。エフェクトは 属性、範囲と おまけは 役職で 決まる
 

@@ -157,10 +157,11 @@ group('そのほか', Object.keys(U.ENEMIES));
 const SPx = globalThis.KD.Specials;
 const RANGE = { room: '見えている 敵 みんな', pierce: '前に まっすぐ つらぬく', around2: '周り 2 マス', front: '正面の 1 体' };
 w('### 9.4 必殺技（名前と 放つときの ひとこと）', '',
-    '1 人 1 回・チームで 3 回まで（ダンジョンごと）。名前の 行と ひとことの 行の 両方を 書き換えられる', '');
+    '1 人 1 回・チームで 3 回まで（ダンジョンごと）。名前の 行と ひとことの 行の 両方を 書き換えられる。ボス・決闘の 相手は HP が 半分で 1 回 放つ', '',
+    '【仮】は 前作に 技が ない ボス・決闘の 相手の 仮の 技（Claude の 案。書き換えてください。範囲を かえたいときも 書いてください）', '');
 Object.entries(SPx.LIST).forEach(([kind, sp]) => {
     const who = (U.HEROES[kind] || U.ENEMIES[kind] || {}).name || kind;
-    w(`**${who}**（${RANGE[sp.range]}）`);
+    w(`**${sp.temp ? "【仮】" : ""}${who}**（${RANGE[sp.range]}）`);
     line(`special.${kind}.name`, sp.name);
     line(`special.${kind}.shout`, `${who}「${sp.shout}」`);
     w('');
