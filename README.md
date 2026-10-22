@@ -53,7 +53,7 @@
 | `js/dungeons.js` | ダンジョン 7 つ（階数・敵の Lv・出る敵・特徴・ボス・ストーリーの台詞） |
 | `js/bigart.js` | ボス・強敵・やすさんたちの大きい絵（前作スロットの絵を写したもの） |
 | `js/enemyart.js` | ダンジョン 2〜7 の敵の絵 |
-| `js/enemyart9.js` | 段階 9（案）の敵 053〜092 と 大魔王ASO・真 の絵。進化形は元の絵の色を変えて しるしを足す。`docs/enemies9.html` をダブルクリックすると一覧で見られる |
+| `js/enemyart9.js` | 段階 9（案）の敵 053〜092 と 大魔王ASO・真 の絵。進化形は元の絵の色を変えて しるしを足す。`docs/characters.html`（キャラ図鑑）で見られる |
 | `js/market.js`・`js/config.js` | 交易所のオンライン（Supabase）・その設定 |
 | `js/collection.js` | 口ぐせ・ライバル探検隊・ハプニング・図鑑・実績のデータ |
 | `js/sound.js` | 効果音と BGM（WebAudio） |
@@ -68,6 +68,7 @@
 
 - 仕様書：[docs/spec.md](docs/spec.md)
 - 敵キャラ表：[docs/enemies.md](docs/enemies.md)
+- キャラ図鑑（絵で見る）：[docs/characters.html](docs/characters.html)。ダブルクリックで開くと、主人公・仲間・ダンジョンごとの敵とボス・どこにでも出る敵・ライバル探検隊・段階 9 の案（ドタバタ大迷宮）の絵と とくちょうが見られる
 
 ## 進捗
 

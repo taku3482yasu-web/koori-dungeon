@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>キャラ図鑑</title>
+<!--
+  ゲームに出るキャラの絵を一覧で見るページ (主人公・仲間・ダンジョンごとの敵とボス・どこにでも出る敵・ライバル探検隊・段階 9 の案)。
+  ダブルクリックで開ける。絵とデータは ゲームと同じ js/ のファイルから読む (段階 9 の案だけは このページに表を持つ)。
+  ?section=aso のように書くと、その章だけ出す (確認用)
+-->
+<style>
+    :root {
+        --bg: #10162a; --card: #1b2440; --line: #2c3a62; --text: #e8f0ff; --sub: #9aa8c8; --gold: #ffd84a; --plan: #ff9ab0;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", sans-serif; }
+    main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 48px; }
+    h1 { font-size: 22px; margin: 0 0 6px; }
+    h2 { font-size: 18px; margin: 36px 0 6px; border-left: 4px solid var(--gold); padding-left: 8px; scroll-margin-top: 56px; }
+    h2 .plan, .tag.plan { color: #10162a; background: var(--plan); font-size: 12px; padding: 1px 8px; border-radius: 99px; margin-left: 6px; vertical-align: 2px; }
+    h3 { font-size: 15px; margin: 18px 0 0; color: var(--sub); }
+    p { color: var(--sub); margin: 4px 0; font-size: 14px; line-height: 1.6; }
+    nav { position: sticky; top: 0; z-index: 1; background: rgba(16, 22, 42, 0.95); padding: 8px 0; margin: 10px 0 0; display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+    nav a { color: var(--text); text-decoration: none; font-size: 13px; padding: 3px 10px; border: 1px solid var(--line); border-radius: 99px; background: var(--card); }
+    nav a:hover { border-color: var(--gold); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin-top: 10px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px 12px; }
+    .card.plan { border-color: #6a3a5a; }
+    .pics { display: flex; align-items: flex-end; justify-content: center; gap: 6px; height: 104px; padding-bottom: 8px; background: #0b1020; border-radius: 6px; }
+    .big .pics { height: 150px; }
+    .pics canvas { image-rendering: pixelated; }
+    .pics .from { opacity: 0.75; }
+    .arrow { color: var(--gold); font-size: 18px; align-self: center; }
+    .head { display: flex; align-items: baseline; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+    .no { color: var(--sub); font-size: 12px; }
+    .name { font-weight: bold; font-size: 16px; }
+    .tags { display: flex; gap: 4px; margin: 6px 0 4px; flex-wrap: wrap; }
+    .tag { font-size: 11px; padding: 1px 7px; border-radius: 99px; color: #10162a; font-weight: bold; }
+    .tag.plain { background: #3a4670; color: var(--text); font-weight: normal; }
+    .tag.boss { background: var(--gold); }
+    .desc { font-size: 12px; color: var(--sub); line-height: 1.5; }
+    .line { font-size: 12px; margin-top: 4px; }
+</style>
+</head>
+<body>
+<main>
+    <h1>キャラ図鑑</h1>
+    <p>ゲームに出るキャラの絵です。ゲームと同じ絵を大きくして描いています（動いているのは待機のアニメーション）。</p>
+    <p><span class="tag plan">案</span> の章は 段階 9（おまけダンジョン「ドタバタ大迷宮」）の案で、まだゲームには出ません。進化形は「元の敵 ▶ 進化形」の順に並べています。</p>
+    <nav id="nav"></nav>
+    <div id="sections"></div>
+</main>
+
+<script src="../js/rng.js"></script>
+<script src="../js/dungeon.js"></script>
+<script src="../js/units.js"></script>
+<script src="../js/enemies.js"></script>
+<script src="../js/items.js"></script>
+<script src="../js/dungeons.js"></script>
+<script src="../js/collection.js"></script>
+<script src="../js/art.js"></script>
+<script src="../js/bigart.js"></script>
+<script src="../js/enemyart.js"></script>
+<script src="../js/enemyart9.js"></script>
+<script>
+(function () {
+    'use strict';
+    const { Units: U, Dungeons: DG, Collection: C, Art: A, BigArt: B, EnemyArt9: E } = KD;
+    // 属性の色 (game.js の ELEMENT_COLORS と同じ)
+    const ELEMENT_COLORS = { 'こおり': '#bff0ff', 'ほのお': '#ff9a4a', 'みず': '#6ab8ff', 'しぜん': '#9ae07a', 'かぜ': '#e8f4ff', 'ふしぎ': '#d8a8ff', 'ふつう': '#ffffff' };
+    const AI = { approach: '近づく', shoot: '撃つ', flee: 'にげる', wait: 'まつ' };
+    // とくちょう (enemies.js の traits)
+    const TRAITS = {
+        ghost: '壁の中を通れる', swim: '水の上を歩ける', lava: '溶岩でダメージを受けない', shell: 'ダメージを受けると甲羅にこもる',
+        rage: '攻撃されると こうげきが上がる', berserk: 'HP が半分を切ると強くなる', split: '攻撃されると分裂する',
+        disguise: '近くに来るまで道具に化けている', mimic: '宝箱に化けている', caltrops: '歩いたあとに まきびし',
+        explode: 'HP が少なくなると爆発', healer: '仲間の敵を回復', evasive: '攻撃が当たりにくい', frenzy: 'しばらくすると凶暴に',
+        revive: '1 回だけ復活', slow: '2 ターンに 1 回しか動かない', charge: '2 回に 1 回 強い攻撃', reflect: 'わざをはね返すことがある',
+        summon: '仲間を呼ぶ', group: '何体かまとまって出る', stealMoney: 'お金を取って逃げる', malfunction: 'ときどき故障して止まる',
+        rich: 'たおすと たくさんのお金', warp: '攻撃されると どこかへ飛ぶ'
+    };
+    const skillName = id => (U.SKILLS[id] ? U.SKILLS[id].name : id);
+
+    // ----- 敵のデータ → カードの中身 -----
+    function enemyCard(id, extra = {}) {
+        const d = U.ENEMIES[id];
+        const moves = (d.moves || []).map(([m]) => skillName(m));
+        if (d.move && !moves.length) moves.push(skillName(d.move));
+        const traits = (d.traits || []).filter(t => !(t === 'swim' && d.element === 'みず') && !(t === 'lava' && d.element === 'ほのお')).map(t => TRAITS[t] || t);
+        if (d.speed === 2) traits.unshift('1 ターンに 2 回動く');
+        if (d.steal) traits.push('道具をぬすんで逃げる');
+        const tags = [AI[d.ai] || d.ai];
+        if (d.role && U.ROLES[d.role] && !d.boss && !d.rival && !d.big) tags.push(`仲間: ${U.ROLES[d.role].name}`);
+        return {
+            id, no: d.no, name: d.name, element: d.element, tags, boss: d.boss,
+            desc: [moves.length ? `わざ: ${moves.join('・')}` : '', traits.join('。')].filter(Boolean).join('　'),
+            line: d.line, ...extra
+        };
+    }
+    function heroCard(id) {
+        const h = U.HEROES[id];
+        const lines = C.LINES[id];
+        const learn = (h.learn || []).map(([, s]) => skillName(s));
+        return {
+            id, no: '', name: h.name, element: h.element, tags: [h.type || (U.ROLES[h.role] && U.ROLES[h.role].name) || ''].filter(Boolean),
+            desc: [h.note || '', learn.length ? `わざ: ${learn.join('・')}` : ''].filter(Boolean).join('　'),
+            line: lines ? lines.attack[0] : ''
+        };
+    }
+
+    // ----- 段階 9 の案 (敵キャラ表 9・10 章) -----
+    // [No, id, 名前, 属性, 強さ, 動き, とくちょう, ひとこと]
+    const PLAN = [
+        ['053', 'harigeneral', 'ハリジェネラル', 'ふつう', '★3', '近づく', '針を直線に飛ばす。ハリベビーを呼ぶ', '突撃ハリ！'],
+        ['054', 'joubachi', 'ジョオウバチ', 'かぜ', '★3', '近づく', '1ターンに 2 回動く。ムメンキョバチを呼ぶ', '免許？ 女王には いらないの'],
+        ['055', 'oodonguriko', 'オオドングリコ', 'しぜん', '★3', '近づく', '2 回に 1 回 強い体当たり', 'ゴロゴロゴロ～！'],
+        ['056', 'nemuridakeou', 'ネムリダケオウ', 'しぜん', '★3', 'まつ', '周り 8 マスに ねむりごな', 'おやすみ…みんな…'],
+        ['057', 'pekorisuking', 'ペコリスキング', 'かぜ', '★3', 'にげる', '1ターンに 2 回動き、道具を取って逃げる', 'ぜんぶ いただきっ！'],
+        ['058', 'tsutankobuju', 'ツタンコブジュ', 'しぜん', '★4', 'まつ', '周り 8 マスを しばる', 'からめとる…'],
+        ['059', 'yoakefukurou', 'ヨアケフクロウ', 'かぜ', '★3', '撃つ', '強い羽ばたき（直線）。目つぶし', 'もう朝だホー'],
+        ['060', 'hyougame', 'ヒョウガメ', 'こおり', '★4', '近づく', 'ダメージを受けると甲羅にこもる。こおり状態にする', '…（ひえひえ）'],
+        ['061', 'ryuuguudai', 'リュウグウダイ', 'みず', '★4', 'まつ', '仲間の敵を回復する', '竜宮へ ご案内♪'],
+        ['062', 'umibozuou', 'ウミボウズオウ', 'ふしぎ', '★4', 'すりぬけ', '壁と水をすりぬける。大波（直線）', 'ぼうず～～ん！！'],
+        ['063', 'daienjou', 'ダイエンジョウ', 'ほのお', '★4', '近づく', '攻撃されると こうげきが上がる。やけど', '大炎上 上等！'],
+        ['064', 'spamking', 'スパムキング', 'ふしぎ', '★3', '近づく', '攻撃されると分裂する', '100万人目の お客様です！'],
+        ['065', 'hitodamaou', 'ヒトダマオウ', 'ほのお', '★4', '撃つ', '火の玉（直線）。やけど', 'めら～り'],
+        ['066', 'jouninman', 'ジョウニンマン', 'かぜ', '★4', '近づく', '1ターンに 2 回動く', 'もう いましたよ～'],
+        ['067', 'kagebunshin', 'カゲブンシンダヌキ', 'ふしぎ', '★4', 'まつ', '道具に化ける。攻撃されると どこかへ飛ぶ', 'ドロロン！'],
+        ['068', 'daibakudanjirou', 'ダイバクダンジロウ', 'ほのお', '★4', '近づく', 'HP が減ると 周りを巻きこんで爆発', 'あとは まかせた～～！！'],
+        ['069', 'kaguyausagi', 'カグヤウサギ', 'ふしぎ', '★4', 'まつ', '仲間の敵を回復する。攻撃されると どこかへ飛ぶ', '月に 帰りますね'],
+        ['070', 'shingetsuwolf', 'シンゲツウルフ', 'かぜ', '★4', '近づく', 'しばらくすると凶暴になる。1ターンに 2 回動く', 'アオーーン！'],
+        ['071', 'yukimidaifuku', 'ユキミダイフク', 'こおり', '★4', '近づく', '雪玉で こおり状態にする', 'ひんやり おつきみ～'],
+        ['072', 'muscletitan', 'マッスルタイタン', 'ふつう', '★5', '近づく', '2 ターンに 1 回しか動かないが とても強い', 'タンパク…シツ…ゴールド…'],
+        ['073', 'kazanmatcho', 'カザンマッチョ', 'ほのお', '★5', '近づく', '周り 8 マスに噴火。やけど', '噴火する 筋肉！'],
+        ['074', 'hyouzanmuscle', 'ヒョウザンマッスル', 'こおり', '★5', '近づく', '周り 8 マスに吹雪。こおり状態にする', '冷えきった 筋肉こそ 最強'],
+        ['075', 'asoshougun', 'アソショウグン', 'ふつう', '★5', '近づく', 'アソヘイを呼ぶ', 'アソ！ アソ！ 全軍 かかれ！'],
+        ['076', 'kinkomimic', 'キンコミミック', 'ふつう', '★5', 'まつ', '宝箱に化けている。たおすと とても良い道具', 'あけたな？ 暗証番号は？'],
+        ['077', 'koorimodokishin', 'コオリモドキ・真', 'こおり', '★5', '近づく', 'こおりくんのわざを全部使う', 'ぼくこそ ほんもののこおりくんだよ'],
+        ['078', 'rishitoribourei', 'リシトリボウレイ', 'ふしぎ', '★5', 'すりぬけ', 'お金を取って逃げる', '…利子も かえせ…'],
+        ['079', 'daichouenou', 'ダイチョウエンオウ', 'ふしぎ', '★4', '近づく', '分裂する。大腸炎にする', 'おなか、ぐるぐるぐる～！'],
+        ['080', 'fubukipenguin', 'フブキペンギン', 'こおり', '★4', '近づく', '1ターンに 2 回動く。こおり状態にする', 'ペンペン！'],
+        ['081', 'tsuraracomori', 'ツララコウモリ', 'こおり', '★4', '撃つ', 'つららを直線に飛ばす。攻撃が当たりにくい', 'キキーン'],
+        ['082', 'koorinokagami', 'コオリノカガミ', 'こおり', '★5', 'まつ', 'わざを はね返すことがある', 'うつってるよ…きみが'],
+        ['083', 'hinotorin', 'ヒノトリン', 'ほのお', '★4', '撃つ', '火の羽（直線）。1 回だけ復活する', 'ピヨッ（ぼうぼう）'],
+        ['084', 'kaendaruma', 'カエンダルマ', 'ほのお', '★4', '近づく', 'HP が減ると爆発する', '七転び 八起き 大爆発！'],
+        ['085', 'youganworm', 'ヨウガンワーム', 'ほのお', '★4', '近づく', '溶岩の上を 歩ける。やけど', 'ズズズ…'],
+        ['086', 'mandoragon', 'マンドラゴン', 'しぜん', '★4', 'まつ', '叫び声で 周り 8 マスを こんらん', 'ギャアアア！（抜かないで）'],
+        ['087', 'obakekabocha', 'オバケカボチャ', 'しぜん', '★4', 'すりぬけ', '壁をすりぬける', 'トリック オア トリート！'],
+        ['088', 'haetorigusan', 'ハエトリグサーン', 'しぜん', '★4', 'まつ', '近づくと すいこみ（強い攻撃）', 'パクッ'],
+        ['089', 'kokemusha', 'コケムシャ', 'しぜん', '★5', '近づく', 'HP が半分を切ると 強くなる', '百年 こけむして 待っておった'],
+        ['090', 'tatsumakitsune', 'タツマキツネ', 'かぜ', '★4', '近づく', '攻撃されると どこかへ飛ぶ。1ターンに 2 回動く', 'コーン！（ぐるぐる）'],
+        ['091', 'kaminarigumo', 'カミナリグモ', 'かぜ', '★5', '撃つ', '雷（直線）で まひ', 'ゴロゴロ…ピシャーン！'],
+        ['092', 'watageboushi', 'ワタゲボウシ', 'かぜ', '★3', 'にげる', 'すぐ逃げる。たおすと 良い道具を落とす', 'ふわふわ～']
+    ];
+    const planCard = ([no, id, name, element, star, ai, desc, line]) => ({ id, no, name, element, tags: [star, ai], desc, line, plan: true });
+    const PLAN_BOSS = { id: 'maoushin', no: '', name: '大魔王ASO・真', element: 'ふしぎ', tags: ['ボス'], boss: true, plan: true,
+        desc: 'HP が減ると 四天王（ダイシ・ズミタニ・ルナヤ・ノゾエマ）を 1 人ずつ呼ぶ', line: 'まだだ……真の力を 見せてやろう！' };
+
+    // ----- 章 -----
+    const SECTIONS = [];
+    const section = (id, title, note, groups, plan = false) => SECTIONS.push({ id, title, note, groups, plan });
+    section('heroes', '主人公・仲間', '主人公は こおりくん か おにおに。やすさん・たむさん・だけさんは ストーリーで仲間になる',
+        [{ cards: ['koori', 'onioni', 'yasu', 'tamu', 'dake'].map(heroCard) }]);
+    DG.LIST.forEach((d, i) => {
+        const groups = [{ title: '敵', cards: d.enemies.map(id => enemyCard(id)) }];
+        if (d.rare && d.rare.length) groups.push({ title: 'まれに出る強敵', cards: d.rare.map(id => enemyCard(id)) });
+        groups.push({ title: `ボス（${d.floors} 階）`, cards: [enemyCard(d.boss)] });
+        section(d.id, `${i + 1}. ${d.name}`, `${d.floors} 階`, groups);
+    });
+    section('anywhere', 'どこにでも出る（まれ）', 'どのダンジョンにも まれに出る', [{ cards: DG.ANYWHERE.map(([id]) => enemyCard(id)) }]);
+    section('rivals', 'ライバル探検隊', 'ハプニングで鉢合わせする。たおすと お金を落とす',
+        Object.entries(C.RIVALS).map(([team, ids]) => ({ title: team, cards: ids.map(id => enemyCard(id)) })));
+    section('plan', '段階 9：ドタバタ大迷宮', '借金を返し切ったあとの おまけダンジョン（99 階）の案', [
+        { title: 'ボス（99 階）', cards: [PLAN_BOSS] },
+        { title: '進化形（053〜079）', cards: PLAN.filter(r => Number(r[0]) <= 79).map(planCard) },
+        { title: 'ドタバタ大迷宮の敵（080〜092）', cards: PLAN.filter(r => Number(r[0]) >= 80).map(planCard) }
+    ], true);
+
+    // ----- 描く -----
+    const sprites = [];   // { canvas, id, scale, h }
+    const BOX = 92;       // 絵の高さの上限 (ドット × 倍率)
+    function makeCanvas(id, max = BOX) {
+        const size = A.SPRITES[id] ? { w: 16, h: 16 } : B.BIG[id];
+        const scale = Math.max(1, Math.min(5, Math.floor(max / size.h)));
+        const c = document.createElement('canvas');
+        c.width = size.w * scale;
+        c.height = size.h * scale;
+        sprites.push({ canvas: c, id, scale, h: size.h });
+        return c;
+    }
+    function draw(s, frame) {
+        const ctx = s.canvas.getContext('2d');
+        ctx.clearRect(0, 0, s.canvas.width, s.canvas.height);
+        if (A.SPRITES[s.id]) A.drawSprite(ctx, s.id, frame, 0, 0, { scale: s.scale });
+        else B.drawBig(ctx, s.id, frame, s.canvas.width / 2, s.canvas.height, { height: s.h * s.scale });
+    }
+    const hasArt = id => Boolean(A.SPRITES[id] || B.BIG[id]);
+
+    function renderCard(c, parent) {
+        const el = document.createElement('div');
+        const big = !A.SPRITES[c.id] && B.BIG[c.id] && B.BIG[c.id].h > 20;
+        el.className = 'card' + (c.plan ? ' plan' : '') + (big ? ' big' : '');
+        const pics = document.createElement('div');
+        pics.className = 'pics';
+        const max = big ? 136 : BOX;
+        const base = E.EVOLVED[c.id];
+        if (base && hasArt(base)) {
+            const from = makeCanvas(base, base === 'maou' ? 60 : 50);
+            from.className = 'from';
+            pics.append(from);
+            pics.insertAdjacentHTML('beforeend', '<span class="arrow">▶</span>');
+        }
+        if (hasArt(c.id)) pics.append(makeCanvas(c.id, max));
+        el.append(pics);
+        const baseName = base && U.ENEMIES[base] ? U.ENEMIES[base].name : null;
+        el.insertAdjacentHTML('beforeend', `
+            <div class="head"><span class="no">${c.no ? 'No.' + c.no : ''}</span><span class="name">${c.name}</span></div>
+            <div class="tags"><span class="tag" style="background:${ELEMENT_COLORS[c.element] || '#ffffff'}">${c.element}</span>
+                ${c.boss ? '<span class="tag boss">ボス</span>' : ''}
+                ${c.tags.filter(t => t !== 'ボス').map(t => `<span class="tag plain">${t}</span>`).join('')}
+                ${baseName ? `<span class="tag plain">元: ${baseName}</span>` : ''}</div>
+            <div class="desc">${c.desc || ''}</div>
+            ${c.line ? `<div class="line">「${c.line}」</div>` : ''}`);
+        parent.append(el);
+    }
+
+    const only = new URLSearchParams(location.search).get('section');
+    const nav = document.getElementById('nav');
+    const root = document.getElementById('sections');
+    SECTIONS.filter(s => !only || s.id === only).forEach(s => {
+        nav.insertAdjacentHTML('beforeend', `<a href="#${s.id}">${s.title.replace(/^\d+\. /, '')}${s.plan ? '（案）' : ''}</a>`);
+        root.insertAdjacentHTML('beforeend', `<h2 id="${s.id}">${s.title}${s.plan ? '<span class="plan">案</span>' : ''}</h2><p>${s.note}</p>`);
+        s.groups.forEach(g => {
+            if (g.title) root.insertAdjacentHTML('beforeend', `<h3>${g.title}</h3>`);
+            const grid = document.createElement('div');
+            grid.className = 'grid';
+            g.cards.forEach(c => renderCard(c, grid));
+            root.append(grid);
+        });
+    });
+
+    let frame = 0;
+    const tick = () => { sprites.forEach(s => draw(s, frame)); frame = 1 - frame; };
+    tick();
+    setInterval(tick, 450);
+})();
+</script>
+</body>
+</html>
