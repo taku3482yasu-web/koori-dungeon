@@ -244,6 +244,9 @@ h1 .howto:hover { border-color: var(--hot); }
         flex: 0 1 auto;
     }
     .ask-choices button, .ask.list .ask-choices button { min-width: 0; padding: 10px 8px; font-size: 14px; text-align: center; }
+    /* 指で 一覧を スクロールできるように (いちばん下まで 押せる) */
+    .ask-choices, .ask-text { touch-action: pan-y; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+    .ask-choices { padding-bottom: 2px; }
     /* 1 つだけ・あまった 最後の 1 つ (もどる・やめる) は 横いっぱい */
     .ask-choices button:last-child:nth-child(odd) { grid-column: 1 / -1; }
     /* 長い 名前が あれば 1 列・左よせ */

@@ -72,6 +72,26 @@ async function key(code, vk, hold = 150) {
     await send('Input.dispatchKeyEvent', { type: 'keyUp', code, key: code, windowsVirtualKeyCode: vk });
     await sleep(350);
 }
+// 指で 押して すべらせる (dy: 上へ 何 px)。一覧の スクロール
+async function swipe(selector, dy) {
+    const b = await evaluate(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height * 0.8 }; })()`);
+    await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: b.x, y: b.y }] });
+    for (let k = 1; k <= 8; k++) {
+        await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: b.x, y: b.y - dy * k / 8 }] });
+        await sleep(16);
+    }
+    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await sleep(400);
+}
+// 指で 1 回 押す (text の ボタン。見えるところまで スクロールしてから)
+async function tapText(selector, text) {
+    const b = await evaluate(`(() => { const e = [...document.querySelectorAll(${JSON.stringify(selector)})].find(x => x.textContent.includes(${JSON.stringify(text)}));
+        const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: b.x, y: b.y }] });
+    await sleep(40);
+    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await sleep(400);
+}
 const pos = () => evaluate('(() => { const p = window.kdGame.state.player; return [p.x, p.y].join(","); })()');
 const asking = () => evaluate('document.getElementById("ask").hidden ? "" : document.querySelector(".ask-text").textContent');
 const phase = () => evaluate('window.kdGame.state.phase');
@@ -240,6 +260,20 @@ try {
         const btns = [...document.querySelectorAll('.ask-choices button')], last = btns[btns.length - 1].getBoundingClientRect();
         return box.top >= st.bottom - 1 && last.bottom <= innerHeight + 1 && getComputedStyle(document.querySelector('.pad')).display === 'none';
     })()`), 'スマホの 町: メニューが ゲーム画面に 重ならず 全部 見える・十字ボタンは かくれる');
+    // 低い スマホ: 長い 一覧 (ダンジョンへ) を 指で スクロールしても 決まらず、いちばん下の「やめる」を 押せる
+    await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 600, deviceScaleFactor: 2, mobile: true });
+    await sleep(300);
+    await tapText('.ask-choices button', 'ダンジョンへ');
+    const listTop = () => evaluate('document.querySelector(".ask-choices").scrollTop');
+    const overflow = await evaluate('(() => { const c = document.querySelector(".ask-choices"); return c.scrollHeight > c.clientHeight + 4; })()');
+    await swipe('.ask-choices', 300);
+    const scrolled = await listTop();
+    const stillList = /どこへ行く/.test(await asking());
+    await tapText('.ask-choices button', 'やめる');
+    check(overflow && scrolled > 0 && stillList && /SEタウン/.test(await asking()),
+        `スマホ: 長い 一覧を 指で スクロールでき（${scrolled}px）、いちばん下を 押せる`);
+    await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+    await sleep(300);
     await press('.ask-choices button', { text: '交易所' });
     await sleep(1500);
     await press('.ask-choices button', { text: 'ほかの探検隊の出品' });

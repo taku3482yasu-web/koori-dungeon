@@ -26,6 +26,9 @@
         input.setAttribute('autocapitalize', 'characters');
         box.insertBefore(input, choices);
         let current = null;   // { options, index, done, onMove }
+        // 指で 押したとき: 離したときに 決める (指を すべらせたら 一覧の スクロール。2026-10-22 ユーザー指定: 下のほうが 押せない)
+        let touchAt = null;   // { id, x, y, i }
+        const TAP_SLOP = 10;
         function render() {
             choices.innerHTML = '';
             current.options.forEach((label, i) => {
@@ -34,9 +37,22 @@
                 b.textContent = label;
                 b.className = i === current.index ? 'on' : '';
                 b.addEventListener('pointerdown', e => {
+                    if (e.pointerType !== 'mouse') {
+                        touchAt = { id: e.pointerId, x: e.clientX, y: e.clientY, i };
+                        return;
+                    }
+                    e.preventDefault();
+                    choose(i);   // マウスは 押した 瞬間
+                });
+                b.addEventListener('pointerup', e => {
+                    const t = touchAt;
+                    touchAt = null;
+                    if (!t || t.id !== e.pointerId || t.i !== i) return;
+                    if (Math.abs(e.clientX - t.x) > TAP_SLOP || Math.abs(e.clientY - t.y) > TAP_SLOP) return;
                     e.preventDefault();
                     choose(i);
                 });
+                b.addEventListener('pointercancel', () => { touchAt = null; });   // スクロールが 始まった
                 choices.appendChild(b);
             });
             // 縦にならべたとき (道具がたくさん) は、えらんでいるものが見えるように
@@ -53,7 +69,7 @@
             if (current.onMove) current.onMove(i);
         }
         function choose(i) {
-            if (!current.options.length) return;   // 「つないでいます」など えらぶものが ない
+            if (!current || !current.options.length) return;   // 「つないでいます」など えらぶものが ない
             if (KD.Sound) KD.Sound.play('ok');
             const c = current;
             current = null;
