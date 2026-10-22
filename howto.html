@@ -100,6 +100,8 @@
     </ul>
     <div class="table-wrap"><table id="recruit"></table></div>
 
+    <p><b>ナイテイの きょうだい</b>（シーシャ・ナイテイ・ナイナイ／アルアル・ナイテイ・ナナッシャ・ナディ）は、ごくまれに 掲示板に出る クエストで 決まった階に 待っています。たおして 報告すると 仲間になります（★5）。</p>
+
     <h2 id="evolve">進化</h2>
     <p>仲間になった 元の敵は、条件を満たすと 進化形に進化します。条件の種類も、何 Lv からかも キャラごとに ちがいます。</p>
     <div class="table-wrap"><table id="evolves"></table></div>
@@ -167,7 +169,7 @@
     }));
     void label;
 
-    table('dungeons', ['ダンジョン', '階', 'ボス', '特徴'], [...DG.LIST, DG.BONUS].map(d => {
+    table('dungeons', ['ダンジョン', '階', 'ボス', '特徴'], [...DG.LIST, ...(DG.EXTRA || []), DG.BONUS].map(d => {
         const f = [];
         if (d.pool) f.push(d.pool.tile === KD.Dungeon.WATER ? '水たまり' : '溶岩');
         if (d.traps && d.traps[0] >= 6) f.push('ワナが多い');
@@ -175,6 +177,7 @@
         if (d.shift) f.push('階の形が変わる');
         if (d.strong) f.push('力持ちの敵');
         if (d.bonus) f.push('10 階ごとに 特徴が変わる・休憩の階');
+        if (d.extra) f.push(d.openText);
         return [d.name, d.floors, U.ENEMIES[d.boss].name, f.join('・') || (d.id === 'forest' ? 'チュートリアル' : '')];
     }));
 
