@@ -72,14 +72,16 @@
 <script src="../js/units.js?v=c51766bd"></script>
 <script src="../js/enemies.js?v=7eed88a2"></script>
 <script src="../js/items.js?v=2dc93420"></script>
-<script src="../js/dungeons.js?v=12a7242f"></script>
+<script src="../js/dungeons.js?v=60f7b169"></script>
 <script src="../js/collection.js?v=d19cab15"></script>
 <script src="../js/allies.js?v=e19c60c5"></script>
 <script src="../js/enemies9.js?v=e898c34f"></script>
-<script src="../js/art.js?v=45e5bb75"></script>
+<script src="../js/enemies10.js?v=4ddcedc4"></script>
+<script src="../js/art.js?v=58d5976a"></script>
 <script src="../js/bigart.js?v=8b50860b"></script>
 <script src="../js/enemyart.js?v=4369f873"></script>
 <script src="../js/enemyart9.js?v=9ce94360"></script>
+<script src="../js/enemyart10.js?v=462eb5f0"></script>
 <script>
 (function () {
     'use strict';
@@ -95,7 +97,7 @@
         explode: 'HP が少なくなると爆発', healer: '仲間の敵を回復', evasive: '攻撃が当たりにくい', frenzy: 'しばらくすると凶暴に',
         revive: '1 回だけ復活', slow: '2 ターンに 1 回しか動かない', charge: '2 回に 1 回 強い攻撃', reflect: 'わざをはね返すことがある',
         summon: '仲間を呼ぶ', group: '何体かまとまって出る', stealMoney: 'お金を取って逃げる', malfunction: 'ときどき故障して止まる',
-        rich: 'たおすと たくさんのお金', warp: '攻撃されると どこかへ飛ぶ', treasure: 'たおすと 良い道具'
+        rich: 'たおすと たくさんのお金', warp: '攻撃されると どこかへ飛ぶ', treasure: 'たおすと 良い道具', metal: 'ダメージが 1〜2 しか通らない・すぐ逃げる'
     };
     const skillName = id => (U.SKILLS[id] ? U.SKILLS[id].name : id);
     const AL = KD.Allies;
@@ -158,6 +160,15 @@
         groups.push({ title: `ボス（${d.floors} 階）`, cards: [enemyCard(d.boss)] });
         section(d.id, `${i + 1}. ${d.name}`, `${d.floors} 階`, groups);
     });
+    // 段階 10 の ダンジョン (コード塔・ツモツモ横丁・ハリー王国)
+    (DG.EXTRA || []).forEach(d => {
+        const groups = [{ title: '敵', cards: d.enemies.map(id => enemyCard(id)) }];
+        if (d.rare && d.rare.length) groups.push({ title: 'まれに出る', cards: [...new Set(d.rare)].map(id => enemyCard(id)) });
+        groups.push({ title: `ボス（${d.floors} 階）`, cards: [enemyCard(d.boss)] });
+        section(d.id, d.name, `${d.floors} 階・${d.openText}`, groups);
+    });
+    section('naitei', 'ナイテイの きょうだい', 'ごくまれに 掲示板に出る クエストで 決まった階に 待っている。たおすと 仲間になる',
+        [{ cards: Object.keys(DG.RARE_QUESTS || {}).map(id => enemyCard(id, { desc: `${DG.byId(DG.RARE_QUESTS[id].dungeon).name}の B${DG.RARE_QUESTS[id].floor}F で 待っている` })) }]);
     section('anywhere', 'どこにでも出る（まれ）', 'どのダンジョンにも まれに出る', [{ cards: DG.ANYWHERE.map(([id]) => enemyCard(id)) }]);
     section('rivals', 'ライバル探検隊', 'ハプニングで鉢合わせする。たおすと お金を落とす。ストーリーをクリアすると 専用クエストで仲間になる。メンバーが そろうと リーダーとの勝負（リーダーは ★5、ほかは ★4）',
         Object.entries(C.RIVALS).map(([team, ids]) => ({ title: team, cards: ids.map(id => enemyCard(id, id === AL.LEADERS[team] ? { tags: [...enemyCard(id).tags, 'リーダー'] } : {})) })));

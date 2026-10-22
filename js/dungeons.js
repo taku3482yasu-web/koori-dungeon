@@ -141,7 +141,8 @@
     });
 
     // ドタバタ大迷宮 (KD.Dungeons.BONUS。enemies9.js で足す) も さがす
-    const byId = id => LIST.find(d => d.id === id) || (KD.Dungeons.BONUS && KD.Dungeons.BONUS.id === id ? KD.Dungeons.BONUS : undefined);
+    const byId = id => LIST.find(d => d.id === id) || (KD.Dungeons.BONUS && KD.Dungeons.BONUS.id === id ? KD.Dungeons.BONUS : undefined)
+        || (KD.Dungeons.EXTRA || []).find(d => d.id === id);
 
     // 一緒に行ける人数 (仕様書 8章: 3 人。ネット寺をクリアすると 4 人、月の迷宮で 5 人)
     const partyMax = cleared => 3 + (cleared >= 3 ? 1 : 0) + (cleared >= 5 ? 1 : 0);

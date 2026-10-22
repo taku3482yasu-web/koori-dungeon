@@ -220,6 +220,22 @@
             ...block('#5a4a3a', '#4a3a2a', '#7a6a5a'), stairs: ['#9a8f8f', '#5a4f4f', '#d8ccc8'],
             lava: ['#e85a1a', '#ffb040'], void: '#0a0604', mini: { floor: '#a8b880', path: '#a89880', lava: '#ff7a3a' }
         },
+        // 段階 10: コード塔 (黒と緑の 画面の色) / ツモツモ横丁 (夜の石だたみ・ネオン) / ハリー王国 (お城の石・金)
+        code: {
+            floor: ['#10241a', '#0e2016', '#14281e'], floorPattern: 'speck', speck: '#3aff8a', path: '#1a3a2a', pathDark: '#10261a', pebble: '#3a6a4a',
+            ...block('#0a140e', '#06100a', '#1e4a2e', { accent: '#3aff8a' }), stairs: ['#3aff8a', '#1a6a3a', '#b0ffd0'],
+            void: '#020604', mini: { floor: '#3a8a5a', path: '#2a6a4a' }
+        },
+        alley: {
+            floor: ['#3a3a4a', '#363646', '#40404e'], floorPattern: 'boards', speck: '#2a2a38', path: '#4a3a3a', pathDark: '#3a2a2a', pebble: '#6a5a6a',
+            ...block('#2a1a2a', '#1e121e', '#4a2a4a', { accent: '#ff5aa0' }), stairs: ['#ffd84a', '#8a6a2a', '#fff0a0'],
+            void: '#06020a', mini: { floor: '#7a7a9a', path: '#8a6a7a' }
+        },
+        kingdom: {
+            floor: ['#8a8070', '#82786a', '#928878'], floorPattern: 'speck', speck: '#6a6050', path: '#a08a5a', pathDark: '#806a3a', pebble: '#c8b080',
+            ...block('#5a5068', '#463e54', '#7a7088', { accent: '#ffd84a' }), stairs: ['#ffd84a', '#8a6a2a', '#fff0a0'],
+            void: '#060408', mini: { floor: '#b8b098', path: '#c8a870' }
+        },
         aso: {
             floor: ['#4a2a2a', '#442626', '#523030'], floorPattern: 'speck', speck: '#7a3a2a', path: '#3a2020', pathDark: '#2a1414', pebble: '#6a3a3a',
             ...block('#2a1414', '#1e0e0e', '#5a2a2a', { accent: '#e85a1a' }), stairs: ['#8a6a6a', '#4a2a2a', '#c8a0a0'],

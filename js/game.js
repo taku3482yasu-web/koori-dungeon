@@ -37,7 +37,7 @@
     // ダンジョン 7 つ (仕様書 12章。dungeons.js)。床の道具・ワナの種類は どこも同じ
     const DG = KD.Dungeons;
     // ドタバタ大迷宮 (段階 9。enemies9.js) は 階ごとに 見た目と特徴が変わる (enterFloor で DG.atFloor)
-    const DUNGEONS = [...DG.LIST, ...(DG.BONUS ? [DG.BONUS] : [])].map(d => ({ items: I.FOREST_ITEMS, trapKinds: I.FOREST_TRAPS, ...d }));
+    const DUNGEONS = [...DG.LIST, ...(DG.BONUS ? [DG.BONUS] : []), ...(DG.EXTRA || [])].map(d => ({ items: I.FOREST_ITEMS, trapKinds: I.FOREST_TRAPS, ...d }));
     const has = (u, trait) => Boolean(u.traits && u.traits.includes(trait));
     const C = KD.Collection;
     const sfx = name => KD.Sound && KD.Sound.play(name);
@@ -842,8 +842,14 @@
             if (has(e, 'summon') && sees && rng.chance(e.boss ? 0.15 : 0.12) && state.enemies.length < MAX_ENEMIES + 4) {
                 return void state.queue.push(() => summon(e));
             }
-            // にげる敵: HP が半分を切ったか、道具やお金を取ったら逃げる。キンメンコイヌは すぐ逃げる
-            const fleeing = sees && ((e.ai === 'flee' && (e.hp < e.stats.hp / 2 || Boolean(e.loot) || has(e, 'rich'))) || e.money > 0);
+            // メタル: 見つかると ときどき 逃げ去る (いなくなる)
+            if (has(e, 'metal') && sees && rng.chance(0.12)) {
+                say(`${e.name}は 逃げ去った！`);
+                state.enemies.splice(state.enemies.indexOf(e), 1);
+                return;
+            }
+            // にげる敵: HP が半分を切ったか、道具やお金を取ったら逃げる。キンメンコイヌ・メタルは すぐ逃げる
+            const fleeing = sees && ((e.ai === 'flee' && (e.hp < e.stats.hp / 2 || Boolean(e.loot) || has(e, 'rich') || has(e, 'metal'))) || e.money > 0);
             const t = !fleeing && pickTarget(e);
             if (t) {
                 face(e, t.x - e.x, t.y - e.y);
@@ -1275,6 +1281,8 @@
                 a.buffs.kiai = false;
             }
             if (t.buffs.guard) dmg = Math.max(1, Math.round(dmg / 2));
+            // メタルハリー・メタルキングハリー: ダメージが 1〜2 しか通らない (段階 10)
+            if (has(t, 'metal')) dmg = rng.chance(0.25) ? 2 : 1;
             return { dmg, eff };
         }
         const effText = eff => (eff > 1 ? ' こうかは ばつぐんだ！' : eff < 1 ? ' こうかは いまひとつ…' : '');

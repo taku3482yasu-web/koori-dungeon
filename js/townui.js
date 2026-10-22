@@ -100,8 +100,9 @@
         function refreshDay() {
             const town = t();
             const kinds = [...state.allies, ...state.roster].map(a => a.kind);
-            town.board = TW.questBoard(dayRng(1), town.day, { owned: town.owned, allyKinds: [...new Set(kinds)], dungeons: openDungeons().filter(d => !d.bonus) });
+            town.board = TW.questBoard(dayRng(1), town.day, { owned: town.owned, allyKinds: [...new Set(kinds)], dungeons: openDungeons().filter(d => !d.bonus && !d.extra) });
             addRivalQuests();
+            addRareQuests();
             town.shop = TW.shopStock(dayRng(2));
             town.rare = TW.rareStock(dayRng(3));
             town.market = TW.rivalListings(dayRng(4));
@@ -176,6 +177,14 @@
                 // はじめてボスをたおした: ストーリーが進む
                 const d = DG.byId(info.id);
                 if (info.boss && d && d.bonus) return bonusClear(d, lines);
+                // 段階 10 の ダンジョン: はじめて突破したら 話
+                if (info.boss && d && d.extra) {
+                    const first = !(t().extraClear || {})[d.id];
+                    t().extraClear = { ...(t().extraClear || {}), [d.id]: true };
+                    state.run = null;
+                    save();
+                    return g.talk([...lines, ...(first ? d.story.clear : [])], () => menu());
+                }
                 if (info.boss && d && DG.LIST.indexOf(d) === (t().cleared || 0)) return storyClear(d, lines);
             }
             else if (reason === 'escape') lines.push(`${info.dungeon}から 脱出して、${TW.NAME}に戻った。`);
@@ -246,8 +255,26 @@
             town.board.unshift(...TW.rivalQuests({ have, accepted: town.quests.map(q => q.id) }));
         }
 
+        // ナイテイの きょうだい (ナイナイ・アルアル・ナディ) の クエスト: ごくまれに 掲示板に出る (段階 10。2026-10-22 ユーザー指定)
+        //   待っている ダンジョンに 行けるときだけ。仲間にいたら 出ない。たおして 報告すると 仲間になる
+        function addRareQuests() {
+            const town = t();
+            const r = dayRng(7);
+            const have = [...state.allies, ...state.roster].map(a => a.kind);
+            const open = openDungeons().map(d => d.id);
+            Object.entries(DG.RARE_QUESTS || {}).forEach(([kind, q]) => {
+                const id = `rare:${kind}`;
+                const roll = r.next();
+                if (have.includes(kind) || town.quests.some(x => x.id === id) || town.board.some(x => x.id === id) || !open.includes(q.dungeon)) return;
+                if (roll >= q.rate && !g.opts.rareQuests) return;
+                town.board.unshift({ id, type: 'duel', kind, dungeon: q.dungeon, floor: q.floor, money: q.money, text: q.text, rare: true,
+                    ally: { kind, name: U.ENEMIES[kind].name, key: id }, progress: 0, count: 1 });
+            });
+        }
+
         // ドタバタ大迷宮 (段階 9) は 借金を返し切って エンディングを見たあと
-        const openDungeons = () => [...DG.LIST.slice(0, Math.min(DG.LIST.length, (t().cleared || 0) + 1)), ...(t().ended && DG.BONUS ? [DG.BONUS] : [])];
+        const openDungeons = () => [...DG.LIST.slice(0, Math.min(DG.LIST.length, (t().cleared || 0) + 1)), ...(t().ended && DG.BONUS ? [DG.BONUS] : []),
+            ...(DG.EXTRA || []).filter(d => d.opens(t()))];   // 段階 10 の ダンジョン (コード塔は ネット寺のあと、横丁・王国は クリア後)
         const paidNeed = id => Math.max(0, (TW.UNLOCK[id] || 0) - t().paid);
         const isOpen = id => g.opts.unlockAll || paidNeed(id) <= 0;
 
@@ -277,7 +304,7 @@
             const qs = t().quests.length ? `受けているクエスト ${t().quests.length} 件` : 'クエストを受けていない';
             const list = openDungeons();
             ask(`どこへ行く？（★ はボスをたおしたダンジョン）\nいっしょに行く：${party}\n${qs}`,
-                [...list.map((d, i) => `${(d.bonus ? t().bonusClear : i < (t().cleared || 0)) ? '★' : '　'}${d.name}（${d.floors} 階）`), 'やめる'], i => {
+                [...list.map((d, i) => `${(d.bonus ? t().bonusClear : d.extra ? (t().extraClear || {})[d.id] : i < (t().cleared || 0)) ? '★' : '　'}${d.name}（${d.floors} 階）`), 'やめる'], i => {
                     if (i >= list.length) return menu();
                     const d = list[i];
                     // はじめて行くときは ふるカワから ひとこと

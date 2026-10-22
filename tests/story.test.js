@@ -9,7 +9,7 @@ globalThis.performance = { now: () => fakeNow };
 const store = new Map();
 globalThis.localStorage = { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
 globalThis.KD = {};
-for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'enemies9.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'enemyart9.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) {
+for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'enemies9.js', 'enemies10.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'enemyart9.js', 'enemyart10.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) {
     vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
 }
 const { Units: U, Items: I, Town: TW, Dungeon: D, Dungeons: DG, createRng } = globalThis.KD;

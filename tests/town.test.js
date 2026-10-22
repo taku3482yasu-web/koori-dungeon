@@ -11,7 +11,7 @@ globalThis.performance = { now: () => fakeNow };
 const store = new Map();
 globalThis.localStorage = { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
 globalThis.KD = {};
-for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'enemies9.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'enemyart9.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
+for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'enemies9.js', 'enemies10.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'enemyart9.js', 'enemyart10.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
 const { Units: U, Items: I, Town: TW, Dungeon: D } = globalThis.KD;
 
 // タイトルから はじめて、はじまりの話を読み、町のメニューまで進める
@@ -224,9 +224,9 @@ test('仲間の広場: 連れていく仲間をえらぶ (主人公のほかに 
 
 test('進化: 条件は キャラごと。Lv・道具を わたす・ダンジョンに 連れていく', () => {
     const A = globalThis.KD.Allies;
-    // 27 体ぶん。条件の Lv は いろいろ、3 種類とも ある
+    // 28 体ぶん (段階 10 で ハリジェネラル → キングハリー を足した)。条件の Lv は いろいろ、3 種類とも ある
     const list = Object.entries(A.EVOLVE);
-    assert.equal(list.length, 27);
+    assert.equal(list.length, 28);
     assert.deepEqual([...new Set(list.map(([, v]) => v.how))].sort(), ['dungeon', 'item', 'level']);
     assert.ok(new Set(list.map(([, v]) => v.lv)).size >= 10);
     for (const [kind, v] of list) {

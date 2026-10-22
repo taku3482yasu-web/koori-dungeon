@@ -9,7 +9,7 @@ globalThis.performance = { now: () => fakeNow };
 const store = new Map();
 globalThis.localStorage = { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
 globalThis.KD = {};
-for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'enemies9.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'enemyart9.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) {
+for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'enemies9.js', 'enemies10.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'enemyart9.js', 'enemyart10.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) {
     vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
 }
 const { Units: U, Dungeons: DG, Collection: C, BigArt: B, Allies: A } = globalThis.KD;
@@ -49,7 +49,7 @@ function setup(opts = {}) {
 const skipTalk = (asks, choose) => { while (asks[0] && asks[0].options.length === 1 && asks[0].options[0] === 'つぎへ') choose('つぎへ'); };
 
 test('敵 053〜092 は 40 体。絵と 仲間のデータがあり、属性は 敵キャラ表どおり', () => {
-    const list = Object.entries(U.ENEMIES).filter(([, e]) => Number(e.no) >= 53);
+    const list = Object.entries(U.ENEMIES).filter(([, e]) => Number(e.no) >= 53 && Number(e.no) <= 92);
     assert.equal(list.length, 40);
     assert.deepEqual(list.map(([, e]) => e.no), Array.from({ length: 40 }, (v, i) => String(53 + i).padStart(3, '0')));
     const count = {};

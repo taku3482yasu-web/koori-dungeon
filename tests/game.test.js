@@ -9,7 +9,7 @@ import vm from 'node:vm';
 let fakeNow = 1000;
 globalThis.performance = { now: () => fakeNow };
 globalThis.KD = {};
-for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'enemies9.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'enemyart9.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
+for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'enemies9.js', 'enemies10.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'enemyart9.js', 'enemyart10.js', 'sound.js', 'config.js', 'market.js', 'townui.js', 'game.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
 const { Dungeon: D, Units: U, Items: I } = globalThis.KD;
 
 // opts: createGame に渡す ({ enemies: false } で敵なし。道具・ワナは things: true のときだけ)。hero: 0 こおりくん / 1 おにおに。role: 役職の番号
