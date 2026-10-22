@@ -143,15 +143,24 @@ try {
     // ゲーム画面を 押しっぱなし → 歩きつづける (3 マス以上 まっすぐ歩ける方向で)
     await calm();
     {
-        const d = await evaluate(`(() => { const s = window.kdGame.state, p = s.player;
-            const run = ([dx, dy]) => { let n = 0, x = p.x, y = p.y; while (n < 4 && KD.Dungeon.canMove(s.map, x, y, dx, dy) && !s.allies.some(a => a.x === x+dx && a.y === y+dy)) { x += dx; y += dy; n++; } return n; };
-            const best = [[0,1],[1,0],[0,-1],[-1,0],[1,1],[-1,1],[1,-1],[-1,-1]].sort((a, b) => run(b) - run(a))[0];
-            return run(best) >= 3 ? best.join(',') : null; })()`);
+        // まっすぐ 4 マス 歩ける場所と方向を さがして、主人公を そこへ移す (通路の角などでは 確かめられないので)
+        const d = await evaluate(`(() => { const s = window.kdGame.state, p = s.player, m = s.map;
+            const free = (x, y) => !s.allies.some(a => a.x === x && a.y === y) && !s.items.some(i => i.x === x && i.y === y);
+            const run = (x, y, [dx, dy]) => { let n = 0; while (n < 4 && KD.Dungeon.canMove(m, x, y, dx, dy) && free(x + dx, y + dy)) { x += dx; y += dy; n++; } return n; };
+            const DIRS = [[0,1],[1,0],[0,-1],[-1,0]];
+            for (let y = 1; y < m.h - 1; y++) for (let x = 1; x < m.w - 1; x++) {
+                if (KD.Dungeon.at(m, x, y) !== KD.Dungeon.FLOOR || !free(x, y)) continue;
+                const dir = DIRS.find(dd => run(x, y, dd) >= 4);
+                if (dir) { p.x = p.fx = x; p.y = p.fy = y; p.anim = null; return dir.join(','); }
+            }
+            return null; })()`);
+        await sleep(300);
         const before = await pos();
         const [dx, dy] = (d || '0,1').split(',').map(Number);
         await press('#screen', { at: [0.5 + dx * 0.3, 0.5 + dy * 0.3], hold: 1500 });
         const [x0, y0] = before.split(',').map(Number), [x1, y1] = (await pos()).split(',').map(Number);
-        check(Math.abs(x1 - x0) + Math.abs(y1 - y0) >= 2, 'ゲーム画面を押しっぱなしで 歩きつづける');
+        const why = Math.abs(x1 - x0) + Math.abs(y1 - y0) >= 2 ? '' : `（向き ${d}・${before} → ${x1},${y1}・${(await evaluate('window.kdGame.state.messages.map(m => m.text).join(" / ")'))}・${await asking()}）`;
+        check(!why, `ゲーム画面を押しっぱなしで 歩きつづける${why}`);
     }
     // 道具・作戦・地図・足ぶみ・攻撃・わざ
     await press('#btn-item');

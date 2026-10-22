@@ -730,3 +730,38 @@ test('操作するキャラの交代: いつでも 仲間を操作できる。�
     assert.equal(s.player, hero, '主人公に もどった');
     assert.ok(!s.over, '主人公は 無事なので 失敗ではない');
 });
+
+test('仲間を操作しているときに 装備を付け外ししても、主人公の能力に すぐ反映する', () => {
+    const { game, s, run, asks, answer } = setup({ enemies: false, partner: true });
+    const hero = s.player;
+    hero.bag.push({ id: 'power_band', n: 1 });
+    const bonus = globalThis.KD.Items.ITEMS.power_band.bonus;
+    const atk = hero.stats.atk;
+    game.switchTo(s.allies[0]);
+    const oni = s.player;
+    const oniAtk = oni.stats.atk;
+    // 道具 → ちからのハチマキ → つける
+    game.itemMenu();
+    answer(hero.bag.findIndex(it => it.id === 'power_band'));
+    answer(asks[0].options.indexOf('つける'));
+    run(600);
+    assert.equal(hero.stats.atk, atk + (bonus.atk || 0), '主人公の こうげきが すぐ上がる');
+    assert.equal(oni.stats.atk, oniAtk, '操作しているおにおには 変わらない');
+    assert.ok(s.messages.some(m => /こおりくんが ちからのハチマキを つけた/.test(m.text)));
+    // はずす
+    game.itemMenu();
+    answer(hero.bag.findIndex(it => it.id === 'power_band'));
+    answer(asks[0].options.indexOf('はずす'));
+    run(600);
+    assert.equal(hero.stats.atk, atk, 'はずすと すぐ戻る');
+    // 置くと (つけていたら) はずれて すぐ戻る
+    game.itemMenu();
+    answer(hero.bag.findIndex(it => it.id === 'power_band'));
+    answer(asks[0].options.indexOf('つける'));
+    run(600);
+    game.itemMenu();
+    answer(hero.bag.findIndex(it => it.id === 'power_band'));
+    answer(asks[0].options.indexOf('置く'));
+    run(600);
+    assert.equal(hero.stats.atk, atk, '置くと はずれて すぐ戻る');
+});

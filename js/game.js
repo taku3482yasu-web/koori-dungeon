@@ -1771,7 +1771,7 @@
             p.bag.splice(p.bag.indexOf(it), 1);
             if (it.eq) {
                 it.eq = false;
-                recalc(p);
+                recalc(heroUnit());   // 装備の効果は 主人公に付く (仲間を操作しているときも すぐ反映)
             }
             return it;
         }
@@ -1812,21 +1812,23 @@
             p.bag.splice(p.bag.indexOf(it), 1);
             if (it.eq) {
                 it.eq = false;
-                recalc(p);
+                recalc(heroUnit());
             }
             state.items.push({ x: p.x, y: p.y, item: it });
             say(`${I.label(it)}を 足元に 置いた。`);
             return PASS_MS;
         }
 
-        // 装備は 1 つだけ (仕様書 9章)
+        // 装備は 1 つだけ (仕様書 9章)。効果は 主人公に付く (道具袋は チームで共有。仲間を操作しているときも すぐ反映する)
         function equip(p, it) {
             if (!p.bag.includes(it)) return 0;
             const was = it.eq;
             p.bag.forEach(b => { b.eq = false; });
             it.eq = !was;
-            recalc(p);
-            say(was ? `${I.ITEMS[it.id].name}を はずした。` : `${I.ITEMS[it.id].name}を つけた！`);
+            const hero = heroUnit();
+            recalc(hero);
+            const who = p === hero ? '' : `${hero.name}が `;
+            say(was ? `${who}${I.ITEMS[it.id].name}を はずした。` : `${who}${I.ITEMS[it.id].name}を つけた！`);
             return PASS_MS;
         }
 
