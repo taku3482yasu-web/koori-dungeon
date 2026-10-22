@@ -156,7 +156,7 @@
             }
             state.phase = 'title';   // 町の画面として描く (キャラ選択の画面を出さない)
             view = 'opening';
-            opening = { scene: i, at: performance.now() };
+            opening = { scene: ['party', 'debt', 'furukawa', 'oni', 'team'][i], at: performance.now() };
             if (i === 0) bgm('title');
             ask(lines[i], ['つぎへ', 'スキップ'], j => story(j === 0 ? i + 1 : lines.length), { place: 'bottom', list: false });
         }
@@ -203,6 +203,10 @@
             // ストーリーをクリアすると、ライバル探検隊から クエストが届く (2026-10-22 ユーザー指定)
             const rivals = st.last ? ['ふるカワ「たいへん！ ギルドに ライバル探検隊のみんなから クエストが 届いてるよ！」',
                 'ふるカワ「頼みを かなえたら 仲間になってくれるって。メンバーが そろうと、リーダーが 勝負を 挑んでくるみたい！」'] : [];
+            if (st.last) {
+                return cutscene([...withScenes([...lines, ...(st.clear || [])], ['asoDown', 'asoDown', 'asoSeal', 'townParty', 'stillDebt', 'stillDebt', 'clearCard']),
+                    ...withScenes(rivals, ['rivalsQuest'])], () => menu());
+            }
             g.talk([...lines, ...(st.clear || []), ...rivals], () => menu());
         }
 
@@ -212,8 +216,26 @@
             t().bonusClear = true;
             state.run = null;
             save();
-            g.talk([...lines, ...(first ? d.story.clear : ['ふるカワ「また 大魔王ASO・真を たおしたね！ すごい！」'])], () => menu());
+            if (!first) return g.talk([...lines, 'ふるカワ「また 大魔王ASO・真を たおしたね！ すごい！」'], () => menu());
+            cutscene(withScenes([...lines, ...d.story.clear], ['shinDown', 'shinDown', 'shinFade', 'rivalsCheer', 'rivalsCheer', 'rivalsCheer', 'oniPraise', 'allParade', 'trueEnd']), () => menu());
         }
+
+        // 場面の絵つきの話 (エンディング。2026-10-22 ユーザー指定)。items: [{ text, scene }]。「スキップ」で 最後まで飛ばす
+        function cutscene(items, done) {
+            const go = i => {
+                if (i >= items.length) {
+                    view = 'town';
+                    return done();
+                }
+                state.phase = 'title';   // 町の画面として描く
+                view = 'opening';
+                opening = { scene: items[i].scene, at: performance.now() };
+                ask(items[i].text, ['つぎへ', 'スキップ'], j => go(j === 0 ? i + 1 : items.length), { place: 'bottom', list: false });
+            };
+            go(0);
+        }
+        // 行ごとに 場面をわりあてる (scenes の長さが足りなければ 最後の場面のまま)
+        const withScenes = (lines, scenes) => lines.map((text, i) => ({ text, scene: scenes[Math.min(i, scenes.length - 1)] }));
 
         // ライバル探検隊のクエストを 掲示板の いちばん上に (ストーリーをクリアしたあと。town.js の rivalQuests)
         function addRivalQuests() {
@@ -368,8 +390,7 @@
             const lines = ['おにおに「……全部、返したな」', 'こおりくん「やったー！ これで こおり 生きていけるよ～～！！」',
                 'ふるカワ「探検隊『ばりきつよめ』、大活躍だったね！」', '～ おしまい ～\n（このあとも 遊べます）',
                 'ふるカワ「たいへん！ SEタウンのはずれに、底の見えない 大きな穴が 開いたよ！」', '新しいダンジョン「ドタバタ大迷宮」（99 階）が 現れた！'];
-            const next = k => (k >= lines.length ? menu() : ask(lines[k], ['つぎへ'], () => next(k + 1), { list: false }));
-            next(0);
+            cutscene(withScenes(lines, ['paid', 'paidJoy', 'townParty', 'endCard', 'hole', 'hole']), () => menu());
         }
 
         // ----- バトルツリー (仕様書 6.4) -----
@@ -1038,7 +1059,178 @@
                 ctx.textAlign = 'left';
             };
             const scene = opening.scene;
-            if (scene === 0) {
+            const big = (id, x, groundY, height, opts = {}) => KD.BigArt.drawBig(ctx, id, bob, x, groundY, { height, ...opts });
+            const firework = (cx, cy, k, color) => {
+                for (let j = 0; j < 12; j++) {
+                    const a = j / 12 * Math.PI * 2;
+                    rect(cx + Math.cos(a) * 30 * k, cy + Math.sin(a) * 30 * k + 10 * k * k, 2, 2, color);
+                }
+            };
+            const fireworks = () => {
+                for (let i = 0; i < 4; i++) {
+                    const k = (t * 0.7 + i * 0.27) % 1;
+                    firework(60 + i * 90 + hash(i) * 30, 50 + hash(i + 9) * 40, k, ['#ffe680', '#ff6a9a', '#7fd3f7', '#9ae07a'][i]);
+                }
+            };
+            const townRow = () => {
+                rect(0, 150, W, 90, '#3a6a3a');
+                [[110, 112, '#d84a4a'], [160, 104, '#4a7ad8'], [210, 114, '#e0a030'], [260, 108, '#9a5ad0']].forEach(([x, y, roof]) => {
+                    rect(x, y + 12, 34, 150 - y - 12, '#e8dcc4');
+                    rect(x - 3, y, 40, 14, roof);
+                    rect(x + 6, y + 20, 8, 8, '#ffe680');
+                });
+            };
+            const rays = (cx, cy, color, n = 14) => {
+                for (let i = 0; i < n; i++) {
+                    const a = i / n * Math.PI * 2 + t * 0.4;
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy);
+                    ctx.lineTo(cx + Math.cos(a) * 420, cy + Math.sin(a) * 420);
+                    ctx.lineTo(cx + Math.cos(a + 0.18) * 420, cy + Math.sin(a + 0.18) * 420);
+                    ctx.fill();
+                }
+            };
+            if (scene === 'asoDown' || scene === 'shinDown') {
+                // 魔王が くずれる (白く光って ゆれる・ひびが入る)
+                sky('#3a0a0a', '#120202');
+                rays(W / 2, 100, 'rgba(255,120,60,.15)');
+                const sx = Math.sin(now / 30) * 4;
+                big(scene === 'asoDown' ? 'maou' : 'maoushin', W / 2 + sx, 196, 150, { alpha: 0.6 + 0.4 * Math.abs(Math.sin(now / 90)) });
+                for (let i = 0; i < 5; i++) rect(W / 2 - 40 + i * 20 + hash(i) * 10, 60 + hash(i + 3) * 80, 2, 18 + hash(i + 5) * 20, '#ffe680');
+                if (Math.floor(now / 120) % 4 === 0) { ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(0, 0, W, H); }
+                label('ば、ばかな……！', W / 2, 24, 16, '#ff9a8a');
+            } else if (scene === 'asoSeal') {
+                // 壺に 吸いこまれて 封印
+                sky('#1a1030', '#0a0818');
+                const k = Math.min(1, t / 1.6);
+                for (let i = 0; i < 18; i++) {
+                    const a = i / 18 * Math.PI * 2 + t * 3;
+                    const r = 90 * (1 - ((t * 0.8 + i / 18) % 1));
+                    rect(W / 2 + Math.cos(a) * r, 140 + Math.sin(a) * r * 0.5, 3, 3, '#d8a8ff');
+                }
+                if (k < 1) big('maou', W / 2, 150 - 40 * (1 - k), 150 * (1 - k) + 6, { alpha: 1 - k * 0.7 });
+                rect(W / 2 - 34, 150, 68, 56, '#6a4a2a');
+                rect(W / 2 - 24, 140, 48, 12, '#7a5a3a');
+                rect(W / 2 - 28, 170, 56, 6, '#c8a060');
+                if (k >= 1) label('封印！', W / 2, 60, 22, '#ffe680');
+            } else if (scene === 'townParty') {
+                // 町で お祝い (花火)
+                sky('#0a1030', '#2a2050');
+                fireworks();
+                townRow();
+                A.drawSprite(ctx, 'koori', bob, 50, 132 - bob * 3, { scale: 3 });
+                A.drawSprite(ctx, 'onioni', 1 - bob, 300, 132 - (1 - bob) * 3, { scale: 3 });
+                big('yasu', 140, 178, 40); big('tamu', 190, 178, 40); big('dake', 240, 178, 40);
+                label(`${KD.Town.NAME}に 平和が もどった！`, W / 2, 24, 14, '#ffe680');
+            } else if (scene === 'stillDebt') {
+                // 借金は まだ 残ってる……
+                sky('#2a2a3a', '#14141e');
+                A.drawSprite(ctx, 'onioni', bob, 220, 70, { scale: 6 });
+                rect(190, 120, 40, 50, '#f4f0e0');
+                rect(195, 126, 30, 4, '#c03a3a');
+                label('借金', 210, 150, 12, '#c03a3a');
+                A.drawSprite(ctx, 'koori', 0, 50 + Math.sin(now / 80) * 2, 100, { scale: 5 });
+                rect(118, 102, 5, 8, '#7fd3f7');
+                label('とほほ～～！！', 90, 80, 14, '#7fd3f7');
+            } else if (scene === 'clearCard' || scene === 'endCard' || scene === 'trueEnd') {
+                // クリアの カード
+                sky('#0a2040', '#1a4a3a');
+                rays(W / 2, 100, 'rgba(255,230,128,.14)', 16);
+                if (scene === 'trueEnd') fireworks();
+                const title = scene === 'clearCard' ? 'STORY CLEAR' : scene === 'endCard' ? 'おしまい' : 'THE TRUE END';
+                const sub = scene === 'clearCard' ? '～ ストーリー クリア ～' : scene === 'endCard' ? '借金 完済！' : 'ほんとうの ほんとうの エンディング';
+                label(title, W / 2, 50, Math.round(26 * Math.min(1, t * 2)) || 1, '#ffe680');
+                label(sub, W / 2, 80, 12, '#ffffff');
+                A.drawSprite(ctx, 'koori', bob, W / 2 - 76, 100 - bob * 3, { scale: 4 });
+                A.drawSprite(ctx, 'onioni', 1 - bob, W / 2 + 12, 100 - (1 - bob) * 3, { scale: 4 });
+            } else if (scene === 'rivalsQuest' || scene === 'rivalsCheer') {
+                // ライバル探検隊が ならぶ
+                sky(scene === 'rivalsQuest' ? '#2a4a7a' : '#1a1030', scene === 'rivalsQuest' ? '#8ac0e0' : '#3a2a5a');
+                if (scene === 'rivalsCheer') fireworks();
+                const ids = scene === 'rivalsQuest' ? Object.values(KD.Allies.LEADERS) : ['yahami', 'maechokkin', 'norahan', 'ishii', 'mazuda', 'naitoon'];
+                ids.forEach((id, i) => {
+                    const x = 40 + i * (W - 80) / (ids.length - 1);
+                    const jump = scene === 'rivalsCheer' ? Math.abs(Math.sin(now / 200 + i)) * 8 : 0;
+                    big(id, x, 190 - jump, 70);
+                });
+                label(scene === 'rivalsQuest' ? 'ライバル探検隊から クエスト！' : 'がんばったね！', W / 2, 24, 14, '#ffe680');
+            } else if (scene === 'shinFade') {
+                // 真・大魔王が 光になって 消える
+                sky('#101030', '#2a1a5a');
+                const k = Math.min(1, t / 2);
+                big('maoushin', W / 2, 196, 150, { alpha: Math.max(0, 1 - k) });
+                for (let i = 0; i < 40; i++) {
+                    const y = 196 - ((t * 60 + hash(i) * 200) % 220);
+                    rect(W / 2 - 60 + hash(i + 7) * 120, y, 2, 2, i % 2 ? '#ffffff' : '#ffe680');
+                }
+            } else if (scene === 'oniPraise') {
+                // おにおにが ほめる
+                sky('#1a4a3a', '#0a2040');
+                rays(W / 2, 110, 'rgba(255,230,128,.12)');
+                A.drawSprite(ctx, 'onioni', bob, W / 2 + 10, 60, { scale: 6 });
+                A.drawSprite(ctx, 'koori', 1 - bob, W / 2 - 110, 110 - (1 - bob) * 4, { scale: 4 });
+                label('よくやったな', W / 2 + 60, 40, 14, '#ffe680');
+            } else if (scene === 'allParade') {
+                // みんなで 行進
+                sky('#7ac8f0', '#d8f0ff');
+                rect(0, 170, W, 70, '#6ab454');
+                fireworks();
+                const list = ['koori', 'onioni', 'yasu', 'tamu', 'dake', 'okagappa', 'asahara', 'ueno', 'yahami', 'ishii'];
+                list.forEach((id, i) => {
+                    const x = ((t * 50 + i * 60) % (W + 120)) - 60;
+                    const y = 190 - Math.abs(Math.sin(now / 180 + i)) * 6;
+                    if (A.SPRITES[id]) A.drawSprite(ctx, id, bob, x - 16, y - 32, { scale: 2 });
+                    else big(id, x, y, 44);
+                });
+                label('これからも ドタバタ 探検するぞー！', W / 2, 30, 13, '#ffffff');
+            } else if (scene === 'paid') {
+                // 借金 完済 (はんこ)
+                sky('#2a1a10', '#140a05');
+                rect(80, 60, 160, 120, '#f4f0e0');
+                rect(92, 74, 136, 6, '#c03a3a');
+                for (let i = 0; i < 6; i++) rect(92, 90 + i * 12, 120 - (i % 3) * 20, 3, '#9a9a9a');
+                const k = Math.min(1, t * 2.5);
+                const sz = Math.round(70 - 34 * k);
+                ctx.save();
+                ctx.translate(200, 130);
+                ctx.rotate(-0.2);
+                ctx.strokeStyle = '#e02a2a';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(-sz, -sz / 2, sz * 2, sz);
+                ctx.restore();
+                label('完済', 200, 130, Math.round(40 * (sz / 36)), '#e02a2a');
+                A.drawSprite(ctx, 'onioni', bob, 270, 120, { scale: 4 });
+            } else if (scene === 'paidJoy') {
+                // こおりくん 大よろこび
+                sky('#0a2040', '#1a4a3a');
+                for (let i = 0; i < 40; i++) {
+                    const y = ((t * 50 + hash(i) * 240) % 240);
+                    rect(hash(i + 50) * W, y, 3, 2, ['#ff6a9a', '#7fd3f7', '#ffe680', '#9ae07a'][i % 4]);
+                }
+                const jump = Math.abs(Math.sin(now / 160)) * 20;
+                A.drawSprite(ctx, 'koori', bob, W / 2 - 40, 90 - jump, { scale: 5 });
+                label('こおり 生きていける！', W / 2, 40, 16, '#ffe680');
+            } else if (scene === 'hole') {
+                // 町のはずれに 大きな穴
+                sky('#7a6a8a', '#3a2a4a');
+                rect(0, 150, W, 90, '#5a7a4a');
+                const sh = t < 1 ? Math.sin(now / 25) * 3 : 0;
+                [[250, 112, '#d84a4a'], [300, 104, '#4a7ad8']].forEach(([x, y, roof]) => {
+                    rect(x + sh, y + 12, 34, 150 - y - 12, '#e8dcc4');
+                    rect(x - 3 + sh, y, 40, 14, roof);
+                });
+                const k = Math.min(1, t / 1.2);
+                ctx.fillStyle = '#0a0610';
+                ctx.beginPath();
+                ctx.ellipse(110 + sh, 180, 90 * k, 34 * k, 0, 0, Math.PI * 2);
+                ctx.fill();
+                for (let i = 0; i < 10; i++) {
+                    const a = i / 10 * Math.PI * 2 + t * 2;
+                    rect(110 + Math.cos(a) * 60 * k, 180 + Math.sin(a) * 22 * k, 3, 3, '#d8a8ff');
+                }
+                label('ドタバタ大迷宮', 110, 120, 16, '#d8a8ff');
+            } else if (scene === 'party') {
                 // 夜の摩天楼。財宝の箱から コインが どんどん 飛んでいく (打ち上げで散財)
                 sky('#0a1030', '#2a1a4a');
                 for (let i = 0; i < 40; i++) rect(hash(i) * W, hash(i + 99) * 110, 1, 1, hash(i + 7) > 0.5 ? '#ffffff' : '#a0a8ff');
@@ -1067,7 +1259,7 @@
                 A.drawSprite(ctx, 'onioni', 1 - bob, 270, 128 - (1 - bob) * 3, { scale: 3 });
                 label('かんぱーい！', 96, 116, 12, '#ffe680');
                 label('財宝で 借金完済！', W / 2, 24, 16, '#ffd84a');
-            } else if (scene === 1) {
+            } else if (scene === 'debt') {
                 // 借用書が 降ってきて、こおりくんが泣く
                 sky('#1a2440', '#0a0f1e');
                 for (let i = 0; i < 14; i++) {
@@ -1088,7 +1280,7 @@
                     rect(W / 2 + 18 + k * 14, 108 + k * 40, 4, 6, '#7fd3f7');
                 }
                 label('借金', W / 2, 40, 22 + Math.sin(now / 200) * 2, '#ff6a6a');
-            } else if (scene === 2) {
+            } else if (scene === 'furukawa') {
                 // SEタウンと、まわりに 次々と現れる ダンジョンの入り口
                 sky('#7ac8f0', '#d8f0ff');
                 rect(0, 150, W, 90, '#6ab454');
@@ -1112,7 +1304,7 @@
                 });
                 drawFurukawa(ctx, 30, 60, 4, bob);
                 label('！', 92, 66, 18, '#ff6a6a');
-            } else if (scene === 3) {
+            } else if (scene === 'oni') {
                 // おにおにの取り立て
                 sky('#401010', '#1a0505');
                 for (let i = 0; i < 12; i++) {
