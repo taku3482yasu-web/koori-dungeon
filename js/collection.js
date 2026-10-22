@@ -121,10 +121,26 @@
         { id: 'rival', name: 'ライバルに勝った', note: 'ライバル探検隊を たおす', test: c => c.stats.rivals >= 1 },
         { id: 'house', name: 'モンスターハウス', note: 'モンスターハウスに 入る', test: c => c.stats.houses >= 1 },
         { id: 'dex_half', name: '図鑑 半分', note: '図鑑の敵を 半分 見る', test: c => Object.keys(c.town.dex.seen).length >= Math.ceil(dexOrder(c.town.version).length / 2) },
-        { id: 'dex_all', name: '図鑑 完成', note: '図鑑の敵を 全部 たおす', test: c => dexOrder(c.town.version).every(k => c.town.dex.beat[k]) }
+        { id: 'dex_all', name: '図鑑 完成', note: '図鑑の敵を 全部 たおす', test: c => dexOrder(c.town.version).every(k => c.town.dex.beat[k]) },
+        // バージョン (氷隊 / 鬼鬼団。enemies11.js) の 実績 (2026-10-22 ユーザー指定。中身は案)
+        { id: 'ver_dungeon', name: '専用ダンジョン 突破', note: 'バージョンの 専用ダンジョンの ボスを たおす', test: c => Boolean((c.town.extraClear || {})[verInfo(c).dungeon]) },
+        { id: 'ver_boss', name: '限定ボスが 仲間に', note: '限定ボスとの 再戦に 勝って 仲間にする', test: c => verQuests(c).some(q => q.ally && q.ally.endsWith('_q') && (c.town.owned || []).includes(q.id)) },
+        { id: 'ver_all', name: '限定キャラ 全員集合', note: 'バージョンの 限定キャラ 10 体を みんな 仲間にする', test: c => verKinds(c).every(k => [...c.allies, ...(c.roster || [])].some(a => a.kind === k)) },
+        { id: 'ver_trade', name: 'キャラ交換', note: '交易所で キャラを 交換する（買う・売れる）', test: c => (c.stats.allyTrades || 0) >= 1 }
     ];
+    // いまの バージョン・専用クエスト・限定キャラ (enemies11.js が 読みこまれていなければ 空)
+    function verInfo(c) {
+        const DG = KD.Dungeons;
+        return DG.versionOf ? DG.versionOf(c.town, c.player && c.player.kind) : { id: '', dungeon: '' };
+    }
+    const verQuests = c => ((KD.Dungeons.VERSION_QUESTS || {})[verInfo(c).id] || []);
+    const verKinds = c => {
+        const v = verInfo(c).id;
+        const kinds = Object.keys(U.ENEMIES).filter(k => U.ENEMIES[k].version === v && U.ENEMIES[k].no);
+        return kinds.length ? kinds : ['?'];
+    };
 
-    const newStats = () => ({ kills: 0, quests: 0, crafted: 0, recruited: 0, sold: 0, colitis: 0, clutch: 0, rivals: 0, houses: 0, evolved: 0 });
+    const newStats = () => ({ kills: 0, quests: 0, crafted: 0, recruited: 0, sold: 0, colitis: 0, clutch: 0, rivals: 0, houses: 0, evolved: 0, allyTrades: 0 });
 
     KD.Collection = { LINES, lineFor, RIVALS, RIVAL_FROM, HAPPEN_RATE, HAPPENINGS, dexOrder, TRAIT_NAMES, ACHIEVEMENTS, newStats };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);

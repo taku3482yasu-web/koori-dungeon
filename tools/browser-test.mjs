@@ -4,6 +4,7 @@
 // Chrome を DevTools Protocol で動かし、本物のマウス操作・タッチで ゲームを遊んで、エラーが出ないか・ボタンが効くかを確かめる。
 // (tests/*.test.js は 画面を使わないので、「1 歩動くと画面が止まる」ような不具合を見つけられなかった)
 // 流れ: はじめから → キャラ選択 → オープニング → 町 → ダンジョン → 十字ボタン・ゲーム画面・攻撃・道具・作戦・わざ・交代・キーボード
+//   → 開きなおして 続き → (スマホの幅) バージョンごとの セーブ 2 つ → 鬼鬼団の 続き → 交易所の キャラ交換
 // 使い方 (koori-dungeon フォルダで): node tools/browser-test.mjs
 // 失敗したら 終了コード 1。Chrome が見つからないときは 飛ばす (終了コード 0)。.githooks/pre-commit が走らせる。
 // =====================================================================
@@ -47,6 +48,7 @@ async function press(selector, { text = null, at = null, hold = 60 } = {}) {
     const b = await evaluate(`(() => {
         const e = [...document.querySelectorAll(${JSON.stringify(selector)})].find(x => ${text ? `x.textContent.includes(${JSON.stringify(text)})` : 'true'});
         if (!e) return null;
+        e.scrollIntoView({ block: 'nearest' });   // 一覧の 外に あれば 見えるところまで スクロール
         const r = e.getBoundingClientRect();
         return { x: r.x + r.width * ${at ? at[0] : 0.5}, y: r.y + r.height * ${at ? at[1] : 0.5} };
     })()`);
@@ -206,6 +208,40 @@ try {
     await sleep(1200);
     const now = await evaluate('(() => { const s = window.kdGame.state, h = window.kdGame.heroUnit(); return [s.floor, h.x, h.y, h.hp, s.enemies.length].join(","); })()');
     check(await phase() === 'play' && now === was, `ページを開きなおすと やめた場所から続く（${was} → ${now}）`);
+
+    // ----- バージョン: セーブが 2 つ・キャラ交換 (スマホの幅で) -----
+    // 氷隊の セーブを 写して 鬼鬼団の セーブを 作る (町から・交易所を 開けて・コンピューターが 氷隊の キャラを 出品している)
+    await evaluate(`(() => {
+        const d = JSON.parse(localStorage.getItem('koori-dungeon-save-koori'));
+        d.hero.kind = 'onioni'; d.hero.name = 'おにおに'; d.allies = d.allies.filter(a => a.kind !== 'onioni');
+        Object.assign(d.town, { version: 'onioni', paid: 100000, debt: 0, cleared: 5, market: [{ id: 'ally_yukiusapon', n: 8, seller: '5DX', price: 8000 }] });
+        d.hero.money = 20000; d.run = null; d.snap = null;
+        localStorage.setItem('koori-dungeon-save-onioni', JSON.stringify(d));
+        return true;
+    })()`);
+    // 交易所の オンラインは つながらない ことにする (テストが ネットに 左右されないように)
+    await send('Network.enable');
+    await send('Network.setBlockedURLs', { urls: ['*supabase.co*'] });
+    await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+    await send('Page.reload');
+    await sleep(2500);
+    const titleBtns = await evaluate('[...document.querySelectorAll(".ask-choices button")].map(b => b.textContent).join(" / ")');
+    check(/つづきから（氷隊）/.test(titleBtns) && /つづきから（鬼鬼団）/.test(titleBtns), `タイトルに バージョンごとの つづきから（${titleBtns}）`);
+    const fits = () => evaluate(`(() => document.documentElement.scrollWidth <= innerWidth + 1
+        && [...document.querySelectorAll('.ask-choices button')].every(b => b.scrollWidth <= b.clientWidth + 1))()`);
+    check(await fits(), 'スマホの幅で タイトルの ボタンが はみ出さない');
+    await press('.ask-choices button', { text: 'つづきから（鬼鬼団）' });
+    await sleep(800);
+    check(await phase() === 'town' && await evaluate('window.kdGame.state.town.version') === 'onioni' && /鬼鬼団/.test(await evaluate('document.title')),
+        '鬼鬼団の 続きから（ページの 名前にも 鬼鬼団）');
+    await press('.ask-choices button', { text: '交易所' });
+    await sleep(1500);
+    await press('.ask-choices button', { text: 'ほかの探検隊の出品' });
+    await sleep(1500);
+    check(await fits(), 'スマホの幅で 交易所の ボタンが はみ出さない');
+    await press('.ask-choices button', { text: 'ユキウサポン' });
+    await sleep(500);
+    check(/買った/.test(await asking()) && await evaluate('window.kdGame.state.roster.some(a => a.kind === "yukiusapon")'), '交易所で もう片方の バージョンの キャラを 買える');
 } catch (e) {
     check(false, `止まった: ${e.message}`);
 } finally {

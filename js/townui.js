@@ -88,7 +88,7 @@
         function check() {
             const town = t();
             if (!town || !p()) return;
-            const c = { town, player: p(), allies: state.allies, stats: town.stats };
+            const c = { town, player: p(), allies: state.allies, roster: state.roster, stats: town.stats };
             C.ACHIEVEMENTS.forEach(a => {
                 if (town.ach[a.id] || !a.test(c)) return;
                 town.ach[a.id] = town.day;
@@ -125,6 +125,7 @@
                 if (!r.chance(TW.sellChance(l))) return true;
                 p().money += l.price;
                 town.stats.sold = (town.stats.sold || 0) + 1;
+                if (tradeAlly(l.id)) town.stats.allyTrades = (town.stats.allyTrades || 0) + 1;
                 town.news.push(`出品していた ${rowLabel(l)}が ${r.pick(TW.RIVALS)}に 売れた！ +${money(l.price)}`);
                 return false;
             });
@@ -623,12 +624,18 @@
             const k = tradeAlly(l.id);
             return k ? `${U.ENEMIES[k].name} Lv${l.n}（★${KD.Allies.star(k)}・${DG.VERSIONS[U.ENEMIES[k].version].name}限定）` : I.label(l);
         };
-        // 買った・取り下げた 物を 受け取る (キャラは 仲間の広場へ)
-        function receive(l) {
+        // 買った・取り下げた 物を 受け取る (キャラは 仲間の広場へ)。
+        //   bought: ほかの探検隊から 買った。キャラの Lv は 主人公の Lv＋5 まで (オンラインの出品は 中身を 信じきれないので)。
+        //   もう片方の バージョンの キャラは 図鑑の「交換で 手に入れた」に のる
+        const ALLY_LV_OVER = 5;
+        function receive(l, bought = false) {
             const k = tradeAlly(l.id);
             if (!k) return giveItem({ id: l.id, n: l.n }, true);
-            const a = g.makeAlly(k, l.n);
-            state.roster.push(a);
+            const lv = Math.max(1, bought ? Math.min(l.n, p().lv + ALLY_LV_OVER) : l.n);
+            state.roster.push(g.makeAlly(k, lv));
+            if (!bought) return;
+            stat('allyTrades');
+            if (U.ENEMIES[k].version !== version().id) t().dex.traded = { ...(t().dex.traded || {}), [k]: true };
         }
 
         // つないでいるあいだは「つないでいます…」を見せる。つながらなければ fail
@@ -664,6 +671,8 @@
                 const total = sold.reduce((n, r) => n + r.price, 0);
                 p().money += total;
                 stat('sold', sold.length);
+                const allies = sold.filter(r => tradeAlly(r.item_id)).length;
+                if (allies) stat('allyTrades', allies);
                 save();
                 ask(['出品していた物が 売れていた！', ...sold.map(r => `${rowLabel({ id: r.item_id, n: r.n })} → ${r.buyer_name || 'だれか'}（+${money(r.price)}）`)].join('\n'),
                     ['もどる'], tradeMenu, { list: false });
@@ -712,7 +721,7 @@
                     if (l.src) {
                         p().money -= l.price;
                         rivals.splice(rivals.indexOf(l.src), 1);
-                        receive(l);
+                        receive(l, true);
                         save();
                         return ask(`${l.seller}から ${rowLabel(l)}を 買った！${tradeAlly(l.id) ? '（仲間の広場で待っている）' : ''}`, ['もどる'], market, { list: false });
                     }
@@ -720,9 +729,9 @@
                         const r = res && res[0];
                         if (!r) return ask('ひと足おそく、売り切れていた！', ['もどる'], market, { list: false });
                         p().money -= r.price;
-                        receive({ id: r.item_id, n: r.n });
+                        receive({ id: r.item_id, n: r.n }, true);
                         save();
-                        ask(`${l.seller}から ${rowLabel(l)}を 買った！${tradeAlly(l.id) ? '（仲間の広場で待っている）' : ''}`, ['もどる'], market, { list: false });
+                        ask(`${l.seller}から ${rowLabel({ ...l, n: Math.min(l.n, tradeAlly(l.id) ? p().lv + ALLY_LV_OVER : l.n) })}を 買った！${tradeAlly(l.id) ? '（仲間の広場で待っている）' : ''}`, ['もどる'], market, { list: false });
                     }, () => offline(market));
                 });
             };
@@ -961,17 +970,23 @@
             const nSeen = order.filter(k => t().dex.seen[k]).length, nBeat = order.filter(k => t().dex.beat[k]).length;
             const items = Object.keys(I.ITEMS);
             const nItems = items.filter(id => t().dexItems[id]).length;
-            ask(`図鑑　敵：見た ${nSeen}・たおした ${nBeat} / ${order.length}　道具：${nItems} / ${items.length}`, ['敵の図鑑', '道具の図鑑', 'もどる'], i => {
+            const nTraded = tradedKinds(order).length;
+            ask(`図鑑　敵：見た ${nSeen}・たおした ${nBeat} / ${order.length}${nTraded ? `（交換 ${nTraded}）` : ''}　道具：${nItems} / ${items.length}`, ['敵の図鑑', '道具の図鑑', 'もどる'], i => {
                 if (i === 0) return enemyDex();
                 if (i === 1) return itemDex();
                 home();
             }, { list: false });
         }
 
+        // 交換で 手に入れた もう片方の バージョンの キャラ (図鑑の おまけ。完成の 数には 入れない)
+        const tradedKinds = order => Object.keys(t().dex.traded || {}).filter(k => U.ENEMIES[k] && !order.includes(k));
+        const dexKnown = kind => Boolean(t().dex.seen[kind] || (t().dex.traded || {})[kind]);
         function enemyDex() {
-            const order = C.dexOrder(t().version);
+            const own = C.dexOrder(t().version);
+            const order = [...own, ...tradedKinds(own)];
             const label = kind => {
                 const e = U.ENEMIES[kind];
+                if (!own.includes(kind)) return `交換 ${e.no}　${e.name}（${DG.VERSIONS[e.version].name}）`;
                 const no = e.no ? `No.${e.no}` : e.boss ? 'ボス' : e.rival ? 'ライバル' : '強敵';
                 if (!t().dex.seen[kind]) return `${no}　？？？`;
                 return `${no}　${e.name}${t().dex.beat[kind] ? `　たおした ${t().dex.beat[kind]}` : ''}`;
@@ -1552,7 +1567,7 @@
             const kind = dexKind;
             if (!kind || !U.ENEMIES[kind]) return;
             const e = U.ENEMIES[kind];
-            const known = t().dex.seen[kind];
+            const known = dexKnown(kind);
             ctx.fillStyle = '#1c2c3c';
             ctx.fillRect(12, 10, 84, 84);
             if (known) {

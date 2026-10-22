@@ -249,3 +249,49 @@ test('カットイン: 限定ボスは「氷隊 限定ボス」。再戦の 相�
     assert.ok(s.cutin && s.cutin.kind === 'harukirin_q', '再戦の カットイン');
     assert.equal(s.cutin.sub, '再戦！');
 });
+
+test('キャラ交換: 買った キャラの Lv は 主人公の Lv＋5 まで。もう片方の キャラは 図鑑の「交換」に のる。実績「キャラ交換」', () => {
+    const { s, asks, choose } = setup({ unlockAll: true });
+    const DGv = globalThis.KD.Dungeons;
+    s.town.market = [{ id: 'ally_goukioni', n: 99, seller: '5DX', price: 100 }];
+    s.player.money = 1000;
+    choose('交易所');
+    choose('ほかの探検隊の出品');
+    choose('ゴウキオニ');
+    assert.match(asks[0].message, /買った/);
+    const a = s.roster.find(x => x.kind === 'goukioni');
+    assert.equal(a.lv, s.player.lv + 5, 'Lv99 の 出品でも 主人公の Lv＋5 まで');
+    assert.ok(s.town.dex.traded.goukioni);
+    assert.equal(s.town.stats.allyTrades, 1);
+    assert.ok(s.town.ach.ver_trade, '実績 キャラ交換');
+    // 図鑑: 数は いまの バージョンの ぶんだけ。交換の キャラは おまけで のる
+    choose('もどる');
+    choose('もどる');   // 出品が なくなった
+    choose('やめる');
+    while (asks.length > 1) asks.shift();
+    choose('家');
+    choose('図鑑');
+    assert.match(asks[0].message, /交換 1/);
+    choose('敵の図鑑');
+    assert.ok(asks[0].options.some(o => o.startsWith('交換 V20　ゴウキオニ（鬼鬼団）')));
+    void DGv;
+});
+
+test('バージョンの 実績: 専用ダンジョン突破・限定ボスが仲間に・限定キャラ全員集合', () => {
+    const { s, game } = setup({}, 'おにおに');
+    const C2 = globalThis.KD.Collection;
+    const ctx = () => ({ town: s.town, player: s.player, allies: s.allies, roster: s.roster, stats: s.town.stats });
+    const ach = id => C2.ACHIEVEMENTS.find(a => a.id === id).test(ctx());
+    assert.ok(!ach('ver_dungeon') && !ach('ver_boss') && !ach('ver_all'));
+    s.town.extraClear = { onijo: true };
+    assert.ok(ach('ver_dungeon'));
+    assert.ok(!(s.town.extraClear.glacier) && !C2.ACHIEVEMENTS.find(a => a.id === 'ver_dungeon').test({ ...ctx(), town: { ...s.town, version: 'koori' } }), '氷隊なら 氷河');
+    s.town.owned.push('vq:kinmetsuki');
+    assert.ok(ach('ver_boss'));
+    const kinds = Object.keys(U.ENEMIES).filter(k => U.ENEMIES[k].version === 'onioni' && U.ENEMIES[k].no);
+    assert.equal(kinds.length, 10);
+    kinds.slice(0, 9).forEach(k => s.roster.push(game.makeAlly(k, 5)));
+    assert.ok(!ach('ver_all'));
+    s.roster.push(game.makeAlly(kinds[9], 5));
+    assert.ok(ach('ver_all'));
+});
