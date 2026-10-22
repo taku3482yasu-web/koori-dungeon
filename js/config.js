@@ -9,6 +9,6 @@
     'use strict';
 
     KD.CONFIG = {
-        supabase: { url: '', key: '' }
+        supabase: { url: 'https://jknmyakxaketocflgsfs.supabase.co', key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imprbm15YWt4YWtldG9jZmxnc2ZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI2MjE1MjIsImV4cCI6MjEwODE5NzUyMn0.zRgSsOO_sPTg4ery0our2VVzz-P9N0kRKAAfRTLBhE0' }
     };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);
