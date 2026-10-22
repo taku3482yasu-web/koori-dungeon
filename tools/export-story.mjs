@@ -165,8 +165,12 @@ Object.entries(SPx.LIST).forEach(([kind, sp]) => {
     line(`special.${kind}.shout`, `${who}「${sp.shout}」`);
     w('');
 });
-w('**前作に いない 仲間**（属性で 名前、役職で 範囲と おまけが 決まる。ひとことは その キャラの 敵の ときの ひとこと＋技の 名前）', '');
-Object.entries(SPx.BY_ELEMENT).forEach(([el, sp]) => line(`special.element.${el}`, `${el}：${sp.name}`));
+w('**必殺技が ない キャラ（汎用の 必殺技）**：属性 × 役職で 名前が 決まる。エフェクトは 属性、範囲と おまけは 役職で 決まる', '',
+    '（アタッカー：見えている 敵 みんな／ディフェンダー：周り 2 マス＋みんな まもり／ヒーラー：敵 みんな＋みんな 回復／ジャマー：敵 みんな＋状態異常（属性で ちがう）／サポーター：敵 みんな＋みんな きあい）。',
+    'ひとことは その キャラの 敵の ときの ひとこと＋技の 名前', '');
+Object.entries(SPx.GENERIC).forEach(([el, byRole]) => {
+    Object.entries(byRole).forEach(([role, name]) => line(`special.generic.${el}.${role}`, `${el}×${U.ROLES[role].name}：${name}`));
+});
 w('');
 
 const text = out.join('\n');

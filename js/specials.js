@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------
 // ダンジョンで 1 人 1 回・チームで 3 回まで 使える 大技。使うと 技の カットインの あと、キャラごとの エフェクトで 放つ。
 // 名前は 前作 (スロット) の 必殺技 (koori-slot-aso の battleLines.js の SPECIALS)。やすさんたちの 技は ふつうの わざと
-// 同じ 名前なので「・極」を 付けた。前作に ない キャラは、属性と 役職で 決まる (GENERIC)。強さ・範囲・おまけは Claude の 案。
+// 同じ 名前なので「・極」を 付けた。必殺技が ない キャラは 属性 × 役職の 汎用の 必殺技 (GENERIC)。強さ・範囲・おまけは Claude の 案。
 //   range: room 見えている 敵 みんな / pierce 前に まっすぐ つらぬく / around2 周り 2 マス / front 正面の 1 体に 大きな 一撃
 //   power: 強さ (わざの 強さと 同じ 目もり)。status・chance: おまけの 状態異常。heal: 仲間 みんなの HP を 回復 (割合)
 //   guard: 仲間 みんなが まもりの かまえ (ターン)。kiai: 仲間 みんなの 次の 攻撃が 2 倍
@@ -44,31 +44,47 @@
         maou: { name: '亜祖宇激烈破', element: 'ほのお', range: 'room', power: 3, fx: 'fire', color: '#ff3a2a', shout: '消え去れ！' }
     };
 
-    // 前作に ない キャラ: 属性で 技の 名前と エフェクト、役職で 範囲と おまけ
-    const BY_ELEMENT = {
-        'こおり': { name: 'ブリザード・バースト', fx: 'ice', color: '#bff0ff' },
-        'ほのお': { name: 'フレイム・バースト', fx: 'fire', color: '#ff7a3a' },
-        'みず': { name: 'タイダル・ウェーブ', fx: 'wave', color: '#4fa0ff' },
-        'しぜん': { name: 'グリーン・ストーム', fx: 'leaf', color: '#7ad85a' },
-        'かぜ': { name: 'ゲイル・ストーム', fx: 'wind', color: '#e8f4ff' },
-        'ふしぎ': { name: 'ミラクル・フラッシュ', fx: 'flash', color: '#d8a8ff' },
-        'ふつう': { name: 'ギガ・インパクト', fx: 'quake', color: '#ffe680' }
+    // ----- 汎用の 必殺技 (2026-10-22 ユーザー指定: 必殺技が ない キャラは 属性と 役職で 決まる。例 こおり×アタッカー＝アイスブリザード) -----
+    // 名前は 属性 × 役職 の 35 とおり (Claude の 案)。エフェクトと 色は 属性、範囲と おまけは 役職で 決まる
+    const GENERIC = {
+        'こおり': { attacker: 'アイスブリザード', defender: 'ダイヤモンドダスト・ガード', healer: 'スノーヒーリング', jammer: 'フリーズロック', supporter: 'オーロラエール' },
+        'ほのお': { attacker: 'メテオフレイム', defender: 'ブレイズウォール', healer: 'ぬくもりの炎', jammer: 'ヒートヘイズ', supporter: 'ファイアーダンス' },
+        'みず': { attacker: 'タイダルウェーブ', defender: 'アクアシールド', healer: 'いやしの雨', jammer: 'バブルトラップ', supporter: 'スプラッシュエール' },
+        'しぜん': { attacker: 'リーフストーム', defender: 'ガイアウォール', healer: '森のめぐみ', jammer: 'ねむりの花畑', supporter: 'ひだまりの歌' },
+        'かぜ': { attacker: 'ゲイルストーム', defender: 'つむじ風の盾', healer: 'そよ風のいやし', jammer: 'まどわしの竜巻', supporter: 'おいかぜ' },
+        'ふしぎ': { attacker: 'ミラクルフラッシュ', defender: 'ミステリーバリア', healer: 'ふしぎな光', jammer: 'ゆめまぼろし', supporter: 'スターダストエール' },
+        'ふつう': { attacker: 'ギガインパクト', defender: 'ガッツストンプ', healer: 'げんきの一撃', jammer: 'ドタバタ大騒ぎ', supporter: 'みんなで応援' }
     };
+    // 属性: エフェクトと 色、ジャマーの 技の 状態異常
+    const BY_ELEMENT = {
+        'こおり': { fx: 'ice', color: '#bff0ff', status: 'freeze' },
+        'ほのお': { fx: 'fire', color: '#ff7a3a', status: 'burn' },
+        'みず': { fx: 'wave', color: '#4fa0ff', status: 'bind' },
+        'しぜん': { fx: 'leaf', color: '#7ad85a', status: 'sleep' },
+        'かぜ': { fx: 'wind', color: '#e8f4ff', status: 'confuse' },
+        'ふしぎ': { fx: 'flash', color: '#d8a8ff', status: 'sleep' },
+        'ふつう': { fx: 'quake', color: '#ffe680', status: 'flinch' }
+    };
+    // 役職: 範囲と おまけ
     const BY_ROLE = {
-        attacker: { range: 'room', power: 2.2 },
-        defender: { range: 'around2', power: 2.4, guard: 4 },
-        healer: { range: 'room', power: 1.4, heal: 0.4 },
-        jammer: { range: 'room', power: 1.6, status: 'sleep', chance: 0.5 },
+        attacker: { range: 'room', power: 2.4 },
+        defender: { range: 'around2', power: 2.6, guard: 4 },
+        healer: { range: 'room', power: 1.4, heal: 0.5 },
+        jammer: { range: 'room', power: 1.6, chance: 0.6 },
         supporter: { range: 'room', power: 1.6, kiai: true }
     };
 
-    // u (仲間の キャラ) の 必殺技。line: 敵の ときの ひとこと (放つときに 言う)
+    // 仲間の キャラの 必殺技。line: 敵の ときの ひとこと (放つときに 言う)
     function of(kind, { element = 'ふつう', role = 'attacker', line = '' } = {}) {
         const base = String(kind).replace(/_q$/, '');
         if (LIST[base]) return { id: base, ...LIST[base] };
-        const el = BY_ELEMENT[element] || BY_ELEMENT['ふつう'];
-        return { id: kind, element, ...BY_ROLE[role] || BY_ROLE.attacker, ...el, shout: line ? `${line} ${el.name}！` : `いくぞ！ ${el.name}！`, generic: true };
+        const el = GENERIC[element] ? element : 'ふつう';
+        const r = BY_ROLE[role] ? role : 'attacker';
+        const { status, ...look } = BY_ELEMENT[el];
+        const name = GENERIC[el][r];
+        return { id: kind, element: el, ...BY_ROLE[r], ...look, ...(r === 'jammer' ? { status } : {}), name,
+            shout: line ? `${line} ${name}！` : `いくぞ！ ${name}！`, generic: true };
     }
 
-    KD.Specials = { MAX_TEAM, LIST, BY_ELEMENT, BY_ROLE, of };
+    KD.Specials = { MAX_TEAM, LIST, GENERIC, BY_ELEMENT, BY_ROLE, of };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);

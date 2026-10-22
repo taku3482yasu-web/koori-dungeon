@@ -388,3 +388,46 @@ test('必殺技: どの エフェクトも 描ける', () => {
     run(600);
     assert.equal(s.bigfx.length, 0);
 });
+
+test('汎用の 必殺技: 必殺技が ない キャラは 属性 × 役職で 決まる (こおり×アタッカー＝アイスブリザード)', () => {
+    const SP = globalThis.KD.Specials, U = globalThis.KD.Units;
+    assert.equal(SP.of('xxx', { element: 'こおり', role: 'attacker' }).name, 'アイスブリザード');
+    const names = new Set();
+    for (const el of U.ELEMENTS) for (const role of U.ROLE_IDS) {
+        const sp = SP.of('xxx', { element: el, role });
+        assert.ok(sp.generic && sp.name && sp.fx && sp.range, `${el}×${role}`);
+        names.add(sp.name);
+        if (role === 'jammer') assert.ok(sp.status, `${el} の ジャマーは 状態異常`);
+        else assert.ok(!sp.status);
+    }
+    assert.equal(names.size, U.ELEMENTS.length * U.ROLE_IDS.length, '35 とおり ぜんぶ ちがう 名前');
+    assert.equal(SP.of('koori').name, '大腸炎アタック', '前作の 必殺技は そのまま');
+});
+
+test('口ぐせ: ライバル探検隊・ボス・特別な キャラにも あり、敵の ときも しゃべる', () => {
+    const C = globalThis.KD.Collection;
+    for (const k of ['okagappa', 'asahara', 'ueno', 'yahami', 'ishii', 'harry', 'runaya', 'maou', 'maoushin', 'triplec', 'kinmetsuki_q', 'naitei', 'goldDog']) {
+        for (const when of ['attack', 'pinch', 'levelup', 'win']) assert.ok(C.lineFor(k, when, { pick: a => a[0] }), `${k} ${when}`);
+    }
+    const { s, game, choose, run, asks } = newGame();
+    choose('ダンジョンへ');
+    choose('ハリーの森');
+    choose('スキップ');
+    run(1300);
+    asks.length = 0;
+    const p = s.player;
+    const dx = [1, -1].find(d => globalThis.KD.Dungeon.canMove(s.map, p.x, p.y, d, 0));
+    const e = game.makeEnemy('asahara', 5, p.x + dx, p.y);
+    e.awake = true;
+    s.enemies.splice(0, s.enemies.length, e);
+    s.visible[e.y * s.map.w + e.x] = 1;
+    p.hp = p.stats.hp = 9999;
+    let said = false;
+    for (let i = 0; i < 40 && !said; i++) {
+        game.wait();
+        run(600);
+        asks.length = 0;
+        said = s.bubbles.some(b => b.u === e);
+    }
+    assert.ok(said, 'KING.ASAHARA が 敵の ときに しゃべった');
+});

@@ -361,6 +361,9 @@
         }
 
         // ----- 演出 -----
+        // 敵が しゃべるか (口ぐせが ある ライバル・ボスなど だけ。見えているとき)。見た目だけなので ゲームの 乱数 (rng) は 使わない
+        const looks = { pick: list => list[Math.floor(Math.random() * list.length)] };   // 見た目だけの えらび方
+        const foeTalk = (u, rate) => Boolean(C.lineFor(u.kind, 'attack', { pick: a => a[0] })) && seen(u) && Math.random() < rate;
         function bubble(u, text) {
             if (!text || u.hp <= 0) return;
             state.bubbles = state.bubbles.filter(b => b.u !== u);
@@ -1332,7 +1335,7 @@
             if (a.hp <= 0 || t.hp <= 0 || !canHit(a, t)) return 0;
             face(a, t.x - a.x, t.y - a.y);
             a.lunge = { at: performance.now(), dir: a.dir };
-            if (a.side === 'party' && rng.chance(0.12)) bubble(a, C.lineFor(a.kind, 'attack', rng));
+            if (a.side === 'party' ? rng.chance(0.12) : foeTalk(a, 0.3)) bubble(a, C.lineFor(a.kind, 'attack', a.side === 'party' ? rng : looks));
             if (!rng.chance(hitRate(a, t, U.HIT))) {
                 say(`${a.name}の こうげき！ ${t.name}は よけた。`);
                 popup(t, 'MISS', '#c8d8e8');
@@ -1381,7 +1384,7 @@
             u.lunge = { at: performance.now(), dir: u.dir };
             say(`${u.name}の ${mv.name}！`);
             sfx(mv.heal ? 'heal' : 'skill');
-            if (u.side === 'party' && rng.chance(0.15)) bubble(u, C.lineFor(u.kind, 'attack', rng));
+            if (u.side === 'party' ? rng.chance(0.15) : foeTalk(u, 0.4)) bubble(u, C.lineFor(u.kind, 'attack', u.side === 'party' ? rng : looks));
             if (mv.role && U.SKILLS[id] && /奥義/.test(mv.note || '')) flash('rgba(255,240,180,.5)');
             if (mv.range === 'self') {
                 selfMove(u, mv);
@@ -1471,6 +1474,13 @@
                 if (seen(t)) say(`${t.name}の こおりが とけた！`);
             }
             if (t.side === 'enemy' && !t.awake) wake(t);
+            // 敵の ピンチ (口ぐせが ある ライバル・ボスなど)
+            if (t.side === 'enemy' && t.hp > 0 && t.hp < t.stats.hp * 0.25 && !t.pinched && foeTalk(t, 1)) {
+                t.pinched = true;
+                bubble(t, C.lineFor(t.kind, 'pinch', looks));
+            }
+            // 敵が 仲間を たおした
+            if (t.side === 'party' && t.hp <= 0 && from && from.side === 'enemy' && foeTalk(from, 1)) bubble(from, C.lineFor(from.kind, 'win', looks));
             if (t.side === 'party') {
                 sfx('hurt');
                 if (n >= t.stats.hp * 0.2) shake(t.hero ? 3 : 2);

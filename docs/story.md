@@ -607,6 +607,692 @@
 
 - 〔catch.dake.win.1〕 なにが こようと 私が たたきつぶしてあげよう！
 
+**おかがっぱ**
+
+（攻撃したとき）
+
+- 〔catch.okagappa.attack.1〕 おかピポ！ イェア！
+- 〔catch.okagappa.attack.2〕 ま～だまだ戦わねバ！
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.okagappa.pinch.1〕 ノリが…足りなかった…イェア…
+
+（Lv が 上がったとき）
+
+- 〔catch.okagappa.levelup.1〕 ノリが 上がってきたぜ イェア！
+
+（敵を たおしたとき）
+
+- 〔catch.okagappa.win.1〕 お宝はいただきだぜ イェア！
+
+**ひびきまくり**
+
+（攻撃したとき）
+
+- 〔catch.hibikimakuri.attack.1〕 これが４DXだ！
+- 〔catch.hibikimakuri.attack.2〕 ここ すっごい ひびくよ～
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.hibikimakuri.pinch.1〕 ひびかなかった～…
+
+（Lv が 上がったとき）
+
+- 〔catch.hibikimakuri.levelup.1〕 もっと 響くように なったよ～
+
+（敵を たおしたとき）
+
+- 〔catch.hibikimakuri.win.1〕 すっごい ひびいたね～
+
+**やまもぅ**
+
+（攻撃したとき）
+
+- 〔catch.yamamou.attack.1〕 牛の力を見せてやる！
+- 〔catch.yamamou.attack.2〕 おちょくるなー！ モォー！
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.yamamou.pinch.1〕 人をおちょくるのがうますぎる～
+
+（Lv が 上がったとき）
+
+- 〔catch.yamamou.levelup.1〕 牛に 一歩 近づいた！ モォー！
+
+（敵を たおしたとき）
+
+- 〔catch.yamamou.win.1〕 モォー！ 牛の勝ちだ！
+
+**Mr.SASAKI**
+
+（攻撃したとき）
+
+- 〔catch.sasaki.attack.1〕 締め切り厳守です。
+- 〔catch.sasaki.attack.2〕 どうも、しご出来です。
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.sasaki.pinch.1〕 やばいです。
+
+（Lv が 上がったとき）
+
+- 〔catch.sasaki.levelup.1〕 すごいです。
+
+（敵を たおしたとき）
+
+- 〔catch.sasaki.win.1〕 すごいです。
+- 〔catch.sasaki.win.2〕 計画どおりです。
+
+**Mr.KOTANI**
+
+（攻撃したとき）
+
+- 〔catch.kotani.attack.1〕 勝率は計算済みです。
+- 〔catch.kotani.attack.2〕 数字はうそをつきません。
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.kotani.pinch.1〕 計算外…です…
+
+（Lv が 上がったとき）
+
+- 〔catch.kotani.levelup.1〕 勝率、上昇。記録しておきます。
+
+（敵を たおしたとき）
+
+- 〔catch.kotani.win.1〕 計算どおりです。
+
+**KING.ASAHARA**
+
+（攻撃したとき）
+
+- 〔catch.asahara.attack.1〕 ひれ伏せ！
+- 〔catch.asahara.attack.2〕 CS城の主の力、見せてやろう！
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.asahara.pinch.1〕 ぐぬぬ…覚えておれ！
+
+（Lv が 上がったとき）
+
+- 〔catch.asahara.levelup.1〕 フハハハ！ ワシは まだまだ 強くなるぞ！
+
+（敵を たおしたとき）
+
+- 〔catch.asahara.win.1〕 フハハハ！ワシの勝ちだ！
+
+**シバター**
+
+（攻撃したとき）
+
+- 〔catch.shibata.attack.1〕 バーイ！
+- 〔catch.shibata.attack.2〕 ぶんぶん！
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.shibata.pinch.1〕 んなああ～…
+
+（Lv が 上がったとき）
+
+- 〔catch.shibata.levelup.1〕 登録者数 アップ！ んなああ～
+
+（敵を たおしたとき）
+
+- 〔catch.shibata.win.1〕 撮れ高いただき！んなああ～
+
+**マッスルウエノーブル**
+
+（攻撃したとき）
+
+- 〔catch.ueno.attack.1〕 妻への愛を受けてみよ！
+- 〔catch.ueno.attack.2〕 我が筋肉の前にひれ伏すがよい！
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.ueno.pinch.1〕 筋肉が…足りなかった…
+
+（Lv が 上がったとき）
+
+- 〔catch.ueno.levelup.1〕 筋肉が また ひとまわり 大きくなった！
+
+（敵を たおしたとき）
+
+- 〔catch.ueno.win.1〕 筋肉は裏切らない！
+
+**イケキム**
+
+（攻撃したとき）
+
+- 〔catch.ikekimu.attack.1〕 すきだらけだ。
+- 〔catch.ikekimu.attack.2〕 チッ…邪魔だ。
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.ikekimu.pinch.1〕 い～やとんとんぱんぱんふるしばた～
+
+（Lv が 上がったとき）
+
+- 〔catch.ikekimu.levelup.1〕 ふん、悪くない。
+
+（敵を たおしたとき）
+
+- 〔catch.ikekimu.win.1〕 ふん、こんなものか。
+
+**ヤーハミー**
+
+（攻撃したとき）
+
+- 〔catch.yahami.attack.1〕 美しく いただくわ！
+- 〔catch.yahami.attack.2〕 お宝も 視線も、ぜんぶ いただくわ
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.yahami.pinch.1〕 わたしの 美しさに 傷が…！
+
+（Lv が 上がったとき）
+
+- 〔catch.yahami.levelup.1〕 美しさに また 磨きが かかったわ
+
+（敵を たおしたとき）
+
+- 〔catch.yahami.win.1〕 当然の 結果ね
+
+**マエチョッキン**
+
+（攻撃したとき）
+
+- 〔catch.maechokkin.attack.1〕 チョッキン♪
+- 〔catch.maechokkin.attack.2〕 きれいに 切りそろえて あげる
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.maechokkin.pinch.1〕 前髪が…そろってない…！
+
+（Lv が 上がったとき）
+
+- 〔catch.maechokkin.levelup.1〕 ハサミの 切れ味 アップ♪
+
+（敵を たおしたとき）
+
+- 〔catch.maechokkin.win.1〕 きれいに そろったわ♪ チョッキン
+
+**ノラハン**
+
+（攻撃したとき）
+
+- 〔catch.norahan.attack.1〕 ニャハッ、いただき♪
+- 〔catch.norahan.attack.2〕 すきあり♪
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.norahan.pinch.1〕 ニャッ…ちょっと やばいかも
+
+（Lv が 上がったとき）
+
+- 〔catch.norahan.levelup.1〕 ニャハッ、また 上手に なっちゃった♪
+
+（敵を たおしたとき）
+
+- 〔catch.norahan.win.1〕 お宝も 勝ちも いただき♪
+
+**イシイー**
+
+（攻撃したとき）
+
+- 〔catch.ishii.attack.1〕 ブヒッ！
+- 〔catch.ishii.attack.2〕 ダンジョン育ちを なめるな！
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.ishii.pinch.1〕 ブヒィ…まだまだ！
+
+（Lv が 上がったとき）
+
+- 〔catch.ishii.levelup.1〕 ブヒッ！ また 強くなった！
+
+（敵を たおしたとき）
+
+- 〔catch.ishii.win.1〕 ブヒッ！ おれたちの 勝ちだ！
+
+**マズダ**
+
+（攻撃したとき）
+
+- 〔catch.mazuda.attack.1〕 ……ふん！
+- 〔catch.mazuda.attack.2〕 よそ者は 通さん
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.mazuda.pinch.1〕 ……まだ 倒れん
+
+（Lv が 上がったとき）
+
+- 〔catch.mazuda.levelup.1〕 ……悪くない
+
+（敵を たおしたとき）
+
+- 〔catch.mazuda.win.1〕 ……修行が 足りんな
+
+**NAITOON**
+
+（攻撃したとき）
+
+- 〔catch.naitoon.attack.1〕 ワォーン！
+- 〔catch.naitoon.attack.2〕 夜の 迷宮は おれたちの もの
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.naitoon.pinch.1〕 ワ、ワォーン……
+
+（Lv が 上がったとき）
+
+- 〔catch.naitoon.levelup.1〕 月が おれに 力を くれた！ ワォーン！
+
+（敵を たおしたとき）
+
+- 〔catch.naitoon.win.1〕 ワォーン！ 勝利の 遠吠えだ！
+
+**ハリー**
+
+（攻撃したとき）
+
+- 〔catch.harry.attack.1〕 ハリー！
+- 〔catch.harry.attack.2〕 メンキョナイー！
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.harry.pinch.1〕 ハ、ハリー…
+- 〔catch.harry.pinch.2〕 ム、ムリー…
+
+（Lv が 上がったとき）
+
+- 〔catch.harry.levelup.1〕 ハリー！（強くなった！）
+
+（敵を たおしたとき）
+
+- 〔catch.harry.win.1〕 チッ…ハリー！
+
+**浦の島重蔵**
+
+（攻撃したとき）
+
+- 〔catch.urashima.attack.1〕 えい、けむりじゃ！
+- 〔catch.urashima.attack.2〕 わし…なんじゃったかの…
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.urashima.pinch.1〕 つりに…いかねば…
+
+（Lv が 上がったとき）
+
+- 〔catch.urashima.levelup.1〕 ほっほっほ。脳汁が でたわい
+
+（敵を たおしたとき）
+
+- 〔catch.urashima.win.1〕 ふぉっふぉっふぉ…なんじゃったかの
+
+**ダイシ**
+
+（攻撃したとき）
+
+- 〔catch.daishi.attack.1〕 仏の顔も、ここまでです。
+- 〔catch.daishi.attack.2〕 よくぞ参られた。拙僧が相手いたそう。
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.daishi.pinch.1〕 見事…拙僧の負けです。
+
+（Lv が 上がったとき）
+
+- 〔catch.daishi.levelup.1〕 修行の 成果が 出ましたな
+
+（敵を たおしたとき）
+
+- 〔catch.daishi.win.1〕 修行が足りませぬな。
+
+**ズミタニ**
+
+（攻撃したとき）
+
+- 〔catch.zumitani.attack.1〕 ついてこられるかな♪
+- 〔catch.zumitani.attack.2〕 やっほー、78代目だよ！
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.zumitani.pinch.1〕 うそでしょ～！？
+
+（Lv が 上がったとき）
+
+- 〔catch.zumitani.levelup.1〕 また 速く なっちゃった♪
+
+（敵を たおしたとき）
+
+- 〔catch.zumitani.win.1〕 やっぱりその程度か♪
+
+**ルナヤ**
+
+（攻撃したとき）
+
+- 〔catch.runaya.attack.1〕 月の力よ…！
+- 〔catch.runaya.attack.2〕 よく来たわね。…よく来たわね。
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.runaya.pinch.1〕 わたしの 迷宮が…
+
+（Lv が 上がったとき）
+
+- 〔catch.runaya.levelup.1〕 月の 力が 満ちてきたわ。…満ちてきたわ
+
+（敵を たおしたとき）
+
+- 〔catch.runaya.win.1〕 あら、もう終わり？…もう終わり？
+
+**ノゾエマ**
+
+（攻撃したとき）
+
+- 〔catch.nozoema.attack.1〕 この刀を越えてみせよ！
+- 〔catch.nozoema.attack.2〕 その前に、この筋肉を見よ！
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.nozoema.pinch.1〕 見事な…筋肉だ…
+
+（Lv が 上がったとき）
+
+- 〔catch.nozoema.levelup.1〕 筋肉が 喜んでおる
+
+（敵を たおしたとき）
+
+- 〔catch.nozoema.win.1〕 鍛え方が足りぬ。
+
+**大魔王ASO**
+
+（攻撃したとき）
+
+- 〔catch.maou.attack.1〕 消え去れ！
+- 〔catch.maou.attack.2〕 数百年、この時を待ちわびたぞ。
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.maou.pinch.1〕 ば、ばかな…この我が…！
+
+（Lv が 上がったとき）
+
+- 〔catch.maou.levelup.1〕 力が あふれてくるぞ！
+
+（敵を たおしたとき）
+
+- 〔catch.maou.win.1〕 我が力、思い知ったか！
+
+**大魔王ASO・真**
+
+（攻撃したとき）
+
+- 〔catch.maoushin.attack.1〕 真の力を 見せてやろう！
+- 〔catch.maoushin.attack.2〕 消え去れ！
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.maoushin.pinch.1〕 このASOが…このASOが～！
+
+（Lv が 上がったとき）
+
+- 〔catch.maoushin.levelup.1〕 真の力が 目覚めていく…！
+
+（敵を たおしたとき）
+
+- 〔catch.maoushin.win.1〕 フハハハハハ！ 我こそ 真の 大魔王！
+
+**マキビコンMk-4**
+
+（攻撃したとき）
+
+- 〔catch.makibikon.attack.1〕 排除を開始するであります。
+- 〔catch.makibikon.attack.2〕 挑戦者を確認したであります。
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.makibikon.pinch.1〕 システム…ダウン…であります…
+
+（Lv が 上がったとき）
+
+- 〔catch.makibikon.levelup.1〕 性能が 向上したであります。
+
+（敵を たおしたとき）
+
+- 〔catch.makibikon.win.1〕 排除、完了であります。
+
+**奈架多ドラゴン**
+
+（攻撃したとき）
+
+- 〔catch.nakata.attack.1〕 グオオオオ！
+- 〔catch.nakata.attack.2〕 グオオオ…（力加減…力加減…）
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.nakata.pinch.1〕 グオ…（まちがえた…）
+
+（Lv が 上がったとき）
+
+- 〔catch.nakata.levelup.1〕 グオ！（介護の 勉強が 実った）
+
+（敵を たおしたとき）
+
+- 〔catch.nakata.win.1〕 グオ！（力加減、成功）
+
+**ゴールド金面犬**
+
+（攻撃したとき）
+
+- 〔catch.goldDog.attack.1〕 ワン！（邪悪な笑み）
+- 〔catch.goldDog.attack.2〕 ワン！（自信ありげ）
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.goldDog.pinch.1〕 クゥ～ン…
+
+（Lv が 上がったとき）
+
+- 〔catch.goldDog.levelup.1〕 ワン！（ごきげん）
+
+（敵を たおしたとき）
+
+- 〔catch.goldDog.win.1〕 ワン！（黄金像にしてやった）
+
+**トリプルC**
+
+（攻撃したとき）
+
+- 〔catch.triplec.attack.1〕 コンパイル 開始！
+- 〔catch.triplec.attack.2〕 C・C++・C#……すべてを 統べる！
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.triplec.pinch.1〕 エラー…エラー…
+
+（Lv が 上がったとき）
+
+- 〔catch.triplec.levelup.1〕 バージョン アップ 完了！
+
+（敵を たおしたとき）
+
+- 〔catch.triplec.win.1〕 ビルド 成功！
+
+**国士無双ニャン**
+
+（攻撃したとき）
+
+- 〔catch.kokushinyan.attack.1〕 ロンだニャ！
+- 〔catch.kokushinyan.attack.2〕 ツモだニャ！
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.kokushinyan.pinch.1〕 テンパイ ならずだニャ…
+
+（Lv が 上がったとき）
+
+- 〔catch.kokushinyan.levelup.1〕 役満に 一歩 近づいたニャ
+
+（敵を たおしたとき）
+
+- 〔catch.kokushinyan.win.1〕 国士無双、あがりだニャ！
+
+**ハリー大帝**
+
+（攻撃したとき）
+
+- 〔catch.harryemperor.attack.1〕 余の トゲを 受けよ！
+- 〔catch.harryemperor.attack.2〕 ひれ伏すがよい！
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.harryemperor.pinch.1〕 余が…押されて おるだと…
+
+（Lv が 上がったとき）
+
+- 〔catch.harryemperor.levelup.1〕 余の トゲが また 鋭く なった
+
+（敵を たおしたとき）
+
+- 〔catch.harryemperor.win.1〕 余の 王国に 敵は おらぬ！
+
+**ハル麒麟**
+
+（攻撃したとき）
+
+- 〔catch.harukirin.attack.1〕 春の 風よ！
+- 〔catch.harukirin.attack.2〕 溶けて 賢者と なりなさい
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.harukirin.pinch.1〕 春が…とおのく…
+
+（Lv が 上がったとき）
+
+- 〔catch.harukirin.levelup.1〕 春の 力が 満ちて いく
+
+（敵を たおしたとき）
+
+- 〔catch.harukirin.win.1〕 氷は とけ、春が 来る
+
+**金滅鬼**
+
+（攻撃したとき）
+
+- 〔catch.kinmetsuki.attack.1〕 金色の 鬼に ひれ伏せ！
+- 〔catch.kinmetsuki.attack.2〕 金の 金棒を 受けよ！
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.kinmetsuki.pinch.1〕 ぐぬぬ……金ピカが はがれる……
+
+（Lv が 上がったとき）
+
+- 〔catch.kinmetsuki.levelup.1〕 金色が いっそう 輝く！
+
+（敵を たおしたとき）
+
+- 〔catch.kinmetsuki.win.1〕 鬼の 中の 鬼は おれだ！
+
+**ヒョウガリュウ**
+
+（攻撃したとき）
+
+- 〔catch.hyougaryu.attack.1〕 氷河の 息吹！
+- 〔catch.hyougaryu.attack.2〕 凍てつけ！
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.hyougaryu.pinch.1〕 氷が…とけていく…
+
+（Lv が 上がったとき）
+
+- 〔catch.hyougaryu.levelup.1〕 氷河の 力が 目覚めた
+
+（敵を たおしたとき）
+
+- 〔catch.hyougaryu.win.1〕 氷河に 眠れ
+
+**ゴウキオニ**
+
+（攻撃したとき）
+
+- 〔catch.goukioni.attack.1〕 一番槍、いくぞ！
+- 〔catch.goukioni.attack.2〕 オラァ！
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.goukioni.pinch.1〕 まだ 倒れねえ！
+
+（Lv が 上がったとき）
+
+- 〔catch.goukioni.levelup.1〕 鬼鬼団の 一番槍、さらに 強く！
+
+（敵を たおしたとき）
+
+- 〔catch.goukioni.win.1〕 鬼鬼団に 敵なし！
+
+**シーシャ・ナイテイ・ナイナイ**
+
+（攻撃したとき）
+
+- 〔catch.naitei.attack.1〕 お前に内定はない！
+- 〔catch.naitei.attack.2〕 内定は……やらん
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.naitei.pinch.1〕 な、内定を…出すしか…
+
+（Lv が 上がったとき）
+
+- 〔catch.naitei.levelup.1〕 内定の 力が 増した
+
+（敵を たおしたとき）
+
+- 〔catch.naitei.win.1〕 不採用だ。
+
+**シーシャ・ナイテイ・アルアル**
+
+（攻撃したとき）
+
+- 〔catch.aruaru.attack.1〕 内定の理を 見せてやろう
+- 〔catch.aruaru.attack.2〕 内定とは…
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.aruaru.pinch.1〕 内定の理が…ゆらぐ…
+
+（Lv が 上がったとき）
+
+- 〔catch.aruaru.levelup.1〕 内定の理が 深まった
+
+（敵を たおしたとき）
+
+- 〔catch.aruaru.win.1〕 また 内定を 出しそびれたな
+
+**ナイテイ・ナナッシャ・ナディ**
+
+（攻撃したとき）
+
+- 〔catch.nadi.attack.1〕 オンライン面接、はじめます
+- 〔catch.nadi.attack.2〕 志望動機を どうぞ
+
+（ピンチ（HP が 少ない））
+
+- 〔catch.nadi.pinch.1〕 通信が…不安定です…
+
+（Lv が 上がったとき）
+
+- 〔catch.nadi.levelup.1〕 面接官として 成長しました
+
+（敵を たおしたとき）
+
+- 〔catch.nadi.win.1〕 お祈り 申し上げます
+
 ### 9.3 敵の ひとこと
 
 会ったとき（ボス・決闘）・化けていたのが ばれたとき・仲間を 呼ぶ／回復する・お金や 道具を 取る・爆発・復活 のときに 出る。図鑑にも のる
@@ -984,12 +1670,43 @@
 - 〔special.maou.name〕 亜祖宇激烈破
 - 〔special.maou.shout〕 大魔王ASO「消え去れ！」
 
-**前作に いない 仲間**（属性で 名前、役職で 範囲と おまけが 決まる。ひとことは その キャラの 敵の ときの ひとこと＋技の 名前）
+**必殺技が ない キャラ（汎用の 必殺技）**：属性 × 役職で 名前が 決まる。エフェクトは 属性、範囲と おまけは 役職で 決まる
 
-- 〔special.element.こおり〕 こおり：ブリザード・バースト
-- 〔special.element.ほのお〕 ほのお：フレイム・バースト
-- 〔special.element.みず〕 みず：タイダル・ウェーブ
-- 〔special.element.しぜん〕 しぜん：グリーン・ストーム
-- 〔special.element.かぜ〕 かぜ：ゲイル・ストーム
-- 〔special.element.ふしぎ〕 ふしぎ：ミラクル・フラッシュ
-- 〔special.element.ふつう〕 ふつう：ギガ・インパクト
+（アタッカー：見えている 敵 みんな／ディフェンダー：周り 2 マス＋みんな まもり／ヒーラー：敵 みんな＋みんな 回復／ジャマー：敵 みんな＋状態異常（属性で ちがう）／サポーター：敵 みんな＋みんな きあい）。
+ひとことは その キャラの 敵の ときの ひとこと＋技の 名前
+
+- 〔special.generic.こおり.attacker〕 こおり×アタッカー：アイスブリザード
+- 〔special.generic.こおり.defender〕 こおり×ディフェンダー：ダイヤモンドダスト・ガード
+- 〔special.generic.こおり.healer〕 こおり×ヒーラー：スノーヒーリング
+- 〔special.generic.こおり.jammer〕 こおり×ジャマー：フリーズロック
+- 〔special.generic.こおり.supporter〕 こおり×サポーター：オーロラエール
+- 〔special.generic.ほのお.attacker〕 ほのお×アタッカー：メテオフレイム
+- 〔special.generic.ほのお.defender〕 ほのお×ディフェンダー：ブレイズウォール
+- 〔special.generic.ほのお.healer〕 ほのお×ヒーラー：ぬくもりの炎
+- 〔special.generic.ほのお.jammer〕 ほのお×ジャマー：ヒートヘイズ
+- 〔special.generic.ほのお.supporter〕 ほのお×サポーター：ファイアーダンス
+- 〔special.generic.みず.attacker〕 みず×アタッカー：タイダルウェーブ
+- 〔special.generic.みず.defender〕 みず×ディフェンダー：アクアシールド
+- 〔special.generic.みず.healer〕 みず×ヒーラー：いやしの雨
+- 〔special.generic.みず.jammer〕 みず×ジャマー：バブルトラップ
+- 〔special.generic.みず.supporter〕 みず×サポーター：スプラッシュエール
+- 〔special.generic.しぜん.attacker〕 しぜん×アタッカー：リーフストーム
+- 〔special.generic.しぜん.defender〕 しぜん×ディフェンダー：ガイアウォール
+- 〔special.generic.しぜん.healer〕 しぜん×ヒーラー：森のめぐみ
+- 〔special.generic.しぜん.jammer〕 しぜん×ジャマー：ねむりの花畑
+- 〔special.generic.しぜん.supporter〕 しぜん×サポーター：ひだまりの歌
+- 〔special.generic.かぜ.attacker〕 かぜ×アタッカー：ゲイルストーム
+- 〔special.generic.かぜ.defender〕 かぜ×ディフェンダー：つむじ風の盾
+- 〔special.generic.かぜ.healer〕 かぜ×ヒーラー：そよ風のいやし
+- 〔special.generic.かぜ.jammer〕 かぜ×ジャマー：まどわしの竜巻
+- 〔special.generic.かぜ.supporter〕 かぜ×サポーター：おいかぜ
+- 〔special.generic.ふしぎ.attacker〕 ふしぎ×アタッカー：ミラクルフラッシュ
+- 〔special.generic.ふしぎ.defender〕 ふしぎ×ディフェンダー：ミステリーバリア
+- 〔special.generic.ふしぎ.healer〕 ふしぎ×ヒーラー：ふしぎな光
+- 〔special.generic.ふしぎ.jammer〕 ふしぎ×ジャマー：ゆめまぼろし
+- 〔special.generic.ふしぎ.supporter〕 ふしぎ×サポーター：スターダストエール
+- 〔special.generic.ふつう.attacker〕 ふつう×アタッカー：ギガインパクト
+- 〔special.generic.ふつう.defender〕 ふつう×ディフェンダー：ガッツストンプ
+- 〔special.generic.ふつう.healer〕 ふつう×ヒーラー：げんきの一撃
+- 〔special.generic.ふつう.jammer〕 ふつう×ジャマー：ドタバタ大騒ぎ
+- 〔special.generic.ふつう.supporter〕 ふつう×サポーター：みんなで応援
