@@ -281,6 +281,11 @@
         }
         requestAnimationFrame(frame);
         window.kdGame = game;   // 確認用 (開発者ツールのコンソールから)
+        // ページを閉じる・ほかのタブに切りかえるときも セーブ (2026-10-22 ユーザー指定)
+        const saveNow = () => { try { game.autosave(true); } catch (e) { console.error(e); } };
+        window.addEventListener('pagehide', saveNow);
+        window.addEventListener('beforeunload', saveNow);
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveNow(); });
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);

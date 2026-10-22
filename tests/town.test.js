@@ -378,7 +378,7 @@ test('敵をたおすと ときどき素材を落とす', () => {
     assert.ok(drops > 2 && drops < 25, `30 体のうち ${drops} 体が落とした`);
 });
 
-test('セーブして、つづきから遊べる。ダンジョンの中なら、その階のはじめから', () => {
+test('セーブして、つづきから遊べる。ダンジョンの中なら、やめた場所から (オートセーブ)', () => {
     const a = newGame();
     a.s.player.money = 4321;
     a.s.town.bp = 7;
@@ -406,12 +406,40 @@ test('セーブして、つづきから遊べる。ダンジョンの中なら�
     b.choose('はい');
     b.run(1300);
     assert.equal(b.s.floor, 2);
+    // B2F で 何歩か歩き、HP が減り、おにおにを 操作している (オートセーブは ターンが すすむごと)
+    const p = b.s.player;
+    for (let i = 0; i < 6; i++) {
+        const d = [[1, 0], [0, 1], [-1, 0], [0, -1]].find(([dx, dy]) => D.canMove(b.s.map, p.x, p.y, dx, dy) && !b.s.allies.some(a => a.x === p.x + dx && a.y === p.y + dy) && !b.s.enemies.some(e => e.x === p.x + dx && e.y === p.y + dy));
+        if (d) b.game.moveInput(d[0], d[1]);
+        b.run(400);
+        while (b.asks.length) b.asks.shift().done(0);
+    }
+    p.hp = Math.max(1, p.hp - 5);
+    b.game.switchTo(b.s.allies[0]);
+    b.game.autosave(true);   // ページを閉じたとき
+    const was = { x: p.x, y: p.y, hp: p.hp, turn: b.s.turn, explored: b.s.explored.reduce((n, v) => n + v, 0), tiles: Array.from(b.s.map.tiles).join(''),
+        enemies: b.s.enemies.map(e => `${e.kind}@${e.x},${e.y}:${e.hp}`).sort().join(' '), leader: b.s.player.kind };
+    assert.ok(was.turn > 0);
     const c = setup({}, { fresh: false });
     c.choose('つづきから');
-    c.run(1300);
+    c.run(300);
     assert.equal(c.s.phase, 'play');
     assert.equal(c.s.floor, 2);
-    assert.equal(c.s.player.money, 50);
+    const hero = c.game.heroUnit();
+    assert.equal(hero.money, 50);
+    assert.deepEqual([hero.x, hero.y, hero.hp], [was.x, was.y, was.hp], 'やめた場所・HP から');
+    assert.equal(c.s.turn, was.turn);
+    assert.equal(Array.from(c.s.map.tiles).join(''), was.tiles, '同じ地図');
+    assert.equal(c.s.explored.reduce((n, v) => n + v, 0) >= was.explored, true, '見たところも のこる');
+    assert.equal(c.s.enemies.map(e => `${e.kind}@${e.x},${e.y}:${e.hp}`).sort().join(' '), was.enemies, '敵も 同じ場所・HP');
+    assert.equal(c.s.player.kind, was.leader, '操作していた仲間のまま');
+    assert.ok(c.s.messages.some(m => /続きから/.test(m.text)));
+    // そのまま 遊べる (歩ける)
+    c.game.switchTo(hero);
+    const t0 = c.s.turn;
+    c.game.wait();
+    c.run(600);
+    assert.ok(c.s.turn > t0);
 });
 
 test('仲間の広場: 並べかえ (★順・役職順・Lv順) と お別れ。こおりくん・おにおに など 特別なキャラとは お別れできない', () => {

@@ -196,6 +196,16 @@ try {
     await press('#btn-sound');
     await sleep(800);
     check(await phase() === 'play', '最後まで 画面が止まらない');
+    // ページを 開きなおすと、やめた場所から 続く (オートセーブ)
+    await press('#btn-wait');
+    await sleep(600);
+    const was = await evaluate('(() => { const s = window.kdGame.state, h = window.kdGame.heroUnit(); return [s.floor, h.x, h.y, h.hp, s.enemies.length].join(","); })()');
+    await send('Page.reload');
+    await sleep(2500);
+    await press('.ask-choices button', { text: 'つづきから' });
+    await sleep(1200);
+    const now = await evaluate('(() => { const s = window.kdGame.state, h = window.kdGame.heroUnit(); return [s.floor, h.x, h.y, h.hp, s.enemies.length].join(","); })()');
+    check(await phase() === 'play' && now === was, `ページを開きなおすと やめた場所から続く（${was} → ${now}）`);
 } catch (e) {
     check(false, `止まった: ${e.message}`);
 } finally {

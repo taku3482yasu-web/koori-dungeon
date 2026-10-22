@@ -457,7 +457,90 @@
             changeFloor(floor, `${state.dungeon.name}  B${floor}F`);
         }
 
-        // 中断セーブから、その階のはじめに戻る
+        // ----- 続きから (2026-10-22 ユーザー指定) -----
+        // 階の中の様子を まるごと取り出す (地図・見たマス・敵・道具・ワナ・みんなの位置と HP・状態)。セーブに入れる
+        const plain = o => JSON.parse(JSON.stringify(o));
+        const unitSnap = u => ({
+            kind: u.kind, name: u.name, hero: Boolean(u.hero), role: u.role, lv: u.lv, exp: u.exp, hp: u.hp, x: u.x, y: u.y, dir: u.dir,
+            status: u.status, buffs: u.buffs, flinch: u.flinch, regen: u.regen, skills: u.skills, element: u.element, immune: u.immune, traits: u.traits
+        });
+        function snapshot() {
+            if (state.phase !== 'play' || !state.map || state.over || state.done) return null;
+            const base = state.dungeon.base || state.dungeon;
+            return {
+                v: 1, dungeon: base.id, floor: state.floor, seed: state.seed, turn: state.turn, shiftAt: state.shiftAt || 0,
+                house: state.house, bossDown: Boolean(state.bossDown),
+                map: { w: state.map.w, h: state.map.h, tiles: Array.from(state.map.tiles), roomAt: Array.from(state.map.roomAt), rooms: state.map.rooms, start: state.map.start, stairs: state.map.stairs },
+                explored: Array.from(state.explored).join(''),
+                enemies: plain(state.enemies.map(e => ({ ...e, anim: null, lunge: null }))),
+                boss: state.enemies.indexOf(state.boss),
+                items: plain(state.items), traps: plain(state.traps),
+                party: [state.player, ...state.allies].map(u => plain(unitSnap(u))),
+                fallen: state.fallen.map(u => plain(unitSnap(u)))
+            };
+        }
+        // 取り出した様子から 続ける。主人公 (道具袋・お金・満腹度・バトルツリー) は セーブから作ってあるものを使う
+        function resumeSnap(snap) {
+            const baseD = DUNGEONS.find(d => d.id === snap.dungeon) || DUNGEONS[0];
+            state.dungeon = baseD.bonus ? { ...baseD, ...DG.atFloor(snap.floor) } : baseD;
+            state.floor = snap.floor;
+            state.seed = snap.seed;
+            rng = KD.createRng(snap.seed + snap.floor * 104729 + snap.turn * 31 + 7);
+            const m = snap.map;
+            state.map = { w: m.w, h: m.h, tiles: Uint8Array.from(m.tiles), roomAt: Int16Array.from(m.roomAt), rooms: m.rooms, start: m.start, stairs: m.stairs };
+            state.explored = Uint8Array.from(snap.explored.split('').map(Number));
+            state.enemies = snap.enemies.map(e => ({ ...e, anim: null, lunge: null, fx: e.x, fy: e.y }));
+            state.boss = snap.boss >= 0 ? state.enemies[snap.boss] : null;
+            state.items = snap.items;
+            state.traps = snap.traps;
+            state.turn = snap.turn;
+            state.shiftAt = snap.shiftAt;
+            state.house = snap.house;
+            state.bossDown = snap.bossDown;
+            state.queue = [];
+            state.dying = [];
+            state.bubbles = [];
+            state.waitUntil = 0;
+            state.arrived = false;
+            state.fastSkip = false;
+            state.done = state.over = false;
+            // みんな: 主人公は いまの state.player (セーブから作った)、仲間は 様子から作り直す
+            const hero = state.player;
+            const apply = (u, d) => {
+                Object.assign(u, { x: d.x, y: d.y, fx: d.x, fy: d.y, dir: d.dir, hp: d.hp, status: d.status, buffs: d.buffs || { kiai: false, guard: 0 },
+                    flinch: d.flinch, regen: d.regen || 0, skills: d.skills, anim: null, lunge: null });
+                return u;
+            };
+            const build = d => {
+                const a = makeAlly(d.kind, d.lv);
+                Object.assign(a, { name: d.name, exp: d.exp, role: d.role });
+                a.stats = U.allyStats(a.kind, a.lv, a.role);
+                return apply(a, d);
+            };
+            const units = snap.party.map(d => (d.hero ? apply(hero, d) : build(d)));
+            state.player = units[0];
+            state.allies = units.slice(1);
+            state.fallen = (snap.fallen || []).map(build);
+            if (!state.player.hero) shareTeam(state.player);
+            recalc(hero);
+            state.phase = 'play';
+            state.run = { dungeon: snap.dungeon, floor: snap.floor, seed: snap.seed };
+            look();
+            if (KD.Sound) KD.Sound.bgm(DUNGEON_BGM[state.dungeon.bgm || state.dungeon.id] || 'forest');
+            say(`${state.dungeon.name} B${state.floor}F の 続きから。`);
+            savedTurn = state.turn;
+            return true;
+        }
+        // オートセーブ: ダンジョンでは ターンが すすむごと (動きが止まっているとき)
+        let savedTurn = -1;
+        function autosave(force = false) {
+            if (!state.town || opts.save === false) return;
+            if (state.phase === 'play' && !force && (busy() || state.fade || state.turn === savedTurn)) return;
+            savedTurn = state.turn;
+            town.save();
+        }
+
+        // 中断セーブから、その階のはじめに戻る (前の版のセーブ。階の様子がないとき)
         function resume(run) {
             state.dungeon = DUNGEONS.find(d => d.id === run.dungeon) || DUNGEONS[0];
             state.seed = run.seed;
@@ -2036,6 +2119,7 @@
 
         function draw(now) {
             update(now);
+            if (state.phase === 'play' && state.map && !state.over && !state.done) autosave();
             if (state.phase === 'title' || state.phase === 'town') {
                 town.draw(ctx, now, W, H);
                 if (state.fade) drawFade(now);
@@ -2535,7 +2619,7 @@
         // 町 (townui.js) に渡す中身
         const town = KD.createTown({
             state, opts, say, later,
-            selectHero, makeHero, makeAlly, recalc, learnNow, startDungeon, resume, backToTown, partyMax, talk, toast, evolve, heroUnit, backToHero
+            selectHero, makeHero, makeAlly, recalc, learnNow, startDungeon, resume, resumeSnap, snapshot, backToTown, partyMax, talk, toast, evolve, heroUnit, backToHero
         }, ui);
 
         if (opts.start === 'dungeon') {
@@ -2545,7 +2629,7 @@
             });
         } else town.title();
         return {
-            state, town, draw, moveInput, wait, confirm, attack: attackFront, useSkill, itemMenu, tacticMenu, busy, makeEnemy, makeAlly, evolve, startDungeon, switchTo, switchMenu, heroUnit, spawnBoss,
+            state, town, draw, moveInput, wait, confirm, attack: attackFront, useSkill, itemMenu, tacticMenu, busy, makeEnemy, makeAlly, evolve, startDungeon, switchTo, switchMenu, heroUnit, snapshot, autosave, spawnBoss,
             skills: () => (state.player && state.phase === 'play' ? state.player.skills.map(skillLabel) : []),
             toggleMinimap() { state.mini = !state.mini; },
             toggleSound() {

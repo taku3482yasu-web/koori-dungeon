@@ -256,6 +256,7 @@
             view = 'town';
             bgm('town');
             check();
+            save();   // オートセーブ (2026-10-22 ユーザー指定)
             const town = t();
             const news = town.news.splice(0);
             const done = town.quests.filter(questDone).length;
@@ -932,7 +933,9 @@
                 v: 1,
                 hero: { ...unitData(hero), tree: hero.tree, bag: hero.bag, money: hero.money, belly: hero.belly },
                 allies: [state.player, ...state.allies].filter(u => !u.hero).map(unitData), roster: state.roster.map(unitData), tactic: state.tactic,
-                town: t(), run: state.run || null
+                town: t(), run: state.run || null,
+                // 階の中の様子 (開きなおすと その場所から続ける。2026-10-22 ユーザー指定)
+                snap: state.phase === 'play' ? g.snapshot() : null
             };
             try {
                 localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -970,7 +973,8 @@
             state.town = { cleared: 0, seen: {}, storyEnd: false, ...collectionData(), ...data.town };
             state.town.stats = { ...C.newStats(), ...state.town.stats };
             addRivalQuests();
-            // ダンジョンの中でやめていたら、その階の はじめから (中断セーブ。仕様書 16章)
+            // ダンジョンの中でやめていたら、その場所から 続ける (階の様子がない 前の版のセーブは その階の はじめから。仕様書 16章)
+            if (data.run && data.snap) return g.resumeSnap(data.snap);
             if (data.run) return g.resume(data.run);
             menu();
             return true;
