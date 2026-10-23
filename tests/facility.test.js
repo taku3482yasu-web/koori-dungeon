@@ -173,3 +173,58 @@ test('出かけている 仲間も セーブに 残り、「持っている」 �
     assert.equal(data.town.expeditions[0].members[0].kind, 'haribaby');
     assert.ok(!data.roster.some(d => d.kind === 'haribaby'));
 });
+
+test('鍛冶屋: 持ち物拡張ボックス (+5・100 まで)・倉庫拡張マシン (+30・1 万 まで 足せる)。作ると すぐ 効く', () => {
+    const { s, asks, choose } = townGame();
+    const I = globalThis.KD.Items;
+    const p = s.player;
+    p.money = 1e7;
+    const stock = () => s.town.storage.push({ id: 'fluffy_fur', n: 99 }, { id: 'tough_vine', n: 99 }, { id: 'acorn_shell', n: 999 }, { id: 'soft_needle', n: 999 });
+    stock();
+    assert.equal(I.bagMax(s.town), 24);
+    assert.equal(I.storageMax(s.town), 200);
+    choose('鍛冶屋');
+    assert.match(asks[0].message, /持ち物 24 こ まで・倉庫 200 こ まで/);
+    choose('○ 持ち物拡張ボックス');
+    assert.match(asks[0].message, /1,000えん/);
+    choose('作る');
+    assert.match(asks[0].message, /持ち物を 29 こ まで 持てるように なった！/);
+    assert.ok(!p.bag.some(it => it.id === 'bag_box') && !s.town.storage.some(it => it.id === 'bag_box'), '道具としては 残らない');
+    assert.equal(p.money, 1e7 - 1000);
+    choose('もどる');
+    choose('○ 倉庫拡張マシン');
+    choose('作る');
+    assert.match(asks[0].message, /倉庫に 230 こ まで/);
+    choose('もどる');
+    assert.equal(I.storageMax(s.town), 230);
+    // 100 こ まで (15 回 で 99、16 回めで 100)。そのあとは 作れない
+    for (let i = 0; i < 15; i++) {
+        choose('持ち物拡張ボックス');
+        choose('作る');
+        choose('もどる');
+    }
+    assert.equal(I.bagMax(s.town), 100);
+    assert.ok(asks[0].options.some(o => o.startsWith('× 持ち物拡張ボックス') && o.includes('もう ひろげられない')));
+    choose('持ち物拡張ボックス');
+    assert.match(asks[0].message, /これ以上は ひろげられない/);
+    choose('もどる');
+    // 倉庫は 足すのが 1 万 まで
+    s.town.storagePlus = I.STORAGE_PLUS_LIMIT - 10;
+    choose('倉庫拡張マシン');
+    choose('作る');
+    assert.equal(I.storageMax(s.town), 200 + 10000);
+    choose('もどる');
+    assert.ok(asks[0].options.some(o => o.startsWith('× 倉庫拡張マシン')));
+});
+
+test('ひろげた 持ち物は 町でも 25 こ目が 入り、セーブに 残る', () => {
+    const { game, s } = townGame();
+    s.town.bagPlus = 5;
+    const p = s.player;
+    while (p.bag.length < 24) p.bag.push({ id: 'onigiri', n: 1 });
+    game.town.giveItem({ id: 'onigiri', n: 1 }, true);
+    assert.equal(p.bag.length, 25, '町でも 持ち物に 入る');
+    game.town.save();
+    const data = JSON.parse([...store.values()].find(v => v.includes('"roster"')));
+    assert.equal(data.town.bagPlus, 5, 'セーブに 残る');
+});

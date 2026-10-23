@@ -7,7 +7,12 @@
 (function (KD) {
     'use strict';
 
-    const BAG_MAX = 24;          // 持てる数 (仕様書 9章)
+    const BAG_MAX = 24;          // 持てる数 (仕様書 9章)。鍛冶屋の 持ち物拡張ボックスで ふえる
+    // 鍛冶屋で ひろげる (2026-10-23 ユーザー指定): 持ち物は 1 つで +5 (合わせて 100 まで)、倉庫は 1 つで +30 (足すのは 1 万まで)
+    const BAG_LIMIT = 100, BAG_STEP = 5;
+    const STORAGE_BASE = 200, STORAGE_STEP = 30, STORAGE_PLUS_LIMIT = 10000;
+    const bagMax = town => Math.min(BAG_LIMIT, BAG_MAX + ((town && town.bagPlus) || 0));
+    const storageMax = town => STORAGE_BASE + Math.min(STORAGE_PLUS_LIMIT, (town && town.storagePlus) || 0);
     const BELLY_MAX = 100;       // 満腹度 (仕様書 6章)
     const HUNGER = 0.1;          // 1 ターンに減る満腹度 (サポーターは 0.6 倍、はらまきは 0.5 倍)
 
@@ -32,6 +37,9 @@
         power_band: { name: 'ちからのハチマキ', kind: 'gear', bonus: { atk: 4 }, price: 600, note: 'つけると こうげき +4' },
         guard_scarf: { name: 'まもりのスカーフ', kind: 'gear', bonus: { def: 4 }, price: 600, note: 'つけると ぼうぎょ +4' },
         haramaki: { name: 'はらぺこ知らずのはらまき', kind: 'gear', hunger: 0.5, price: 1000, note: 'つけると おなかが減りにくい' },
+        // 鍛冶屋で 作ると すぐ 効く (持ち物には 入らない。2026-10-23 ユーザー指定)
+        bag_box: { name: '持ち物拡張ボックス', kind: 'upgrade', upgrade: 'bag', price: 1000, only: 'smith', note: `持てる 道具が ${BAG_STEP} こ ふえる（${BAG_LIMIT} こ まで）。作ると すぐ 効く` },
+        storage_machine: { name: '倉庫拡張マシン', kind: 'upgrade', upgrade: 'storage', price: 2000, only: 'smith', note: `倉庫に 置ける 数が ${STORAGE_STEP} こ ふえる（${STORAGE_PLUS_LIMIT.toLocaleString()} こ まで 足せる）。作ると すぐ 効く` },
 
         // 素材 (敵がときどき落とす。鍛冶屋で使う)
         soft_needle: { name: 'やわらかい針', kind: 'material', count: [1, 2], price: 20, note: 'ハリベビーが落とす素材' },
@@ -137,5 +145,5 @@
         return `${ITEMS[it.id].name}${it.n > 1 ? ` ×${it.n}` : ''}`;
     }
 
-    KD.Items = { BAG_MAX, BELLY_MAX, HUNGER, ITEMS, FOREST_ITEMS, TRAPS, FOREST_TRAPS, MATERIAL_RATE, DROPS, weighted, rollItem, rollMoney, sellPrice, label };
+    KD.Items = { BAG_MAX, BAG_LIMIT, BAG_STEP, STORAGE_BASE, STORAGE_STEP, STORAGE_PLUS_LIMIT, bagMax, storageMax, BELLY_MAX, HUNGER, ITEMS, FOREST_ITEMS, TRAPS, FOREST_TRAPS, MATERIAL_RATE, DROPS, weighted, rollItem, rollMoney, sellPrice, label };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);

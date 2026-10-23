@@ -222,6 +222,8 @@
         // 一緒に行ける人数 (ストーリーで ふえる。仕様書 8章)
         const partyMax = () => DG.partyMax(state.town ? state.town.cleared || 0 : 0);
         // 装備は キャラごとに 1 つ (u.gear。つけると 持ち物から なくなる。2026-10-23 ユーザー指定)
+        // 持てる 数 (鍛冶屋の 持ち物拡張ボックスで ふえる。items.js)
+        const bagMax = () => I.bagMax(state.town);
         const equipped = u => (u && u.gear) || null;
         const gearOf = u => (u.gear ? I.ITEMS[u.gear.id] : null);
         // チームの だれかが つけている 装備の 効果 (はらまき・お金が ふえる など。道具袋・お金・満腹度は チームで共有)
@@ -346,7 +348,7 @@
             } else if (id === 'call') {
                 const gift = rng.pick(['onigiri', 'ice_shard', 'ice_shard', 'big_onigiri', 'revive_seed']);
                 say('ハプニング！ ふるカワから 通信だ。');
-                if (p.bag.length < I.BAG_MAX) {
+                if (p.bag.length < bagMax()) {
                     p.bag.push({ id: gift, n: 1 });
                     say(dline('furukawaGift', { item: I.ITEMS[gift].name }));
                 } else {
@@ -1976,7 +1978,7 @@
                 return say(`${n}えん 拾った！`);
             }
             const stack = I.ITEMS[item.id].count && p.bag.find(it => it.id === item.id);
-            if (!stack && p.bag.length >= I.BAG_MAX) return say(`${I.label(item)}が 落ちている。でも、もう持てない。`);
+            if (!stack && p.bag.length >= bagMax()) return say(`${I.label(item)}が 落ちている。でも、もう持てない。`);
             if (stack) stack.n += item.n;
             else p.bag.push({ ...item });
             state.items.splice(state.items.indexOf(fi), 1);
@@ -2066,7 +2068,7 @@
             if (busy()) return;
             const p = state.player;
             if (!p.bag.length) return say('道具を 持っていない。');
-            ui.ask(`道具（${p.bag.length}/${I.BAG_MAX}）　${p.money}えん`, [...p.bag.map(I.label), 'やめる'], i => {
+            ui.ask(`道具（${p.bag.length}/${bagMax()}）　${p.money}えん`, [...p.bag.map(I.label), 'やめる'], i => {
                 if (i < p.bag.length) itemActions(p.bag[i]);
             }, { list: true });
         }
@@ -2117,7 +2119,7 @@
         }
         // はずせるか (持ち物に あきがあるか、足元の 近くに 置けるか)。置く場所は 先に たしかめる
         function unequipSpot(u) {
-            if (state.player.bag.length < I.BAG_MAX) return 'bag';
+            if (state.player.bag.length < bagMax()) return 'bag';
             const p = state.player;
             return canDropNear(p.x, p.y) ? 'floor' : null;
         }

@@ -176,7 +176,10 @@
         { make: 'protein_belt', need: { protein_powder: 5, magma_stone: 2 }, cost: 1500 },
         { make: 'magma_armor', need: { magma_stone: 5, protein_powder: 2 }, cost: 1500 },
         { make: 'maou_blade', need: { aso_ash: 5, cursed_coin: 3 }, cost: 2500 },
-        { make: 'cursed_crown', need: { cursed_coin: 6, aso_ash: 2 }, cost: 2500 }
+        { make: 'cursed_crown', need: { cursed_coin: 6, aso_ash: 2 }, cost: 2500 },
+        // 持ち物・倉庫を ひろげる (作ると すぐ 効く。素材と お金は Claude の 案)
+        { make: 'bag_box', need: { fluffy_fur: 3, tough_vine: 3 }, cost: 1000 },
+        { make: 'storage_machine', need: { acorn_shell: 5, soft_needle: 5 }, cost: 2000 }
     ];
     const recipeText = r => Object.entries(r.need).map(([id, n]) => `${I.ITEMS[id].name}×${n}`).join('・') + (r.cost ? `・${r.cost}えん` : '');
 

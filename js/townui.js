@@ -12,7 +12,6 @@
 
     const { Units: U, Items: I, Town: TW, Art: A } = KD;
     const SAVE_KEY = 'koori-dungeon-save';
-    const STORAGE_MAX = 200;   // 倉庫に置ける数
     const QUEST_MAX = 3;       // 一度に受けられるクエスト
     const FONT = '"BIZ UDPGothic", "Yu Gothic", sans-serif';
 
@@ -653,7 +652,7 @@
             const bag = p().bag;
             const stack = stackable(item.id) && bag.find(it => it.id === item.id);
             if (stack) stack.n += item.n;
-            else if (bag.length < I.BAG_MAX) bag.push({ ...item });
+            else if (bag.length < I.bagMax(t())) bag.push({ ...item });
             else {
                 toStorage(item);
                 return quiet ? 'storage' : say(`${I.label(item)}は 持ちきれないので 倉庫に入れた。`);
@@ -729,12 +728,13 @@
         // ----- 鍛冶屋 (2026-10-22 追加: 敵が落とした素材で 武器や道具を作る) -----
         function smith() {
             const list = TW.RECIPES;
-            const can = r => Object.entries(r.need).every(([id, n]) => countHave(id) >= n) && p().money >= r.cost;
-            ask(`鍛冶屋「素材を持ってくれば、いいものを作ってやるぞ」\n（素材は 敵をたおすと ときどき落とす。持ち物と倉庫の両方から使う）`,
-                [...list.map(r => `${can(r) ? '○' : '×'} ${I.ITEMS[r.make].name}${r.n > 1 ? ` ×${r.n}` : ''} ← ${TW.recipeText(r)}`), 'やめる'], i => {
+            const can = r => Object.entries(r.need).every(([id, n]) => countHave(id) >= n) && p().money >= r.cost && !maxed(r);
+            ask(`鍛冶屋「素材を持ってくれば、いいものを作ってやるぞ」\n（素材は 敵をたおすと ときどき落とす。持ち物と倉庫の両方から使う）\n持ち物 ${I.bagMax(t())} こ まで・倉庫 ${I.storageMax(t()).toLocaleString()} こ まで`,
+                [...list.map(r => `${can(r) ? '○' : '×'} ${I.ITEMS[r.make].name}${r.n > 1 ? ` ×${r.n}` : ''} ← ${TW.recipeText(r)}${maxed(r) ? '（もう ひろげられない）' : ''}`), 'やめる'], i => {
                     if (i >= list.length) return menu();
                     const r = list[i];
                     const d = I.ITEMS[r.make];
+                    if (maxed(r)) return ask(`${d.name}：これ以上は ひろげられない。`, ['もどる'], smith, { list: false });
                     if (!can(r)) {
                         const have = Object.entries(r.need).map(([id, n]) => `${I.ITEMS[id].name} ${countHave(id)}/${n}（${whereText(id)}）`).join('\n');
                         return ask(`素材か お金が たりない。\n${d.name}：${d.note}\n持っている：\n${have}`, ['もどる'], smith, { list: false });
@@ -750,6 +750,22 @@
                     }, { list: false });
                 });
         }
+        // 持ち物・倉庫を ひろげる もの (作ると すぐ 効く。2026-10-23 ユーザー指定)
+        const maxed = r => {
+            const up = I.ITEMS[r.make].upgrade;
+            if (up === 'bag') return I.bagMax(t()) >= I.BAG_LIMIT;
+            if (up === 'storage') return (t().storagePlus || 0) >= I.STORAGE_PLUS_LIMIT;
+            return false;
+        };
+        function applyUpgrade(d) {
+            const town = t();
+            if (d.upgrade === 'bag') {
+                town.bagPlus = Math.min(I.BAG_LIMIT - I.BAG_MAX, (town.bagPlus || 0) + I.BAG_STEP);
+                return `持ち物を ${I.bagMax(town)} こ まで 持てるように なった！`;
+            }
+            town.storagePlus = Math.min(I.STORAGE_PLUS_LIMIT, (town.storagePlus || 0) + I.STORAGE_STEP);
+            return `倉庫に ${I.storageMax(town).toLocaleString()} こ まで 置けるように なった！`;
+        }
         const countIn = (list, id) => list.filter(it => it.id === id && !it.eq).reduce((n, it) => n + (it.n || 1), 0);
         const whereText = id => `持ち物 ${countIn(p().bag, id)}・倉庫 ${countIn(t().storage, id)}`;
         function craft(r) {
@@ -758,6 +774,12 @@
             p().money -= r.cost;
             t().stats.crafted = (t().stats.crafted || 0) + 1;
             check();
+            if (d.upgrade) {
+                noteItem(r.make);
+                const text = applyUpgrade(d);
+                save();
+                return ask(`カン！ カン！ ……${d.name}が できた！\n${text}`, ['もどる'], smith, { list: false });
+            }
             const where = giveItem({ id: r.make, n: r.n || 1 }, true);
             save();
             ask(`カン！ カン！ ……${d.name}${r.n > 1 ? ` ×${r.n}` : ''}が できた！${where === 'storage' ? '（倉庫へ）' : ''}\n${d.note}`, ['もどる'], smith, { list: false });
@@ -985,7 +1007,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
         // ----- 倉庫 -----
         function storage() {
             const town = t();
-            ask(`倉庫（${town.storage.length}/${STORAGE_MAX}）　あずけたお金 ${money(town.bank)}\n（倉庫の物とお金は、倒れても なくならない）`, ['あずける', '引き出す', 'お金を全部あずける', 'お金を全部引き出す', 'やめる'], i => {
+            ask(`倉庫（${town.storage.length}/${I.storageMax(t())}）　あずけたお金 ${money(town.bank)}\n（倉庫の物とお金は、倒れても なくならない）`, ['あずける', '引き出す', 'お金を全部あずける', 'お金を全部引き出す', 'やめる'], i => {
                 if (i === 0) return deposit();
                 if (i === 1) return withdraw();
                 if (i === 2) {
@@ -1003,7 +1025,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
         function deposit() {
             const items = p().bag.filter(it => !it.eq);
             if (!items.length) return ask('あずけられる道具が ない。（つけている装備は あずけられない）', ['もどる'], storage, { list: false });
-            if (t().storage.length >= STORAGE_MAX) return ask('倉庫が いっぱい。', ['もどる'], storage, { list: false });
+            if (t().storage.length >= I.storageMax(t())) return ask('倉庫が いっぱい。', ['もどる'], storage, { list: false });
             ask('どれを あずける？', [...items.map(I.label), 'もどる'], i => {
                 if (i >= items.length) return storage();
                 p().bag.splice(p().bag.indexOf(items[i]), 1);
@@ -1015,11 +1037,11 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
         function withdraw() {
             const st = t().storage;
             if (!st.length) return ask('倉庫は からっぽ。', ['もどる'], storage, { list: false });
-            ask(`どれを 引き出す？（持ち物 ${p().bag.length}/${I.BAG_MAX}）`, [...st.map(I.label), 'もどる'], i => {
+            ask(`どれを 引き出す？（持ち物 ${p().bag.length}/${I.bagMax(t())}）`, [...st.map(I.label), 'もどる'], i => {
                 if (i >= st.length) return storage();
                 const it = st[i];
                 const stack = stackable(it.id) && p().bag.find(b => b.id === it.id);
-                if (!stack && p().bag.length >= I.BAG_MAX) return ask('もう持てない。', ['もどる'], withdraw, { list: false });
+                if (!stack && p().bag.length >= I.bagMax(t())) return ask('もう持てない。', ['もどる'], withdraw, { list: false });
                 st.splice(i, 1);
                 if (stack) stack.n += it.n;
                 else p().bag.push({ ...it });
@@ -1358,7 +1380,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                 p().money += loot.money;
                 let lost = 0;
                 loot.items.forEach(it => {
-                    if (town.storage.length >= STORAGE_MAX && !(stackable(it.id) && town.storage.some(s => s.id === it.id))) return void lost++;
+                    if (town.storage.length >= I.storageMax(t()) && !(stackable(it.id) && town.storage.some(s => s.id === it.id))) return void lost++;
                     noteItem(it.id);
                     toStorage(it);
                 });
@@ -1837,7 +1859,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                     rect(x + sh, y + 12, 34, 150 - y - 12, '#e8dcc4');
                     rect(x - 3 + sh, y, 40, 14, roof);
                 });
-                const k = Math.min(1, t / 1.2);
+                const k = Math.max(0, Math.min(1, t / 1.2));   // 場面の はじめに t が すこし マイナスでも こわれないように
                 ctx.fillStyle = '#0a0610';
                 ctx.beginPath();
                 ctx.ellipse(110 + sh, 180, 90 * k, 34 * k, 0, 0, Math.PI * 2);
@@ -2137,7 +2159,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             const dim = a => { ctx.fillStyle = `rgba(0,0,0,${a})`; ctx.fillRect(0, 0, W, H); };
             if (sc.type === 'gate') {
                 // ダンジョンの 入り口と、奥で 待っている ボスの 影
-                const k = Math.min(1, t * 1.5);
+                const k = Math.max(0, Math.min(1, t * 1.5));
                 const cx = W / 2 + 70;
                 ctx.fillStyle = '#4a3a30';
                 ctx.beginPath();
