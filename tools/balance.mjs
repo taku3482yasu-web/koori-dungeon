@@ -84,7 +84,7 @@ function play(d, index, seed, from = 1, to = d.floors) {
         if (p.hp < p.stats.hp * 0.4 && useItem('ice_shard')) continue;
         if (p.belly < 15 && (useItem('onigiri') || useItem('big_onigiri'))) continue;
         // となりの敵: 戦う (強いわざが使えたら わざ)
-        const adj = s.enemies.filter(e => e.hp > 0 && Math.max(Math.abs(e.x - p.x), Math.abs(e.y - p.y)) === 1 && D.canMove(s.map, p.x, p.y, e.x - p.x, e.y - p.y));
+        const adj = s.enemies.filter(e => e.hp > 0 && Math.max(Math.abs(e.x - p.x), Math.abs(e.y - p.y)) === 1 && D.canReach(s.map, p.x, p.y, e.x - p.x, e.y - p.y));
         if (adj.length) {
             const e = adj.reduce((a, b) => (b.hp < a.hp ? b : a));
             game.moveInput(e.x - p.x, e.y - p.y, { turnOnly: true });

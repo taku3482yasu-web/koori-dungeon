@@ -418,10 +418,13 @@ test('氷のかけら で HP が戻る。ちからのハチマキ をつける�
     assert.equal(p.hp, Math.min(p.stats.hp, 45));
     const atk = p.stats.atk;
     p.bag.push({ id: 'power_band', n: 1 });
-    useFromBag(game, asks, answer, 'ちからのハチマキ', 'つける');
+    useFromBag(game, asks, answer, 'ちからのハチマキ', '装備する');
+    answer(0);   // だれに つけるか: 主人公
     run(600);
     assert.equal(p.stats.atk, atk + 4);
-    useFromBag(game, asks, answer, 'ちからのハチマキ', 'はずす');
+    game.equipMenu();
+    answer(0);
+    answer(asks[0].options.findIndex(o => o.startsWith('はずす')));
     run(600);
     assert.equal(p.stats.atk, atk);
 });
@@ -731,7 +734,7 @@ test('操作するキャラの交代: いつでも 仲間を操作できる。�
     assert.ok(!s.over, '主人公は 無事なので 失敗ではない');
 });
 
-test('仲間を操作しているときに 装備を付け外ししても、主人公の能力に すぐ反映する', () => {
+test('仲間を操作しているときも、主人公 (や だれか) に 装備を つけられ、すぐ反映する', () => {
     const { game, s, run, asks, answer } = setup({ enemies: false, partner: true });
     const hero = s.player;
     hero.bag.push({ id: 'power_band', n: 1 });
@@ -740,28 +743,21 @@ test('仲間を操作しているときに 装備を付け外ししても、主�
     game.switchTo(s.allies[0]);
     const oni = s.player;
     const oniAtk = oni.stats.atk;
-    // 道具 → ちからのハチマキ → つける
+    // 道具 → ちからのハチマキ → 装備する → こおりくん
     game.itemMenu();
     answer(hero.bag.findIndex(it => it.id === 'power_band'));
-    answer(asks[0].options.indexOf('つける'));
+    answer(asks[0].options.indexOf('装備する'));
+    answer(asks[0].options.findIndex(o => o.startsWith(hero.name)));
     run(600);
     assert.equal(hero.stats.atk, atk + (bonus.atk || 0), '主人公の こうげきが すぐ上がる');
     assert.equal(oni.stats.atk, oniAtk, '操作しているおにおには 変わらない');
-    assert.ok(s.messages.some(m => /こおりくんが ちからのハチマキを つけた/.test(m.text)));
+    assert.ok(s.messages.some(m => /こおりくんは ちからのハチマキを つけた/.test(m.text)));
+    assert.ok(!hero.bag.some(it => it.id === 'power_band'), '持ち物から なくなる');
     // はずす
-    game.itemMenu();
-    answer(hero.bag.findIndex(it => it.id === 'power_band'));
-    answer(asks[0].options.indexOf('はずす'));
+    game.equipMenu();
+    answer(asks[0].options.findIndex(o => o.startsWith(hero.name)));
+    answer(asks[0].options.findIndex(o => o.startsWith('はずす')));
     run(600);
     assert.equal(hero.stats.atk, atk, 'はずすと すぐ戻る');
-    // 置くと (つけていたら) はずれて すぐ戻る
-    game.itemMenu();
-    answer(hero.bag.findIndex(it => it.id === 'power_band'));
-    answer(asks[0].options.indexOf('つける'));
-    run(600);
-    game.itemMenu();
-    answer(hero.bag.findIndex(it => it.id === 'power_band'));
-    answer(asks[0].options.indexOf('置く'));
-    run(600);
-    assert.equal(hero.stats.atk, atk, '置くと はずれて すぐ戻る');
+    assert.ok(hero.bag.some(it => it.id === 'power_band'), '持ち物に もどる');
 });

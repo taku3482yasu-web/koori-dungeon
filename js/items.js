@@ -2,7 +2,7 @@
 // 道具・ワナ・お金のデータ (仕様書 4.4・9章)
 // ---------------------------------------------------------------------
 // 画面にもマップにも触らない (game.js が使う)。
-// 道具は { id, n } で持つ (n: 小石などの数。数のない道具は 1)。装備は eq: true で「つけている」。
+// 道具は { id, n } で持つ (n: 小石などの数。数のない道具は 1)。つけた装備は 持ち物から出て、キャラの 装備欄 (gear) に入る。
 // =====================================================================
 (function (KD) {
     'use strict';
@@ -132,9 +132,9 @@
     // 売るときの値段 (買う値段の半分。小石などは数をかける)
     const sellPrice = it => Math.floor((ITEMS[it.id].price || 0) / 2) * (it.n || 1);
 
-    // 持ち物の表示名 (小石 ×5・そうび中)
+    // 持ち物の表示名 (小石 ×5)
     function label(it) {
-        return `${ITEMS[it.id].name}${it.n > 1 ? ` ×${it.n}` : ''}${it.eq ? '（そうび中）' : ''}`;
+        return `${ITEMS[it.id].name}${it.n > 1 ? ` ×${it.n}` : ''}`;
     }
 
     KD.Items = { BAG_MAX, BELLY_MAX, HUNGER, ITEMS, FOREST_ITEMS, TRAPS, FOREST_TRAPS, MATERIAL_RATE, DROPS, weighted, rollItem, rollMoney, sellPrice, label };

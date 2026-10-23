@@ -124,6 +124,14 @@
         return true;
     }
 
+    // (x, y) から (dx, dy) のマスへ 攻撃が 届くか。行き先が 壁・水でも 届く (壁の中・水の上の 敵にも 当たる)。
+    //   斜めは、角を壁がふさいでいたら 届かない (動けるかと 同じ)
+    function canReach(map, x, y, dx, dy) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= map.w || ny >= map.h) return false;
+        return !(dx && dy && (at(map, x + dx, y) === WALL || at(map, x, y + dy) === WALL));
+    }
+
     // 今見えるマス (仕様書 4.1): 部屋の中なら部屋全体とまわりの壁、通路ならまわり 1 マス
     function visibleFrom(map, x, y) {
         const seen = new Uint8Array(map.w * map.h);
@@ -161,5 +169,5 @@
         return { count: n, seen };
     }
 
-    KD.Dungeon = { WALL, FLOOR, CORRIDOR, WATER, LAVA, generate, at, walkable, canMove, visibleFrom, reachable };
+    KD.Dungeon = { WALL, FLOOR, CORRIDOR, WATER, LAVA, generate, at, walkable, canMove, canReach, visibleFrom, reachable };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);

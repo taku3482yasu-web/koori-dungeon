@@ -41,6 +41,8 @@
     // ドタバタ大迷宮 (段階 9。enemies9.js) は 階ごとに 見た目と特徴が変わる (enterFloor で DG.atFloor)
     const DUNGEONS = [...DG.LIST, ...(DG.BONUS ? [DG.BONUS] : []), ...(DG.EXTRA || [])].map(d => ({ items: I.FOREST_ITEMS, trapKinds: I.FOREST_TRAPS, ...d }));
     const has = (u, trait) => Boolean(u.traits && u.traits.includes(trait));
+    // 水の上を 通れる: みず・かぜ の 属性か、泳げる とくちょう (敵も 主人公・仲間も。2026-10-23 ユーザー指定)
+    const swims = u => has(u, 'swim') || u.element === 'みず' || u.element === 'かぜ';
     const C = KD.Collection;
     const sfx = name => KD.Sound && KD.Sound.play(name);
     // ダンジョンの BGM (ボスが起きたら boss)。曲は ダンジョンごと (sound.js の SONGS。名前は ダンジョンの id)。
@@ -209,18 +211,19 @@
         const backToHero = () => { if (!state.player.hero) switchTo(heroUnit(), true); };
         // 一緒に行ける人数 (ストーリーで ふえる。仕様書 8章)
         const partyMax = () => DG.partyMax(state.town ? state.town.cleared || 0 : 0);
-        const equipped = p => p.bag && p.bag.find(it => it.eq);
+        // 装備は キャラごとに 1 つ (u.gear。つけると 持ち物から なくなる。2026-10-23 ユーザー指定)
+        const equipped = u => (u && u.gear) || null;
+        const gearOf = u => (u.gear ? I.ITEMS[u.gear.id] : null);
+        // チームの だれかが つけている 装備の 効果 (はらまき・お金が ふえる など。道具袋・お金・満腹度は チームで共有)
+        const teamGear = key => party().map(gearOf).filter(d => d && d[key]).map(d => d[key]);
 
         // 能力を計算しなおす (Lv・役職・バトルツリー・装備)。仲間はバトルツリーでは強くならない (仕様書 6.2)
         function recalc(p) {
-            if (!p.hero) {
-                p.stats = U.allyStats(p.kind, p.lv, p.role);
-                p.hp = Math.min(p.hp, p.stats.hp);
-                return;
+            const s = p.hero ? U.heroStats(p.kind, p.lv, p.role) : U.allyStats(p.kind, p.lv, p.role);
+            if (p.hero) {
+                const tree = KD.Town.treeStats(p.kind, p.tree || []);
+                for (const k of Object.keys(tree)) s[k] += tree[k];
             }
-            const s = U.heroStats(p.kind, p.lv, p.role);
-            const tree = KD.Town.treeStats(p.kind, p.tree || []);
-            for (const k of Object.keys(tree)) s[k] += tree[k];
             const g = equipped(p);
             const bonus = g && I.ITEMS[g.id].bonus;
             if (bonus) for (const k of Object.keys(bonus)) s[k] += bonus[k];
@@ -485,7 +488,8 @@
         const plain = o => JSON.parse(JSON.stringify(o));
         const unitSnap = u => ({
             kind: u.kind, name: u.name, hero: Boolean(u.hero), role: u.role, lv: u.lv, exp: u.exp, hp: u.hp, x: u.x, y: u.y, dir: u.dir,
-            status: u.status, buffs: u.buffs, flinch: u.flinch, regen: u.regen, skills: u.skills, element: u.element, immune: u.immune, traits: u.traits
+            status: u.status, buffs: u.buffs, flinch: u.flinch, regen: u.regen, skills: u.skills, element: u.element, immune: u.immune, traits: u.traits,
+            gear: u.gear || null
         });
         function snapshot() {
             if (state.phase !== 'play' || !state.map || state.over || state.done) return null;
@@ -538,8 +542,9 @@
             };
             const build = d => {
                 const a = makeAlly(d.kind, d.lv);
-                Object.assign(a, { name: d.name, exp: d.exp, role: d.role });
-                a.stats = U.allyStats(a.kind, a.lv, a.role);
+                Object.assign(a, { name: d.name, exp: d.exp, role: d.role, gear: d.gear || null });
+                a.hp = Infinity;
+                recalc(a);
                 return apply(a, d);
             };
             const units = snap.party.map(d => (d.hero ? apply(hero, d) : build(d)));
@@ -780,7 +785,7 @@
             let best = null, bestD = here;
             for (const [dx, dy] of DIRS8) {
                 const nx = e.x + dx, ny = e.y + dy;
-                if (!D.canMove(state.map, e.x, e.y, dx, dy, has(e, 'swim')) || occupied(nx, ny)) continue;
+                if (!D.canMove(state.map, e.x, e.y, dx, dy, swims(e)) || occupied(nx, ny)) continue;
                 const d = dist[idx(nx, ny)];
                 if (d < 0) continue;
                 if (away ? d > bestD : d < bestD) {
@@ -810,15 +815,28 @@
             const dx = b.x - a.x, dy = b.y - a.y;
             const n = Math.max(Math.abs(dx), Math.abs(dy));
             if (n < 2 || n > SHOOT_RANGE || (dx && dy && Math.abs(dx) !== Math.abs(dy))) return false;
-            const sx = Math.sign(dx), sy = Math.sign(dy);
-            for (let i = 0, x = a.x, y = a.y; i < n; i++, x += sx, y += sy) {
-                if (!D.canMove(state.map, x, y, sx, sy)) return false;
-                if (i < n - 1 && occupied(x + sx, y + sy)) return false;
-            }
-            return true;
+            const path = ray(a, [Math.sign(dx), Math.sign(dy)], n);
+            return path.length === n && path.slice(0, -1).every(([x, y]) => !occupied(x, y));
         }
 
-        const canHit = (a, b) => cheb(a, b) === 1 && D.canMove(state.map, a.x, a.y, b.x - a.x, b.y - a.y);
+        // u から (dx, dy) へ まっすぐ飛ぶものが 通るマス (n マスまで)。水の上は 飛んでいく。
+        //   壁で 止まるが、壁の中に キャラ (壁を通る敵) が いれば そのマスまで 届く (2026-10-23 ユーザー指定)
+        function ray(u, [dx, dy], n) {
+            const out = [];
+            for (let i = 0, x = u.x, y = u.y; i < n && D.canReach(state.map, x, y, dx, dy); i++) {
+                x += dx;
+                y += dy;
+                if (D.at(state.map, x, y) === D.WALL) {
+                    if (occupied(x, y)) out.push([x, y]);
+                    break;
+                }
+                out.push([x, y]);
+            }
+            return out;
+        }
+
+        // となりに 攻撃が 届くか (相手が 壁の中・水の上でも 届く)
+        const canHit = (a, b) => cheb(a, b) === 1 && D.canReach(state.map, a.x, a.y, b.x - a.x, b.y - a.y);
 
         // 敵がねらう相手: となりにいる主人公・仲間。ディフェンダーは ねらわれやすい (味方の壁。仕様書 6.3)
         function pickTarget(e) {
@@ -846,7 +864,7 @@
             // こんらん: 半分の確率で、でたらめな方向へ歩く
             if (st === 'confuse' && rng.chance(0.5)) {
                 const [dx, dy] = rng.pick(DIRS8);
-                if (D.canMove(state.map, e.x, e.y, dx, dy, has(e, 'swim')) && !occupied(e.x + dx, e.y + dy)) moveUnit(e, dx, dy, ms);
+                if (D.canMove(state.map, e.x, e.y, dx, dy, swims(e)) && !occupied(e.x + dx, e.y + dy)) moveUnit(e, dx, dy, ms);
                 return;
             }
             const sees = state.visible[idx(e.x, e.y)] === 1;   // こちらから見えている敵は、こちらも見えている
@@ -883,7 +901,7 @@
                 face(e, t.x - e.x, t.y - e.y);
                 const m = pickMove(e, ['front', 'around', 'self']);
                 // ペコリス: 主人公の道具をぬすむ / シャッキンボウレイ: お金を取る
-                if (e.steal && t === p && !e.loot && p.bag.some(it => !it.eq) && rng.chance(0.5)) state.queue.push(() => steal(e));
+                if (e.steal && t === p && !e.loot && p.bag.length && rng.chance(0.5)) state.queue.push(() => steal(e));
                 else if (has(e, 'stealMoney') && t === p && p.money > 0 && !e.money && rng.chance(0.4)) state.queue.push(() => stealMoney(e));
                 else if (m) state.queue.push(() => enemySkill(e, t, m));
                 else state.queue.push(() => attack(e, t));
@@ -1024,7 +1042,7 @@
         // 道具をぬすむ (つけている装備はぬすめない)
         function steal(e) {
             const p = state.player;
-            const list = p.bag.filter(it => !it.eq);
+            const list = p.bag;
             if (e.hp <= 0 || p.hp <= 0 || !canHit(e, p) || !list.length) return 0;
             const it = rng.pick(list);
             p.bag.splice(p.bag.indexOf(it), 1);
@@ -1050,14 +1068,14 @@
             if (st === 'sleep' || st === 'freeze' || paralyzed(a) || cramped(a)) return;
             if (st === 'confuse' && rng.chance(0.5)) {
                 const [dx, dy] = rng.pick(DIRS8);
-                if (st !== 'bind' && D.canMove(state.map, a.x, a.y, dx, dy) && !occupied(a.x + dx, a.y + dy)) moveUnit(a, dx, dy, ms);
+                if (st !== 'bind' && D.canMove(state.map, a.x, a.y, dx, dy, swims(a)) && !occupied(a.x + dx, a.y + dy)) moveUnit(a, dx, dy, ms);
                 return;
             }
             const p = state.player;
             const foes = state.enemies.filter(e => e.hp > 0 && e.awake && state.visible[idx(e.x, e.y)]);
             const adj = foes.filter(e => canHit(a, e));
             const canWalk = st !== 'bind';
-            const foeDist = () => distancesFrom(foes.map(e => [e.x, e.y]));
+            const foeDist = () => distancesFrom(foes.map(e => [e.x, e.y]), swims(a));
             if (state.tactic === 'flee') {
                 // にげて: 戦わずに、敵からはなれる
                 if (foes.length && canWalk) return void stepAlong(a, foeDist(), ms, true);
@@ -1255,8 +1273,8 @@
         function hunger(p) {
             const before = p.belly;
             let rate = I.HUNGER * (p.role === 'supporter' ? 0.6 : 1);
-            const g = equipped(p);
-            if (g && I.ITEMS[g.id].hunger) rate *= I.ITEMS[g.id].hunger;
+            const slow = teamGear('hunger');
+            if (slow.length) rate *= Math.min(...slow);
             p.belly = Math.max(0, p.belly - rate);
             if (before > 20 && p.belly <= 20) say('おなかが すいてきた…');
             else if (before > 10 && p.belly <= 10) say('おなかが ぺこぺこだ！ はやく何か食べないと…');
@@ -1275,13 +1293,14 @@
             // 仲間 (主人公に近い人から)
             const p = state.player;
             const distP = distances(p.x, p.y);
-            state.allies.slice().sort((a, b) => cheb(a, p) - cheb(b, p)).forEach(a => { if (a.hp > 0) allyAct(a, distP, ms); });
+            const distPSwim = state.allies.some(swims) ? distancesFrom([[p.x, p.y]], true) : distP;
+            state.allies.slice().sort((a, b) => cheb(a, p) - cheb(b, p)).forEach(a => { if (a.hp > 0) allyAct(a, swims(a) ? distPSwim : distP, ms); });
             // 敵は、いちばん近い主人公・仲間をめざす (泳げる敵は 水の上も通る)
             const points = party().map(u => [u.x, u.y]);
             const dist = distancesFrom(points);
-            const distSwim = state.enemies.some(e => has(e, 'swim')) ? distancesFrom(points, true) : dist;
+            const distSwim = state.enemies.some(swims) ? distancesFrom(points, true) : dist;
             for (let round = 0; round < 2 * times; round++) {
-                for (const e of state.enemies.slice()) if (e.hp > 0 && e.speed * times > round) act(e, has(e, 'swim') ? distSwim : dist, ms);
+                for (const e of state.enemies.slice()) if (e.hp > 0 && e.speed * times > round) act(e, swims(e) ? distSwim : dist, ms);
             }
             // 時間がたつと敵が増える (仕様書 4.3)
             if (opts.enemies !== false && state.turn % SPAWN_EVERY === 0 && state.enemies.length < MAX_ENEMIES) spawnEnemy(-1);
@@ -1300,7 +1319,7 @@
             for (const u of [...party(), ...state.enemies]) {
                 if (u.hp <= 0) continue;
                 // 溶岩の上 (ほのおの敵・マグマのよろいは へいき。こおりくんは 2 倍)
-                if (D.at(state.map, u.x, u.y) === D.LAVA && !has(u, 'lava') && !(equipped(u) && I.ITEMS[equipped(u).id].lava)) {
+                if (D.at(state.map, u.x, u.y) === D.LAVA && !has(u, 'lava') && !(gearOf(u) && gearOf(u).lava)) {
                     const n = Math.max(1, Math.floor(u.stats.hp / 20)) * (u.kind === 'koori' ? 2 : 1);
                     if (seen(u)) say(`${u.name}は 溶岩で アチチ！ ${n} のダメージ！`);
                     hurt(u, n, null);
@@ -1388,11 +1407,9 @@
         // わざの当たる相手 (仕様書 7章: 正面 1 マス / 前方の直線 / 周り 8 マス)
         function targetsOf(u, range, [dx, dy]) {
             const foe = t => t && t.side !== u.side;
-            if (range === 'front') return D.canMove(state.map, u.x, u.y, dx, dy) && foe(unitAt(u.x + dx, u.y + dy)) ? [unitAt(u.x + dx, u.y + dy)] : [];
+            if (range === 'front') return D.canReach(state.map, u.x, u.y, dx, dy) && foe(unitAt(u.x + dx, u.y + dy)) ? [unitAt(u.x + dx, u.y + dy)] : [];
             if (range === 'line') {
-                for (let i = 0, x = u.x, y = u.y; i < LINE_RANGE && D.canMove(state.map, x, y, dx, dy); i++) {
-                    x += dx;
-                    y += dy;
+                for (const [x, y] of ray(u, [dx, dy], LINE_RANGE)) {
                     const t = unitAt(x, y);
                     if (t) return foe(t) ? [t] : [];
                 }
@@ -1401,14 +1418,7 @@
             if (range === 'around') return [...party(), ...state.enemies].filter(t => foe(t) && canHit(u, t));
             // つらぬく: 壁まで まっすぐ、何体でも (2026-10-22)
             if (range === 'pierce') {
-                const out = [];
-                for (let i = 0, x = u.x, y = u.y; i < LINE_RANGE && D.canMove(state.map, x, y, dx, dy); i++) {
-                    x += dx;
-                    y += dy;
-                    const t = unitAt(x, y);
-                    if (t && foe(t)) out.push(t);
-                }
-                return out;
+                return ray(u, [dx, dy], LINE_RANGE).map(([x, y]) => unitAt(x, y)).filter(foe);
             }
             // 部屋の 敵 みんな: 見えていて 6 マス以内 (仲間が 使うとき)。敵が 使うときは 探検隊
             if (range === 'room') return u.side === 'party' ? state.enemies.filter(e => e.hp > 0 && state.visible[idx(e.x, e.y)] && cheb(e, u) <= 6) : party().filter(t => t.hp > 0 && cheb(t, u) <= 6);
@@ -1416,14 +1426,9 @@
         }
 
         // 直線のわざが止まるマス (飛んでいくところを見せる)
-        function lineEnd(u, [dx, dy]) {
-            let x = u.x, y = u.y;
-            for (let i = 0; i < LINE_RANGE && D.canMove(state.map, x, y, dx, dy); i++) {
-                x += dx;
-                y += dy;
-                if (unitAt(x, y)) break;
-            }
-            return [x, y];
+        function lineEnd(u, dir) {
+            const path = ray(u, dir, LINE_RANGE);
+            return path.find(([x, y]) => unitAt(x, y)) || path[path.length - 1] || [u.x, u.y];
         }
 
         // わざを使う (主人公も敵も)。見せる時間を返す
@@ -1498,20 +1503,16 @@
         // ふきとばす: 向きの ほうへ n マス (壁・ほかの キャラで 止まる)
         function knockBack(t, [dx, dy], n) {
             let k = 0;
-            while (k < n && D.canMove(state.map, t.x, t.y, dx, dy) && !occupied(t.x + dx, t.y + dy)) {
+            while (k < n && D.canMove(state.map, t.x, t.y, dx, dy, swims(t)) && !occupied(t.x + dx, t.y + dy)) {
                 moveUnit(t, dx, dy, 60);
                 k++;
             }
             if (k) say(`${t.name}は ふきとばされた！`);
         }
         // つらぬく わざの 止まる マス
-        function pierceEnd(u, [dx, dy]) {
-            let x = u.x, y = u.y;
-            for (let i = 0; i < LINE_RANGE && D.canMove(state.map, x, y, dx, dy); i++) {
-                x += dx;
-                y += dy;
-            }
-            return [x, y];
+        function pierceEnd(u, dir) {
+            const path = ray(u, dir, LINE_RANGE);
+            return path[path.length - 1] || [u.x, u.y];
         }
         // team の わざが 届く 仲間 (自分と 4 マス以内)。team で なければ 自分と となり
         const helpRange = (u, mv) => (u.side === 'party' ? party().filter(t => t.hp > 0 && cheb(t, u) <= (mv.team ? 4 : 1)) : [u]);
@@ -1563,8 +1564,7 @@
                 t.flinch = true;
                 return say(`${t.name}は ひるんだ！`);
             }
-            const gear = t.bag && equipped(t);
-            const immune = [...(t.immune || []), ...((gear && I.ITEMS[gear.id].immune) || [])];
+            const immune = [...(t.immune || []), ...((gearOf(t) && gearOf(t).immune) || [])];
             if (t.status || immune.includes(id)) return loud ? say(`${t.name}には 効かなかった。`) : undefined;
             const [a, b] = U.STATUS[id].turns;
             t.status = { id, turns: rng.int(a, b) };
@@ -1741,7 +1741,7 @@
             a.element = U.ENEMIES[v.to].element;
             a.immune = U.ENEMIES[v.to].immune || [];
             a.role = KD.Allies.roleOf(v.to);
-            a.stats = U.allyStats(a.kind, a.lv, a.role);
+            recalc(a);
             a.hp = Math.max(1, Math.round(a.stats.hp * ratio));
             if (!a.skills.some(k => k.id === U.ROLES[a.role].skill)) a.skills[0] = U.newSkill(U.ROLES[a.role].skill);
             say(`おや……！？ ${before}の ようすが……！`);
@@ -1904,7 +1904,7 @@
             if (paralyzed(p)) return void passTurn(`${p.name}は からだが しびれて 動けない！`);
             if (cramped(p)) return void passTurn(`${p.name}は おなかが ぐるぐる… 動けない！`);
             const blocker = enemyAt(p.x + dx, p.y + dy);
-            if (!D.canMove(state.map, p.x, p.y, dx, dy) || blocker) {
+            if (!D.canMove(state.map, p.x, p.y, dx, dy, swims(p)) || blocker) {
                 // 化けている敵に ぶつかると 正体を見せる
                 if (blocker && !blocker.awake && (has(blocker, 'disguise') || has(blocker, 'mimic'))) wake(blocker);
                 if (confused) passTurn(`${p.name}は ふらふらしている…`);
@@ -1940,8 +1940,8 @@
             const { item } = fi;
             if (item.id === 'money') {
                 // サポーターは お金が多く拾える (仕様書 6.3)
-                const coin = equipped(p) && I.ITEMS[equipped(p).id].money;
-                const n = Math.round(item.n * (p.role === 'supporter' ? 1.5 : 1) * (coin || 1));
+                const coin = Math.max(1, ...teamGear('money'));
+                const n = Math.round(item.n * (p.role === 'supporter' ? 1.5 : 1) * coin);
                 p.money += n;
                 state.items.splice(state.items.indexOf(fi), 1);
                 sfx('money');
@@ -1997,7 +1997,7 @@
             for (let tries = 0; tries < 80; tries++) {
                 const room = rng.pick(map.rooms);
                 const x = room.x + rng.int(0, room.w - 1), y = room.y + rng.int(0, room.h - 1);
-                if (occupied(x, y) || trapAt(x, y) || (x === map.stairs.x && y === map.stairs.y)) continue;
+                if (D.at(map, x, y) !== D.FLOOR || occupied(x, y) || trapAt(x, y) || (x === map.stairs.x && y === map.stairs.y)) continue;
                 u.x = u.fx = x;
                 u.y = u.fy = y;
                 u.anim = null;
@@ -2014,6 +2014,7 @@
             for (let i = 0; i < dist.length; i++) {
                 if (dist[i] < 0 || dist[i] > 2 || (best && dist[i] >= best[2])) continue;
                 const tx = i % map.w, ty = Math.floor(i / map.w);
+                if (D.at(map, tx, ty) === D.WATER || D.at(map, tx, ty) === D.LAVA) continue;
                 if (itemAt(tx, ty) || trapAt(tx, ty) || (tx === map.stairs.x && ty === map.stairs.y)) continue;
                 best = [tx, ty, dist[i]];
             }
@@ -2022,17 +2023,13 @@
         }
 
         // ----- 道具を使う (仕様書 9章) -----
-        // 1 つだけ取り出す (小石などは数を減らす)。装備ならはずれる
+        // 1 つだけ取り出す (小石などは数を減らす)
         function takeOne(p, it) {
             if (it.n > 1) {
                 it.n--;
                 return { id: it.id, n: 1 };
             }
             p.bag.splice(p.bag.indexOf(it), 1);
-            if (it.eq) {
-                it.eq = false;
-                recalc(heroUnit());   // 装備の効果は 主人公に付く (仲間を操作しているときも すぐ反映)
-            }
             return it;
         }
 
@@ -2050,7 +2047,7 @@
             const p = state.player;
             const d = I.ITEMS[it.id];
             const acts = [];
-            if (d.kind === 'gear') acts.push([it.eq ? 'はずす' : 'つける', () => playerTurn(() => equip(p, it))]);
+            if (d.kind === 'gear') acts.push(['装備する', () => gearWho(it)]);
             else if (['food', 'seed'].includes(d.kind) || it.id === 'revive_seed') acts.push(['食べる', () => playerTurn(() => useItem(p, it))]);
             else if (['heal', 'orb'].includes(d.kind)) acts.push(['使う', () => playerTurn(() => useItem(p, it))]);
             acts.push(['投げる', () => {
@@ -2070,26 +2067,115 @@
         function putItem(p, it) {
             if (!p.bag.includes(it)) return 0;
             p.bag.splice(p.bag.indexOf(it), 1);
-            if (it.eq) {
-                it.eq = false;
-                recalc(heroUnit());
-            }
             state.items.push({ x: p.x, y: p.y, item: it });
             say(`${I.label(it)}を 足元に 置いた。`);
             return PASS_MS;
         }
 
-        // 装備は 1 つだけ (仕様書 9章)。効果は 主人公に付く (道具袋は チームで共有。仲間を操作しているときも すぐ反映する)
-        function equip(p, it) {
-            if (!p.bag.includes(it)) return 0;
-            const was = it.eq;
-            p.bag.forEach(b => { b.eq = false; });
-            it.eq = !was;
-            const hero = heroUnit();
-            recalc(hero);
-            const who = p === hero ? '' : `${hero.name}が `;
-            say(was ? `${who}${I.ITEMS[it.id].name}を はずした。` : `${who}${I.ITEMS[it.id].name}を つけた！`);
+        // ----- 装備 (2026-10-23 ユーザー指定) -----
+        // キャラごとに 1 つ。つけると 持ち物から なくなり、つけていた 装備は 持ち物に もどる。
+        // はずすと 持ち物に もどる (いっぱいなら 足元の 近くに 置く)
+        function equip(u, it) {
+            const bag = state.player.bag;
+            if (!bag.includes(it) || u.hp <= 0) return 0;
+            bag.splice(bag.indexOf(it), 1);
+            const old = u.gear;
+            u.gear = { id: it.id, n: 1 };
+            if (old) bag.push(old);
+            recalc(u);
+            say(`${u.name}は ${I.ITEMS[it.id].name}を つけた！${old ? `（${I.ITEMS[old.id].name}は 持ち物に もどした）` : ''}`);
+            popup(u, 'そうび！', '#c8d8e8');
             return PASS_MS;
+        }
+        // はずせるか (持ち物に あきがあるか、足元の 近くに 置けるか)。置く場所は 先に たしかめる
+        function unequipSpot(u) {
+            if (state.player.bag.length < I.BAG_MAX) return 'bag';
+            const p = state.player;
+            return canDropNear(p.x, p.y) ? 'floor' : null;
+        }
+        function unequip(u) {
+            const g = u.gear;
+            if (!g) return 0;
+            const where = unequipSpot(u);
+            if (!where) return void say('持ち物が いっぱいで、置く 場所も ない。');
+            u.gear = null;
+            recalc(u);
+            if (where === 'bag') {
+                state.player.bag.push(g);
+                say(`${u.name}は ${I.ITEMS[g.id].name}を はずした。`);
+            } else {
+                dropItem(state.player.x, state.player.y, g);
+                say(`${u.name}は ${I.ITEMS[g.id].name}を はずした。持ち物が いっぱいなので 足元に 置いた。`);
+            }
+            return PASS_MS;
+        }
+        // 足元の 近くに 道具を 置けるか (dropItem と 同じ さがし方)
+        function canDropNear(x, y) {
+            const map = state.map;
+            const dist = distances(x, y);
+            for (let i = 0; i < dist.length; i++) {
+                if (dist[i] < 0 || dist[i] > 2) continue;
+                const tx = i % map.w, ty = Math.floor(i / map.w);
+                if (D.at(map, tx, ty) === D.WATER || D.at(map, tx, ty) === D.LAVA) continue;
+                if (!itemAt(tx, ty) && !trapAt(tx, ty) && !(tx === map.stairs.x && ty === map.stairs.y)) return true;
+            }
+            return false;
+        }
+        const gearName = u => (u.gear ? I.ITEMS[u.gear.id].name : 'なし');
+        const gearBonusText = d => {
+            const names = { hp: 'HP', atk: 'こうげき', def: 'ぼうぎょ', spa: 'とくこう', spd: 'とくぼう' };
+            return Object.entries(d.bonus || {}).map(([k, v]) => `${names[k]} +${v}`).join('・');
+        };
+        const members = () => party().filter(u => u.hp > 0);
+        // 持ち物の 装備を だれに つけるか えらぶ (道具の画面から)
+        function gearWho(it) {
+            const list = members();
+            ui.ask(`${I.ITEMS[it.id].name}を だれに つける？\n${I.ITEMS[it.id].note}`,
+                [...list.map(u => `${u.name} Lv${u.lv}　いま：${gearName(u)}`), 'やめる'], i => {
+                    if (i < list.length) playerTurn(() => equip(list[i], it));
+                }, { list: true });
+        }
+        // 装備の 画面: キャラ 1 人の 装備欄 → つける・はずす
+        function gearMenu(u, back = () => {}) {
+            state.statusOf = u;   // 上に その キャラの ステータスを 出す
+            const bag = state.player.bag;
+            const gears = bag.filter(it => I.ITEMS[it.id].kind === 'gear');
+            const opts = [...gears.map(it => `つける：${I.ITEMS[it.id].name}　${gearBonusText(I.ITEMS[it.id]) || I.ITEMS[it.id].note}`)];
+            if (u.gear) opts.push(`はずす：${gearName(u)}`);
+            opts.push('もどる');
+            const head = `${u.name}の 装備欄：${gearName(u)}${u.gear ? `\n${I.ITEMS[u.gear.id].note}` : ''}${gears.length ? '' : '\n（持ち物に 装備が ない）'}`;
+            ui.ask(head, opts, i => {
+                if (i < gears.length) return playerTurn(() => equip(u, gears[i]));
+                if (u.gear && i === gears.length) {
+                    if (!unequipSpot(u)) {
+                        say('持ち物が いっぱいで、置く 場所も ない。');
+                        return gearMenu(u, back);
+                    }
+                    return playerTurn(() => unequip(u));
+                }
+                back();
+            }, { list: true });
+        }
+        // 装備コマンド: だれの 装備を 変えるか えらぶ
+        function equipMenu() {
+            if (busy()) return;
+            const list = members();
+            ui.ask('だれの 装備を 変える？', [...list.map(u => `${u.name} Lv${u.lv}　装備：${gearName(u)}`), 'やめる'], i => {
+                if (i < list.length) gearMenu(list[i], equipMenu);
+            }, { list: true });
+        }
+
+        // ----- ステータス画面 (2026-10-23 ユーザー指定) -----
+        // 下に 一覧、上に えらんでいる キャラの 絵と 能力・わざ・装備 (state.statusOf)。ターンは すすまない
+        function statusMenu(index = 0) {
+            if (busy()) return;
+            const list = [state.player, ...state.allies, ...state.fallen];
+            state.statusOf = list[Math.min(index, list.length - 1)];
+            ui.ask('ステータス（えらぶと 装備を 変えられる）', [...list.map(u => `${u.name} Lv${u.lv}${state.fallen.includes(u) ? '（たおれている）' : ''}`), 'もどる'], i => {
+                const u = list[i];
+                if (!u || state.fallen.includes(u)) return void (state.statusOf = null);
+                gearMenu(u, () => statusMenu(i));
+            }, { place: 'bottom', list: true, index, onMove: i => { state.statusOf = list[i] || null; } });
         }
 
         // 食べる・使う
@@ -2174,7 +2260,7 @@
             let { dx, dy } = dash;
             if (!inRoom && !(dx && dy)) {
                 // 通路: 来た方向を除いて、進める道が1つなら そちらへ曲がる。2つ以上 (分かれ道) か 0 (行き止まり) なら止まる
-                const ways = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([ax, ay]) => !(ax === -dx && ay === -dy) && D.walkable(map, p.x + ax, p.y + ay));
+                const ways = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([ax, ay]) => !(ax === -dx && ay === -dy) && D.walkable(map, p.x + ax, p.y + ay, swims(p)));
                 if (ways.length !== 1) return false;
                 [dx, dy] = ways[0];
             }
@@ -2287,22 +2373,16 @@
                 return { targets: t ? [t] : [], to: t ? [t.x, t.y] : [u.x + dx, u.y + dy] };
             }
             // pierce: 壁まで まっすぐ (敵を つらぬく)。cross: 上下左右の 4 方向に つらぬく
-            const ray = ([ddx, ddy]) => {
-                const hit = [];
-                let x = u.x, y = u.y;
-                for (let i = 0; i < 10 && D.canMove(state.map, x, y, ddx, ddy); i++) {
-                    x += ddx;
-                    y += ddy;
-                    const e = foes.find(f => f.x === x && f.y === y);
-                    if (e) hit.push(e);
-                }
-                return { hit, end: [x, y] };
+            const beam = ([ddx, ddy]) => {
+                const path = ray(u, [ddx, ddy], 10);
+                const hit = path.map(([x, y]) => foes.find(f => f.x === x && f.y === y)).filter(Boolean);
+                return { hit, end: path[path.length - 1] || [u.x, u.y] };
             };
             if (sp.range === 'cross') {
-                const rays = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(ray);
+                const rays = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(beam);
                 return { targets: rays.flatMap(r => r.hit), to: [u.x, u.y], ends: rays.map(r => r.end) };
             }
-            const r = ray([dx, dy]);
+            const r = beam([dx, dy]);
             return { targets: r.hit, to: r.end };
         }
         function specialHit(u, sp) {
@@ -2630,8 +2710,87 @@
             if (state.mini) drawMinimap(th);
             drawMessages(now);
             drawCutin(now);
+            if (state.statusOf && ui.asking()) drawStatus(now, state.statusOf);
+            else state.statusOf = null;
             if (state.fade) drawFade(now);
             drawToasts(now);
+        }
+
+        // ステータス画面: 絵・Lv・HP・けいけんち・能力・属性・役職・とくちょう・装備・わざ
+        function drawStatus(now, u) {
+            const ph = 116;
+            ctx.fillStyle = 'rgba(8,16,26,.94)';
+            ctx.fillRect(4, 4, W - 8, ph);
+            ctx.strokeStyle = '#4a6a8a';
+            ctx.strokeRect(4.5, 4.5, W - 9, ph - 1);
+            ctx.fillStyle = '#1c2c3c';
+            ctx.fillRect(10, 10, 64, 64);
+            const frame = Math.floor(now / 400) % 2;
+            if (A.SPRITES[u.kind]) {
+                const rows = A.SPRITES[u.kind].frames[0];
+                const s = Math.max(1, Math.floor(56 / Math.max(rows.length, rows[0].length)));
+                A.drawSprite(ctx, u.kind, frame, 42 - rows[0].length * s / 2, 42 - rows.length * s / 2, { scale: s });
+            } else if (KD.BigArt.has(u.kind)) KD.BigArt.drawBig(ctx, u.kind, frame, 42, 70, { height: 56 });
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'left';
+            ctx.font = `bold 11px ${FONT}`;
+            ctx.fillStyle = '#ffe680';
+            const star = !u.hero && KD.Allies.star(u.kind) ? ' ' + '★'.repeat(KD.Allies.star(u.kind)) : '';
+            ctx.fillText(`${u.name}${star}　Lv${u.lv}${u.hero ? '（主人公）' : ''}${u === state.player ? '　操作中' : ''}`, 82, 16);
+            ctx.font = `9px ${FONT}`;
+            ctx.fillStyle = ELEMENT_COLORS[u.element] || '#ffffff';
+            ctx.fillText(`属性：${u.element}`, 82, 31);
+            ctx.fillStyle = '#8fd6f7';
+            ctx.fillText(`役職：${U.ROLES[u.role].name}`, 150, 31);
+            const need = U.expToNext(u.lv);
+            ctx.fillStyle = '#c8d8e8';
+            ctx.fillText(`けいけんち ${u.exp}/${need}`, 240, 31);
+            // HP
+            const k = Math.max(0, u.hp) / u.stats.hp;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText('HP', 82, 45);
+            ctx.fillStyle = '#3a1010';
+            ctx.fillRect(98, 42, 80, 6);
+            ctx.fillStyle = k > 0.5 ? '#6ae06a' : k > 0.25 ? '#f0d040' : '#ff5a4a';
+            ctx.fillRect(98, 42, Math.round(80 * k), 6);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(`${Math.max(0, u.hp)}/${u.stats.hp}`, 184, 45);
+            const st = u.status ? U.STATUS[u.status.id] : null;
+            ctx.fillStyle = st ? st.color : '#8a9aaa';
+            ctx.fillText(`状態：${st ? st.name : 'ふつう'}`, 240, 45);
+            // 能力 (装備の ぶんは 黄色で +)
+            const bonus = (gearOf(u) && gearOf(u).bonus) || {};
+            [['こうげき', 'atk'], ['ぼうぎょ', 'def'], ['とくこう', 'spa'], ['とくぼう', 'spd']].forEach(([name, key], i) => {
+                const x = 82 + (i % 2) * 110, y = 59 + Math.floor(i / 2) * 12;
+                ctx.fillStyle = '#c8d8e8';
+                ctx.fillText(`${name} ${u.stats[key]}`, x, y);
+                if (bonus[key]) {
+                    ctx.fillStyle = '#ffe680';
+                    ctx.fillText(`（装備 +${bonus[key]}）`, x + ctx.measureText(`${name} ${u.stats[key]}`).width, y);
+                }
+            });
+            if (bonus.hp) {
+                ctx.fillStyle = '#ffe680';
+                ctx.fillText(`（装備 HP +${bonus.hp}）`, 302, 59);
+            }
+            // 装備欄
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText('装備：', 10, 85);
+            ctx.fillStyle = u.gear ? '#ffe680' : '#8a9aaa';
+            const g = gearOf(u);
+            ctx.fillText(u.gear ? `${g.name}　${g.note}` : 'なし', 40, 85);
+            // とくちょう (苦手でない 状態異常・泳げる など)
+            const notes = [];
+            if (swims(u)) notes.push('水の上を 通れる');
+            if (has(u, 'lava') || (g && g.lava)) notes.push('溶岩へいき');
+            const immune = [...(u.immune || []), ...((g && g.immune) || [])];
+            if (immune.length) notes.push(`${[...new Set(immune)].map(id => U.STATUS[id].name).join('・')}状態に ならない`);
+            ctx.fillStyle = '#c8d8e8';
+            ctx.fillText(`とくちょう：${notes.join('・') || 'なし'}`, 10, 98);
+            // わざ
+            ctx.fillStyle = '#8fd6f7';
+            const sk = u.skills.map(s => `${U.SKILLS[s.id].name} ${s.pp}/${s.max}`).join('　');
+            ctx.fillText(`わざ：${sk || 'なし'}`, 10, 111);
         }
 
         // 口ぐせの吹き出し (1.6 秒)
@@ -2881,8 +3040,7 @@
             if (p.status) tags.push([U.STATUS[p.status.id].name, U.STATUS[p.status.id].color]);
             if (p.buffs.kiai) tags.push(['きあい', '#ffb060']);
             if (p.buffs.guard) tags.push(['まもり', '#8fd6f7']);
-            const g = equipped(p);
-            if (g) tags.push([`そうび：${I.ITEMS[g.id].name}`, '#c8d8e8']);
+            if (p.gear) tags.push([`そうび：${gearName(p)}`, '#c8d8e8']);
             state.hudRows = tags.length ? 2 : 1;
             if (!tags.length) return;
             let x = 4;
@@ -3069,6 +3227,7 @@
         } else town.title();
         return {
             state, town, draw, moveInput, wait, confirm, attack: attackFront, useSkill, itemMenu, tacticMenu, specialMenu, specialFor, busy, makeEnemy, makeAlly, evolve, startDungeon, switchTo, switchMenu, heroUnit, snapshot, autosave, spawnBoss,
+            statusMenu, equipMenu, equip, unequip, recalc,
             skills: () => (state.player && state.phase === 'play' ? state.player.skills.map(skillLabel) : []),
             toggleMinimap() { state.mini = !state.mini; },
             // 「音」ボタン: 音の設定 (音量・オン・オフ。2026-10-22 ユーザー指定)。S キーは これまでどおり オン・オフだけ

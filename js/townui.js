@@ -653,6 +653,15 @@
             }
             return 'bag';
         }
+        // 仲間が つけていた 装備を はずして 持ち物 (いっぱいなら 倉庫) に もどす (お別れ・出品)。知らせる 文を 返す
+        function takeGear(a) {
+            if (!a.gear) return '';
+            const item = a.gear;
+            a.gear = null;
+            g.recalc(a);
+            const where = giveItem(item, true);
+            return `\n（つけていた ${I.ITEMS[item.id].name}は ${where === 'storage' ? '倉庫' : '持ち物'}に もどした）`;
+        }
         function toStorage(item) {
             const st = t().storage;
             const stack = stackable(item.id) && st.find(it => it.id === item.id);
@@ -918,7 +927,10 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                 ask(`${a.name}を ${money(row.price)}で 出品しますか？\n（売れると いなくなる。取り下げると もどってくる）`, ['出品する', 'やめる'], j => {
                     if (j === 1) return listAlly();
                     const done = () => ask(`${a.name}を ${money(row.price)}で 出品した。`, ['もどる'], tradeMenu, { list: false });
-                    const take = () => { if (state.roster.includes(a)) state.roster.splice(state.roster.indexOf(a), 1); };
+                    const take = () => {
+                        if (state.roster.includes(a)) state.roster.splice(state.roster.indexOf(a), 1);
+                        takeGear(a);
+                    };
                     if (!net.online) {
                         take();
                         t().listings.push(row);
@@ -1065,8 +1077,9 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                     return ask(`${a.name}と お別れしますか？\n（お別れすると もう もどってこない）`, ['いいえ', 'はい、お別れする'], k => {
                         if (k !== 1) return plazaUnit(a, max);
                         [state.allies, state.roster].forEach(list => { if (list.includes(a)) list.splice(list.indexOf(a), 1); });
+                        const gear = takeGear(a);
                         save();
-                        ask(`${a.name}「いままで ありがとう！ 元気でね！」\n${a.name}と お別れした。`, ['もどる'], plaza, { list: false });
+                        ask(`${a.name}「いままで ありがとう！ 元気でね！」\n${a.name}と お別れした。${gear}`, ['もどる'], plaza, { list: false });
                     });
                 } else if (giveable && j === 1) {
                     if (!KD.Allies.canEvolve(a, { item: v.item })) return ask(`${a.name}「……まだ 早いみたい」\n（Lv${v.lv} から 進化できる）`, ['もどる'], () => plazaUnit(a, max), { list: false });
@@ -1142,7 +1155,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
         // 交換で 手に入れた もう片方の バージョンの キャラ (図鑑の おまけ。完成の 数には 入れない)
         const tradedKinds = order => Object.keys(t().dex.traded || {}).filter(k => U.ENEMIES[k] && !order.includes(k));
         const dexKnown = kind => Boolean(t().dex.seen[kind] || (t().dex.traded || {})[kind]);
-        function enemyDex() {
+        function enemyDex(index = 0) {
             const own = C.dexOrder(t().version);
             const order = [...own, ...tradedKinds(own)];
             const label = kind => {
@@ -1153,11 +1166,13 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                 return `${no}　${e.name}${t().dex.beat[kind] ? `　たおした ${t().dex.beat[kind]}` : ''}`;
             };
             view = 'dex';
-            dexKind = order[0];
-            ui.ask('敵の図鑑（えらぶと 上に くわしく出る）', [...order.map(label), 'もどる'], () => {
+            dexKind = order[Math.min(index, order.length - 1)];
+            // キャラを 押したら その キャラを 上に 出して 一覧の まま (「もどる」だけで 前の 画面へ。2026-10-23 ユーザー指定)
+            ui.ask('敵の図鑑（えらぶと 上に くわしく出る）', [...order.map(label), 'もどる'], i => {
+                if (i < order.length) return enemyDex(i);
                 view = 'town';
                 dexMenu();
-            }, { place: 'bottom', list: true, onMove: i => { dexKind = order[i] || null; } });
+            }, { place: 'bottom', list: true, index, onMove: i => { dexKind = order[i] || null; } });
         }
 
         function itemDex() {
@@ -1206,7 +1221,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
         }
 
         // ----- セーブ (仕様書 16章。localStorage) -----
-        const unitData = u => ({ kind: u.kind, name: u.name, role: u.role, lv: u.lv, exp: u.exp, hp: u.hp, skills: u.skills });
+        const unitData = u => ({ kind: u.kind, name: u.name, role: u.role, lv: u.lv, exp: u.exp, hp: u.hp, skills: u.skills, gear: u.gear || null });
         // セーブは バージョンごとに 1 つずつ (氷隊・鬼鬼団。2026-10-22 ユーザー指定)。前の版の セーブ (SAVE_KEY) は バージョンの ほうへ 移す
         const slotKey = v => `${SAVE_KEY}-${v}`;
         const SLOTS = ['koori', 'onioni'];
@@ -1256,13 +1271,21 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             if (peek) return data;
             const h = data.hero;
             const hero = g.makeHero(h.kind, h.role);
-            Object.assign(hero, { lv: h.lv, exp: h.exp, skills: h.skills, tree: h.tree, bag: h.bag, money: h.money, belly: h.belly ?? I.BELLY_MAX });
+            Object.assign(hero, { lv: h.lv, exp: h.exp, skills: h.skills, tree: h.tree, bag: h.bag, money: h.money, belly: h.belly ?? I.BELLY_MAX, gear: h.gear || null });
+            // 前の版の セーブ: 道具袋の中で「そうび中」だった 装備は 主人公の 装備欄へ (2026-10-23)
+            const worn = hero.bag.find(it => it.eq);
+            hero.bag.forEach(it => { delete it.eq; });
+            if (worn && !hero.gear) {
+                hero.bag.splice(hero.bag.indexOf(worn), 1);
+                hero.gear = { id: worn.id, n: 1 };
+            }
             g.recalc(hero);
             hero.hp = Math.min(h.hp || hero.stats.hp, hero.stats.hp);
             state.player = hero;
             const ally = d => {
                 const a = g.makeAlly(d.kind, d.lv);
-                Object.assign(a, { name: d.name, exp: d.exp, skills: d.skills });
+                Object.assign(a, { name: d.name, exp: d.exp, skills: d.skills, gear: d.gear || null });
+                g.recalc(a);
                 a.hp = a.stats.hp;
                 return a;
             };

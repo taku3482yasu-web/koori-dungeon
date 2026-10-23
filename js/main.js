@@ -186,6 +186,7 @@
             else if (k === 'KeyC' && !e.repeat) game.switchMenu();   // 操作するキャラの 交代
             else if (k === 'KeyV' && !e.repeat) game.specialMenu();   // 必殺技 (2026-10-22)
             else if (k === 'KeyS' && !e.repeat) game.toggleSound();
+            else if (k === 'KeyE' && !e.repeat) game.statusMenu();   // ステータス・装備 (2026-10-23)
             else if (/^(Digit|Numpad)[1-4]$/.test(k) && !e.repeat && !NUMPAD[k]) game.useSkill(Number(k.slice(-1)) - 1);
         });
         window.addEventListener('keyup', e => {
@@ -270,6 +271,7 @@
         tap('btn-switch', () => (ask.asking() ? ask.key('back') : game.switchMenu()));
         tap('btn-special', () => (ask.asking() ? null : game.specialMenu()));
         tap('btn-sound', () => game.soundMenu());
+        tap('btn-status', () => (ask.asking() ? ask.key('back') : game.statusMenu()));
 
         // ----- わざのボタン (変わったときだけ作り直す) -----
         const skillBox = document.getElementById('skills');

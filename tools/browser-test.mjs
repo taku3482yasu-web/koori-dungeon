@@ -222,6 +222,15 @@ try {
     await press('#btn-special');
     check(/必殺技（チームで あと 3 回/.test(await asking()), '「必殺技」ボタンで 必殺技の 画面');
     await press('.ask-choices button', { text: 'やめる' });
+    // ステータス・装備 (2026-10-23): ボタンで ステータスの 画面 → キャラを えらぶと 装備欄 → ハチマキを つけると 持ち物から 消える
+    await evaluate("window.kdGame.state.player.bag.push({ id: 'power_band', n: 1 })");
+    await press('#btn-status');
+    check(/ステータス/.test(await asking()), '「ステータス」ボタンで ステータスの画面');
+    await press('.ask-choices button', { text: 'こおりくん' });
+    check(/装備欄：/.test(await asking()), 'キャラを えらぶと 装備欄');
+    await press('.ask-choices button', { text: 'つける：ちからのハチマキ' });
+    await sleep(800);
+    check(await evaluate("(() => { const p = window.kdGame.state.player; return p.gear && p.gear.id === 'power_band' && !p.bag.some(it => it.id === 'power_band'); })()"), 'ハチマキを つけると 装備欄に 入り、持ち物から なくなる');
     await press('#btn-map');
     await press('#btn-sound');
     check(/音の設定/.test(await asking()), '「音」ボタンで 音の設定');
