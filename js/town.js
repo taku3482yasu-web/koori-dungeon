@@ -27,7 +27,7 @@
     // ----- 施設の開放 (2026-10-22 ユーザー指定: 借金を返していくと、決めた額で開く) -----
     // 返した合計がこの額になると使えるようになる (書いていない施設は はじめから使える)
     // 仲間の広場は はじめから使える (2026-10-22 ユーザー指定。前は 5,000えん)
-    const UNLOCK = { storage: 2000, tree: 10000, smith: 20000, trade: 30000 };
+    const UNLOCK = { storage: 2000, training: 5000, expedition: 8000, tree: 10000, smith: 20000, trade: 30000 };
     const isOpen = (place, paid) => (UNLOCK[place] || 0) <= paid;
 
     // ----- バトルツリー (仕様書 6.4) -----
@@ -323,7 +323,83 @@
     const weatherBoost = (day, element) => (element && WEATHERS[weatherOf(day).id].boost[element]) || 1;
     const weatherText = w => Object.entries(w.boost).map(([el, k]) => `${el}の わざ ${k} 倍`).join('・');
 
+    // ----- 特訓場 (2026-10-23 ユーザー指定。数字は Claude の 案) -----
+    // コーチ 1 体と 特訓する キャラ 1 体。実際の 時間が たつと 終わる。
+    //   コーチごとに 上がる 能力 (その キャラの 得意な 2 つ) と はやさ (★で 決まる) が ちがう。おそい コーチほど たくさん 上がる
+    const COACH_SPEEDS = {
+        fast: { name: 'はやい', minutes: 15, levels: 1, stat: 1 },
+        normal: { name: 'ふつう', minutes: 30, levels: 2, stat: 2 },
+        slow: { name: 'おそい', minutes: 60, levels: 3, stat: 3 }
+    };
+    const INHERIT_RATE = 0.25;   // コーチの わざを 受け継ぐ 確率
+    const STAT_NAMES = { hp: 'HP', atk: 'こうげき', def: 'ぼうぎょ', spa: 'とくこう', spd: 'とくぼう' };
+    function coachOf(kind) {
+        const star = KD.Allies.star(kind) || 3;
+        const speed = star <= 2 ? 'fast' : star >= 4 ? 'slow' : 'normal';
+        // 得意な 能力: Lv30 の 能力 (HP は 3 分の 1 で くらべる) の 高い ほうから 2 つ
+        const s = U.allyStats(kind, 30);
+        const stats = Object.keys(STAT_NAMES).sort((a, b) => (b === 'hp' ? s[b] / 3 : s[b]) - (a === 'hp' ? s[a] / 3 : s[a])).slice(0, 2);
+        return { speed, stats, ...COACH_SPEEDS[speed] };
+    }
+    const coachText = kind => {
+        const c = coachOf(kind);
+        return `${c.stats.map(k => STAT_NAMES[k]).join('・')}が 上がる　はやさ：${c.name}（${c.minutes} 分）`;
+    };
+    // 特訓の 結果: けいけんち (trainee の Lv で levels 回ぶん)・能力 (HP は 3 倍)・受け継ぐ わざ (なければ null)
+    function trainResult(rng, coach, trainee) {
+        const c = coachOf(coach.kind);
+        let exp = 0;
+        for (let i = 0; i < c.levels; i++) exp += U.expToNext(trainee.lv + i);
+        const bonus = {};
+        c.stats.forEach(k => { bonus[k] = k === 'hp' ? c.stat * 3 : c.stat; });
+        const known = new Set([...trainee.skills.map(k => k.id), ...(trainee.extra || [])]);
+        const can = coach.skills.map(k => k.id).filter(id => U.SKILLS[id] && !U.SKILLS[id].role && !known.has(id));
+        const skill = can.length && rng.chance(INHERIT_RATE) ? rng.pick(can) : null;
+        return { exp, bonus, skill };
+    }
+
+    // ----- 遠征所 (2026-10-23 ユーザー指定。数字は Claude の 案) -----
+    // クリアした ダンジョンへ 仲間 5 体までの チームを 送る。実際の 時間が たつと 帰ってくる。
+    //   手に入る けいけんち・道具・お金は ふつうに 1 回 突破したときと 同じくらい (階ごとに 敵 5 体・床の 道具・お金。いちばん下の ボスも)
+    const EXPEDITION_SIZE = 5;
+    const EXPEDITION_TEAMS = 3;
+    const TEAM_PRICE = [0, 10000, 30000];   // 2 つめ・3 つめの チームを ふやす お金
+    const KILLS_PER_FLOOR = 5;
+    // かかる 時間 (分): 階数と 難しさ (いちばん下の 階の 敵の Lv)
+    const expeditionMinutes = d => Math.max(5, Math.round(d.floors * (1 + KD.Dungeons.levelFor(d, d.floors) / 20) * 1.5));
+    function expeditionLoot(rng, d) {
+        const DG = KD.Dungeons;
+        let exp = 0, money = 0, kills = 0;
+        const items = [];
+        const add = it => {
+            const same = I.ITEMS[it.id].count && items.find(x => x.id === it.id);
+            if (same) same.n += it.n;
+            else items.push({ ...it });
+        };
+        for (let f = 1; f <= d.floors; f++) {
+            const table = DG.tableFor(d, f);
+            for (let k = 0; k < KILLS_PER_FLOOR; k++) {
+                const kind = rng.pick(table);
+                exp += U.enemyStats(kind, DG.levelFor(d, f)).exp;
+                kills++;
+                if (I.DROPS[kind] && rng.chance(I.MATERIAL_RATE)) {
+                    const m = I.ITEMS[I.DROPS[kind]];
+                    add({ id: I.DROPS[kind], n: rng.int(m.count[0], m.count[1]) });
+                }
+            }
+            for (let i = rng.int(4, 7); i > 0; i--) add(I.rollItem(rng, d.items || I.FOREST_ITEMS));   // game.js と 同じ (表が なければ 森の 表)
+            for (let i = rng.int(2, 4); i > 0; i--) money += Math.round(I.rollMoney(rng, f) * (d.money || 1));
+        }
+        if (d.boss && U.ENEMIES[d.boss]) {
+            exp += U.enemyStats(d.boss, DG.levelFor(d, d.floors) + 2).exp;
+            kills++;
+        }
+        return { exp, money, items, kills };
+    }
+
     KD.Town = {
+        COACH_SPEEDS, INHERIT_RATE, STAT_NAMES, coachOf, coachText, trainResult,
+        EXPEDITION_SIZE, EXPEDITION_TEAMS, TEAM_PRICE, expeditionMinutes, expeditionLoot,
         WEATHERS, weatherOf, weatherBoost, weatherText,
         NAME, DEBT_START, BP_PER, BONUS_EVERY, BONUS_BP, INTEREST, bpFor, UNLOCK, isOpen,
         ROLE_ORDER, OUGI, treeNodes, TREE_START, canUnlock, treeStats, rolesOpen, treeSkills, nodeText,

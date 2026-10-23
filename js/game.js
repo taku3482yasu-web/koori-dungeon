@@ -237,6 +237,8 @@
             const g = equipped(p);
             const bonus = g && I.ITEMS[g.id].bonus;
             if (bonus) for (const k of Object.keys(bonus)) s[k] += bonus[k];
+            // 特訓で 上がった 能力 (町の 特訓場。2026-10-23)
+            if (p.bonus) for (const k of Object.keys(p.bonus)) s[k] += p.bonus[k];
             p.stats = s;
             p.hp = Math.min(p.hp, s.hp);
         }
@@ -499,7 +501,7 @@
         const unitSnap = u => ({
             kind: u.kind, name: u.name, hero: Boolean(u.hero), role: u.role, lv: u.lv, exp: u.exp, hp: u.hp, x: u.x, y: u.y, dir: u.dir,
             status: u.status, buffs: u.buffs, flinch: u.flinch, regen: u.regen, skills: u.skills, element: u.element, immune: u.immune, traits: u.traits,
-            gear: u.gear || null
+            gear: u.gear || null, bonus: u.bonus || null, extra: u.extra || null
         });
         function snapshot() {
             if (state.phase !== 'play' || !state.map || state.over || state.done) return null;
@@ -552,7 +554,7 @@
             };
             const build = d => {
                 const a = makeAlly(d.kind, d.lv);
-                Object.assign(a, { name: d.name, exp: d.exp, role: d.role, gear: d.gear || null });
+                Object.assign(a, { name: d.name, exp: d.exp, role: d.role, gear: d.gear || null, bonus: d.bonus || null, extra: d.extra || null });
                 a.hp = Infinity;
                 recalc(a);
                 return apply(a, d);

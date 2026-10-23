@@ -27,6 +27,8 @@
         { id: 'trade', name: '交易所', who: '', color: '#8a5ac8' },
         { id: 'storage', name: '倉庫', who: '', color: '#7a5a3a' },
         { id: 'plaza', name: '仲間の広場', who: '', color: '#4a8ac8' },
+        { id: 'training', name: '特訓場', who: '', color: '#c86a3a' },
+        { id: 'expedition', name: '遠征所', who: '', color: '#3a6a9a' },
         { id: 'home', name: '家', who: '', color: '#c8a04a' }
     ];
 
@@ -88,7 +90,7 @@
         function check() {
             const town = t();
             if (!town || !p()) return;
-            const c = { town, player: p(), allies: state.allies, roster: state.roster, stats: town.stats };
+            const c = { town, player: p(), allies: state.allies, roster: [...state.roster, ...awayData()], stats: town.stats };
             C.ACHIEVEMENTS.forEach(a => {
                 if (town.ach[a.id] || !a.test(c)) return;
                 town.ach[a.id] = town.day;
@@ -110,7 +112,7 @@
         // 日がかわると、掲示板・お店・交易所が入れかわる。出品していた物が売れることもある
         function refreshDay() {
             const town = t();
-            const kinds = [...state.allies, ...state.roster].map(a => a.kind);
+            const kinds = owned().map(a => a.kind);
             town.board = TW.questBoard(dayRng(1), town.day, { owned: town.owned, allyKinds: [...new Set(kinds)], dungeons: openDungeons().filter(d => !d.bonus && !d.extra) });
             addRivalQuests();
             addVersionQuests();
@@ -278,7 +280,7 @@
             const town = t();
             town.cleared = DG.LIST.indexOf(d) + 1;
             const st = d.story || {};
-            if (st.ally && ![...state.allies, ...state.roster].some(a => a.kind === st.ally)) {
+            if (st.ally && !owned().some(a => a.kind === st.ally)) {
                 const a = g.makeAlly(st.ally, Math.max(1, p().lv - 1));
                 if (state.allies.length < g.partyMax() - 1) state.allies.push(a);
                 else state.roster.push(a);
@@ -435,10 +437,12 @@
             state.phase = 'town';
             view = 'town';
             bgm('town');
+            // 特訓・遠征が 終わっていたら 先に 結果を 見せる (2026-10-23 ユーザー指定)
+            if (finishJobs(menu)) return;
             check();
             save();   // オートセーブ (2026-10-22 ユーザー指定)
             const town = t();
-            const news = town.news.splice(0);
+            const news = [...town.news.splice(0), ...jobLines()];
             const done = town.quests.filter(questDone).length;
             const vl = version().lines;
             const head = [`${TW.NAME}　${town.day}日目（${weather()[1]}：${TW.weatherText(TW.weatherOf(town.day))}）　借金 ${money(town.debt)}　お金 ${money(p().money)}　BP ${town.bp}`,
@@ -538,7 +542,7 @@
                     state.roster.push(a);
                     t().owned.push(q.ally.key || 'ally:hari');
                     lines.push(`★${a.name}が 仲間になった！（仲間の広場で待っている）`);
-                    if (q.rival && q.type !== 'duel' && C.RIVALS[q.rival].every(k => k === KD.Allies.LEADERS[q.rival] || [...state.allies, ...state.roster].some(u => u.kind === k))) {
+                    if (q.rival && q.type !== 'duel' && C.RIVALS[q.rival].every(k => k === KD.Allies.LEADERS[q.rival] || owned().some(u => u.kind === k))) {
                         lines.push(`${q.rival}の メンバーが そろった！ リーダーの ${U.ENEMIES[KD.Allies.LEADERS[q.rival]].name}から 勝負の クエストが 届いた！`);
                     }
                 }
@@ -1070,7 +1074,8 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             const ids = u.hero
                 ? [...U.HEROES[u.kind].learn.filter(([lv]) => lv <= u.lv).map(([, id]) => id), ...TW.treeSkills(u.kind, u.tree || [], u.role)]
                 : [U.ROLES[u.role].skill, ...KD.Allies.learnList(u.kind).filter(([lv]) => lv <= u.lv).map(([, id]) => id), ...U.enemyAllySkills(u.kind, u.lv).map(k => k.id)];
-            return [...new Set([...u.skills.map(k => k.id), ...ids])].filter(id => U.SKILLS[id] && (!U.SKILLS[id].role || U.SKILLS[id].role === u.role));
+            // extra: 特訓で 受け継いだ わざ・覚えきれなかった わざ
+            return [...new Set([...u.skills.map(k => k.id), ...ids, ...(u.extra || [])])].filter(id => U.SKILLS[id] && (!U.SKILLS[id].role || U.SKILLS[id].role === u.role));
         }
         const skillRow = id => `${U.SKILLS[id].name}　${U.skillShort(id)}`;
         function skillSwap(u, back) {
@@ -1271,7 +1276,200 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             ask(`実績 ${got} / ${list.length}`, [...list.map(a => (t().ach[a.id] ? `★ ${a.name}　${a.note}` : `　 ？？？　${a.note}`)), 'もどる'], () => home());
         }
 
-        const PLACE_FN = { dungeon: goDungeon, guild, debt, tree, shop, smith, trade, storage, plaza, home };
+        const PLACE_FN = { dungeon: goDungeon, guild, debt, tree, shop, smith, trade, storage, plaza, training, expedition, home };
+
+        // ----- 特訓場・遠征所 (2026-10-23 ユーザー指定。数字は town.js の 案) -----
+        // 出かけている 仲間は 広場から はずして、町の データ (t().training・t().expeditions) に 入れておく。
+        // 時間は 実際の 時計 (opts.clock が あれば それ。テスト用)
+        const nowMs = () => (g.opts.clock ? g.opts.clock() : Date.now());
+        const MIN = 60 * 1000;
+        const left = end => Math.max(0, Math.ceil((end - nowMs()) / MIN));
+        const leftText = end => (end <= nowMs() ? '終わった！' : `あと ${left(end)} 分`);
+        const teams = () => {
+            const town = t();
+            town.expeditions = town.expeditions || [];
+            town.expTeams = town.expTeams || 1;
+            return town.expeditions;
+        };
+        // 出かけている 仲間の データ (持っているかを しらべる ため)
+        const awayData = () => [...(t().training ? [t().training.coach, t().training.trainee] : []), ...(t().expeditions || []).flatMap(x => x.members)];
+        const owned = () => [...state.allies, ...state.roster, ...awayData()];
+        // 広場で 待っている・いっしょに 行く 仲間 (出かけられる)
+        const homeUnits = () => [...state.allies, ...state.roster];
+        const takeOut = a => [state.allies, state.roster].forEach(list => { if (list.includes(a)) list.splice(list.indexOf(a), 1); });
+        const unitRow = a => `${state.allies.includes(a) ? '【いっしょ】' : ''}${a.name}${KD.Allies.star(a.kind) ? ' ' + '★'.repeat(KD.Allies.star(a.kind)) : ''} Lv${a.lv}　${U.ROLES[a.role].name}`;
+
+        // 町の メニューに 出す 進み具合
+        function jobLines() {
+            const out = [];
+            const tr = t().training;
+            if (tr) out.push(`特訓場：${tr.trainee.name}（コーチ ${tr.coach.name}）${leftText(tr.end)}`);
+            teams().forEach((x, i) => out.push(`遠征 ${i + 1}：${DG.byId(x.dungeon).name}　${leftText(x.end)}`));
+            return out;
+        }
+
+        // 町で けいけんちを もらう (Lv が 上がると わざを 覚える・進化する)。覚えきれない わざは 付け替えの 候補 (extra) へ
+        function townExp(u, n) {
+            const lv0 = u.lv;
+            U.gainExp(u, n);
+            g.recalc(u);
+            u.hp = u.stats.hp;
+            const learned = [];
+            U.learnedBetween(u.kind, lv0, u.lv).forEach(id => {
+                if (u.skills.some(k => k.id === id)) return;
+                learned.push(U.SKILLS[id].name);
+                if (u.skills.length < U.MAX_SKILLS) u.skills.push(U.newSkill(id));
+                else if (!(u.extra || []).includes(id)) (u.extra = u.extra || []).push(id);
+            });
+            const before = u.name;
+            const evolved = KD.Allies.canEvolve(u) && g.evolve(u);
+            return `${before} Lv${lv0} → Lv${u.lv}${learned.length ? `（${learned.join('・')}を 覚えた）` : ''}${evolved ? `　${before}は ${u.name}に 進化した！` : ''}`;
+        }
+
+        // 終わった 特訓・遠征の 結果を 1 つずつ 見せる。見せる ものが あれば true (おわったら done)
+        function finishJobs(done) {
+            const town = t();
+            if (!town) return false;
+            const results = [];
+            const tr = town.training;
+            if (tr && tr.end <= nowMs()) {
+                town.training = null;
+                const coach = restoreAlly(tr.coach), trainee = restoreAlly(tr.trainee);
+                const r = TW.trainResult(KD.createRng(tr.seed), coach, trainee);
+                trainee.bonus = { ...(trainee.bonus || {}) };
+                Object.entries(r.bonus).forEach(([k, v]) => { trainee.bonus[k] = (trainee.bonus[k] || 0) + v; });
+                const lines = [`特訓が 終わった！（コーチ ${coach.name}）`, townExp(trainee, r.exp), `能力：${Object.entries(r.bonus).map(([k, v]) => `${TW.STAT_NAMES[k]} +${v}`).join('・')}`];
+                if (r.skill) {
+                    lines.push(`${coach.name}の わざ「${U.SKILLS[r.skill].name}」を 受け継いだ！`);
+                    if (trainee.skills.length < U.MAX_SKILLS) trainee.skills.push(U.newSkill(r.skill));
+                    else (trainee.extra = trainee.extra || []).push(r.skill);
+                    if (trainee.skills.length >= U.MAX_SKILLS && !trainee.skills.some(k => k.id === r.skill)) lines.push('（仲間の広場の「わざを 付け替える」で 使える）');
+                }
+                state.roster.unshift(coach, trainee);
+                results.push(lines.join('\n'));
+            }
+            teams().slice().forEach(x => {
+                if (x.end > nowMs()) return;
+                town.expeditions.splice(town.expeditions.indexOf(x), 1);
+                const d = DG.byId(x.dungeon);
+                const loot = TW.expeditionLoot(KD.createRng(x.seed), d);
+                const members = x.members.map(restoreAlly);
+                const lines = [`遠征チームが ${d.name}から 帰ってきた！（たおした 敵 ${loot.kills}）`, `けいけんち +${loot.exp}（みんなに）`, ...members.map(u => townExp(u, loot.exp))];
+                p().money += loot.money;
+                let lost = 0;
+                loot.items.forEach(it => {
+                    if (town.storage.length >= STORAGE_MAX && !(stackable(it.id) && town.storage.some(s => s.id === it.id))) return void lost++;
+                    noteItem(it.id);
+                    toStorage(it);
+                });
+                lines.push(`お金 ${money(loot.money)}（持ち金へ）`, `道具（倉庫へ）：${loot.items.map(I.label).join('・') || 'なし'}`);
+                if (lost) lines.push(`倉庫が いっぱいで、${lost} こ 入らなかった。`);
+                state.roster.unshift(...members);
+                results.push(lines.join('\n'));
+            });
+            if (!results.length) return false;
+            save();
+            const next = () => (results.length ? ask(results.shift(), ['つぎへ'], next, { list: false }) : done());
+            next();
+            return true;
+        }
+
+        // ----- 特訓場 -----
+        function training() {
+            const tr = t().training;
+            if (tr) {
+                return ask(`特訓中：${tr.trainee.name} Lv${tr.trainee.lv}（コーチ ${tr.coach.name}）\n${TW.coachText(tr.coach.kind)}\n${leftText(tr.end)}`,
+                    ['特訓を やめる（何も 上がらない）', 'もどる'], i => {
+                        if (i !== 0) return menu();
+                        t().training = null;
+                        state.roster.unshift(restoreAlly(tr.coach), restoreAlly(tr.trainee));
+                        save();
+                        say('特訓を やめた。2 人は 広場に もどった。');
+                    }, { list: false });
+            }
+            const list = homeUnits();
+            if (list.length < 2) return say('特訓には 仲間が 2 人 いる（コーチと 特訓する キャラ）。\n（主人公は 特訓できない。遠征に 出ている 仲間も えらべない）');
+            ask('コーチを えらぶ（コーチごとに 上がる 能力と はやさが ちがう）', [...list.map(a => `${unitRow(a)}　${TW.coachText(a.kind)}`), 'もどる'], i => {
+                if (i >= list.length) return menu();
+                const coach = list[i];
+                const rest = list.filter(a => a !== coach);
+                ask(`コーチ：${coach.name}（${TW.coachText(coach.kind)}）\n特訓する キャラを えらぶ`, [...rest.map(unitRow), 'もどる'], j => {
+                    if (j >= rest.length) return training();
+                    const trainee = rest[j], c = TW.coachOf(coach.kind);
+                    ask(`${trainee.name}を ${coach.name}が ${c.minutes} 分 特訓する。\n上がる：Lv ${c.levels} つぶんの けいけんち・${c.stats.map(k => `${TW.STAT_NAMES[k]} +${k === 'hp' ? c.stat * 3 : c.stat}`).join('・')}\n（${Math.round(TW.INHERIT_RATE * 100)}% で コーチの わざを 受け継ぐ。特訓中の 2 人は ダンジョンに 行けない）`,
+                        ['特訓を はじめる', 'やめる'], k => {
+                            if (k !== 0) return training();
+                            takeOut(coach);
+                            takeOut(trainee);
+                            const start = nowMs();
+                            t().training = { coach: unitData(coach), trainee: unitData(trainee), start, end: start + c.minutes * MIN, seed: (start ^ t().seed) >>> 0 };
+                            save();
+                            say(`特訓を はじめた！（${c.minutes} 分）\n実際の 時間が たつと 終わる。町に もどったときに 結果が 出る。`);
+                        }, { list: false });
+                });
+            });
+        }
+
+        // ----- 遠征所 -----
+        // 行ける ダンジョン: ボスを たおした ダンジョン (ドタバタ大迷宮は のぞく)
+        const clearedDungeons = () => [...DG.LIST.slice(0, t().cleared || 0), ...(DG.EXTRA || []).filter(d => (t().extraClear || {})[d.id])];
+        function expedition() {
+            const list = teams();
+            const rows = [];
+            for (let i = 0; i < t().expTeams; i++) {
+                const x = list[i];
+                rows.push(x ? `チーム ${i + 1}：${DG.byId(x.dungeon).name}（${x.members.length} 人）${leftText(x.end)}` : `チーム ${i + 1}：あき（えらぶと 編成する）`);
+            }
+            const price = TW.TEAM_PRICE[t().expTeams];
+            const opts = [...rows, ...(t().expTeams < TW.EXPEDITION_TEAMS ? [`チームを ふやす（${money(price)}）`] : []), 'もどる'];
+            ask(`遠征所（チーム ${t().expTeams}/${TW.EXPEDITION_TEAMS}）\nクリアした ダンジョンへ 仲間だけで 行ってくる。実際の 時間が たつと 帰ってくる`, opts, i => {
+                if (i < t().expTeams) return list[i] ? teamInfo(list[i]) : newTeam([]);
+                if (opts[i].startsWith('チームを ふやす')) {
+                    if (p().money < price) return say(`お金が たりない。（${money(price)} いる）`);
+                    p().money -= price;
+                    t().expTeams++;
+                    save();
+                    return expedition();
+                }
+                menu();
+            });
+        }
+        function teamInfo(x) {
+            ask(`${DG.byId(x.dungeon).name}へ 遠征中　${leftText(x.end)}\n${x.members.map(m => `${m.name} Lv${m.lv}`).join('・')}`, ['呼びもどす（何も 手に入らない）', 'もどる'], i => {
+                if (i !== 0) return expedition();
+                teams().splice(teams().indexOf(x), 1);
+                state.roster.unshift(...x.members.map(restoreAlly));
+                save();
+                expedition();
+            }, { list: false });
+        }
+        // 編成: 仲間を 5 人まで えらぶ → 行き先
+        function newTeam(picked) {
+            const list = homeUnits();
+            if (!clearedDungeons().length) return say('遠征できる ダンジョンが ない。（ボスを たおした ダンジョンに 行ける）');
+            if (!list.length) return say('遠征に 行ける 仲間が いない。（主人公は 行けない。特訓中の 仲間も えらべない）');
+            ask(`遠征チームを 編成する（${picked.length}/${TW.EXPEDITION_SIZE} 人）。えらぶと 入れる・はずす`,
+                [...list.map(a => `${picked.includes(a) ? '【えらんだ】' : '　　　　　'}${unitRow(a)}`), '行き先を えらぶ', 'やめる'], i => {
+                    if (i < list.length) {
+                        const a = list[i];
+                        if (picked.includes(a)) picked.splice(picked.indexOf(a), 1);
+                        else if (picked.length < TW.EXPEDITION_SIZE) picked.push(a);
+                        return newTeam(picked);
+                    }
+                    if (i > list.length) return expedition();
+                    if (!picked.length) return ask('1 人は えらんでね。', ['もどる'], () => newTeam(picked), { list: false });
+                    const ds = clearedDungeons();
+                    ask('どこへ 遠征する？', [...ds.map(d => `${d.name}（${d.floors} 階）　${TW.expeditionMinutes(d)} 分`), 'もどる'], j => {
+                        if (j >= ds.length) return newTeam(picked);
+                        const d = ds[j];
+                        picked.forEach(takeOut);
+                        const start = nowMs();
+                        teams().push({ dungeon: d.id, members: picked.map(unitData), start, end: start + TW.expeditionMinutes(d) * MIN, seed: (start ^ t().seed ^ (d.floors * 7919)) >>> 0 });
+                        save();
+                        say(`${picked.map(a => a.name).join('・')}が ${d.name}へ 出発した！（${TW.expeditionMinutes(d)} 分）\n帰ってきたら、手に入れた 道具は 倉庫に 入る。`);
+                    });
+                });
+        }
 
         // ----- ダンジョンの中から (クエストの進み具合) -----
         function questReached(q) {
@@ -1306,7 +1504,16 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
         }
 
         // ----- セーブ (仕様書 16章。localStorage) -----
-        const unitData = u => ({ kind: u.kind, name: u.name, role: u.role, lv: u.lv, exp: u.exp, hp: u.hp, skills: u.skills, gear: u.gear || null });
+        const unitData = u => ({ kind: u.kind, name: u.name, role: u.role, lv: u.lv, exp: u.exp, hp: u.hp, skills: u.skills, gear: u.gear || null,
+            bonus: u.bonus || null, extra: u.extra || null });
+        // セーブ・特訓・遠征の データから 仲間を 作りなおす
+        function restoreAlly(d) {
+            const a = g.makeAlly(d.kind, d.lv);
+            Object.assign(a, { name: d.name, exp: d.exp, skills: d.skills, gear: d.gear || null, bonus: d.bonus || null, extra: d.extra || null });
+            g.recalc(a);
+            a.hp = a.stats.hp;
+            return a;
+        }
         // セーブは バージョンごとに 1 つずつ (氷隊・鬼鬼団。2026-10-22 ユーザー指定)。前の版の セーブ (SAVE_KEY) は バージョンの ほうへ 移す
         const slotKey = v => `${SAVE_KEY}-${v}`;
         const SLOTS = ['koori', 'onioni'];
@@ -1367,13 +1574,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             g.recalc(hero);
             hero.hp = Math.min(h.hp || hero.stats.hp, hero.stats.hp);
             state.player = hero;
-            const ally = d => {
-                const a = g.makeAlly(d.kind, d.lv);
-                Object.assign(a, { name: d.name, exp: d.exp, skills: d.skills, gear: d.gear || null });
-                g.recalc(a);
-                a.hp = a.stats.hp;
-                return a;
-            };
+            const ally = restoreAlly;
             state.allies = data.allies.map(ally);
             state.roster = data.roster.map(ally);
             state.tactic = data.tactic || 'fight';
@@ -2307,8 +2508,13 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             ctx.fillRect(0, 0, W, H);
             drawWeather(ctx, now, W, H, 'back');
             // 建物 (5 × 2)
+            // 6 × 2 (特訓場・遠征所を 足したので 少し 小さく)
             PLACES.forEach((pl, i) => {
-                const x = 12 + (i % 5) * 74, y = 30 + Math.floor(i / 5) * 62;
+                const x = 2 + (i % 6) * 63.5, y = 30 + Math.floor(i / 6) * 62;
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.scale(0.96, 1);
+                ctx.translate(-x, -y);
                 const on = pick === i && state.phase === 'town';
                 const locked = !isOpen(pl.id);
                 ctx.globalAlpha = locked ? 0.35 : 1;
@@ -2338,6 +2544,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                 ctx.fillText(pl.name, x + 32, y + 52);
                 ctx.lineWidth = 1;
                 ctx.globalAlpha = 1;
+                ctx.restore();
             });
             ctx.textAlign = 'left';
             drawStreet(ctx, now, W);

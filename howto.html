@@ -176,7 +176,7 @@
 <script src="js/enemies9.js?v=9dffc81b"></script>
 <script src="js/enemies10.js?v=5cfe54c6"></script>
 <script src="js/enemies11.js?v=4cd5c7ea"></script>
-<script src="js/town.js?v=0f40ec1c"></script>
+<script src="js/town.js?v=a48ca047"></script>
 <script>
 // 天気の わざの 倍率 (js/town.js の WEATHERS。2026-10-22)
 document.getElementById('weathers').textContent = Object.values(KD.Town.WEATHERS).map(w => `${w.name}＝${KD.Town.weatherText(w)}`).join('／');
@@ -201,7 +201,9 @@ document.getElementById('weathers').textContent = Object.values(KD.Town.WEATHERS
         debt: ['借金返済所', '借金を返す。返すと BP（おにおに）'], tree: ['バトルツリー', 'BP で 能力アップ・役職の開放と切りかえ'],
         shop: ['お店', '道具を 買う・売る（ともいし）'], smith: ['鍛冶屋', '敵が落とした素材で 武器や道具を作る'],
         trade: ['交易所', '珍しい道具・ほかの探検隊の出品・自分の出品'], storage: ['倉庫', '道具とお金を あずける（倒れても なくならない）'],
-        plaza: ['仲間の広場', '連れていく仲間をえらぶ・並べかえ・進化・お別れ'], home: ['家', 'セーブ・1 日すすめる・図鑑と実績']
+        plaza: ['仲間の広場', '連れていく仲間をえらぶ・並べかえ・進化・お別れ・ステータスと装備・わざの付け替え'],
+        training: ['特訓場', 'コーチと 特訓する 仲間を 1 体ずつ。実際の 時間が たつと Lv と 能力が 上がる（ときどき コーチの わざを 受け継ぐ）'],
+        expedition: ['遠征所', 'クリアした ダンジョンへ 仲間 5 体の チームを 送る。実際の 時間が たつと けいけんち・お金・道具（倉庫へ）。チームは お金で 3 つまで'], home: ['家', 'セーブ・1 日すすめる・図鑑と実績']
     };
     table('places', ['施設', 'できること', '開く'], Object.entries(PLACE_NOTES).map(([id, [name, note]]) =>
         [name, note, TW.UNLOCK[id] ? `借金を ${money(TW.UNLOCK[id])} 返すと` : 'はじめから']));
