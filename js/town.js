@@ -46,6 +46,28 @@
         koori: { attacker: 'shitenno', healer: 'koori_oasis', defender: 'koori_wall', jammer: 'diamond_dust', supporter: 'koori_map' },
         onioni: { attacker: 'oni_kishin', healer: 'oni_kanbyo', defender: 'oni_niou', jammer: 'oni_gyoso', supporter: 'oni_takara' }
     };
+    // 枝の のばした ところ (2026-10-23 ユーザー指定: ステータスや わざを もっと 覚える。中身は Claude の 案)。
+    //   奥義の 先に 能力アップ → わざ → 能力アップ → わざ → 大きな 能力アップ。
+    //   わざは 役職の 汎用わざ (allies.js の GENERIC) で、どの 役職の ときでも 使える
+    const EXTEND_STATS = {
+        attacker: [{ atk: 4 }, { atk: 4, spa: 3 }, { atk: 6, spa: 5, hp: 10 }],
+        healer: [{ hp: 10 }, { hp: 10, spd: 4 }, { hp: 20, spd: 5, spa: 3 }],
+        defender: [{ def: 4 }, { hp: 12, def: 4 }, { hp: 15, def: 7, spd: 4 }],
+        jammer: [{ spa: 4 }, { spa: 4, spd: 3 }, { spa: 7, spd: 4, atk: 3 }],
+        supporter: [{ hp: 8, spd: 2 }, { hp: 8, def: 3 }, { hp: 15, atk: 3, def: 3, spd: 3 }]
+    };
+    const EXTEND_SKILLS = {
+        attacker: ['hissatsu', 'abaremawaru'], healer: ['megumi', 'negai_hoshi'], defender: ['teppeki', 'tetsu_kabe'],
+        jammer: ['saimin', 'panic'], supporter: ['michishirube', 'neraiuchi']
+    };
+    // いちばん 外の 輪 (となりの どちらかの 枝の 6 マスめから): 能力アップと、どの 役職でも 使える わざ
+    const OUTER = [
+        { id: 'o1', between: ['attacker', 'healer'], stats: { hp: 15 } },
+        { id: 'o2', between: ['healer', 'defender'], skill: 'megaton_kick' },
+        { id: 'o3', between: ['defender', 'jammer'], stats: { atk: 3, def: 3, spa: 3, spd: 3 } },
+        { id: 'o4', between: ['jammer', 'supporter'], skill: 'speed_star' },
+        { id: 'o5', between: ['supporter', 'attacker'], stats: { hp: 10, atk: 4, spa: 4 } }
+    ];
     const COMMON = [
         { id: 'c1', between: ['attacker', 'healer'], stats: { hp: 8 } },
         { id: 'c2', between: ['healer', 'defender'], stats: { def: 2, spd: 2 } },
@@ -65,6 +87,19 @@
             nodes.push({ id: `${r}3`, type: 'skill', role: r, skill: U.ROLES[r].skill, cost: 3, req: [`${r}2`], ...at(3) });
             nodes.push({ id: `${r}4`, type: 'stat', role: r, stats: BRANCH_STATS[r][1], cost: 3, req: [`${r}3`], ...at(4) });
             nodes.push({ id: `${r}5`, type: 'skill', role: r, skill: OUGI[hero][r], ougi: true, cost: 6, req: [`${r}4`], ...at(5) });
+            // のばした ところ (free: どの 役職でも 使える わざ)
+            const [s6, s8, s10] = EXTEND_STATS[r], [k7, k9] = EXTEND_SKILLS[r];
+            nodes.push({ id: `${r}6`, type: 'stat', role: r, stats: s6, cost: 3, req: [`${r}5`], ...at(6) });
+            nodes.push({ id: `${r}7`, type: 'skill', role: r, skill: k7, free: true, cost: 4, req: [`${r}6`], ...at(7) });
+            nodes.push({ id: `${r}8`, type: 'stat', role: r, stats: s8, cost: 4, req: [`${r}7`], ...at(8) });
+            nodes.push({ id: `${r}9`, type: 'skill', role: r, skill: k9, free: true, cost: 5, req: [`${r}8`], ...at(9) });
+            nodes.push({ id: `${r}10`, type: 'stat', role: r, stats: s10, cost: 6, req: [`${r}9`], ...at(10) });
+        });
+        OUTER.forEach(c => {
+            const i = ROLE_ORDER.indexOf(c.between[0]);
+            const a = -Math.PI / 2 + (i + 0.5) * Math.PI * 2 / 5;
+            const base = { id: c.id, cost: c.skill ? 5 : 4, req: c.between.map(r => `${r}6`), any: true, x: Math.cos(a) * 7.5, y: Math.sin(a) * 7.5 };
+            nodes.push(c.skill ? { ...base, type: 'skill', skill: c.skill, free: true } : { ...base, type: 'stat', stats: c.stats });
         });
         COMMON.forEach(c => {
             const i = ROLE_ORDER.indexOf(c.between[0]);
@@ -94,8 +129,8 @@
     }
 
     const rolesOpen = tree => ROLE_ORDER.filter(r => tree.includes(`${r}1`));
-    // いまの役職で使える、ツリーのわざ
-    const treeSkills = (hero, tree, role) => treeNodes(hero).filter(n => n.type === 'skill' && n.role === role && tree.includes(n.id)).map(n => n.skill);
+    // いまの役職で使える、ツリーのわざ (free の わざは どの 役職でも)
+    const treeSkills = (hero, tree, role) => treeNodes(hero).filter(n => n.type === 'skill' && (n.free || n.role === role) && tree.includes(n.id)).map(n => n.skill);
 
     function nodeText(n) {
         const label = { hp: 'HP', atk: 'こうげき', def: 'ぼうぎょ', spa: 'とくこう', spd: 'とくぼう' };

@@ -411,3 +411,49 @@ test('広場: 主人公と 仲間の ステータス・装備を 見られ、町
     choose('もどる');
     assert.match(asks[0].message, /おにおに/, '仲間の 画面に もどる');
 });
+
+test('バトルツリー: 奥義の 先に 5 マス・外の 輪 5 マス。のばした わざは どの 役職でも 使える', () => {
+    const TW = globalThis.KD.Town, U = globalThis.KD.Units;
+    for (const hero of ['koori', 'onioni']) {
+        const nodes = TW.treeNodes(hero);
+        assert.equal(nodes.length, 1 + 5 * 10 + 5 + 5, 'まんなか + 枝 10 マス × 5 + 間 5 + 外の 輪 5');
+        nodes.forEach(n => {
+            assert.ok(n.req.every(r => nodes.some(m => m.id === r)), `${n.id} の 前の マスが ある`);
+            if (n.type === 'skill') assert.ok(U.SKILLS[n.skill], `${n.id} の わざ ${n.skill}`);
+        });
+        assert.ok(nodes.filter(n => n.free).every(n => !U.SKILLS[n.skill].role), 'のばした わざは 役職に しばられない');
+    }
+    const nodes = TW.treeNodes('koori');
+    // 奥義を 開放していないと 6 マスめは 開放できない。開放すると 7 マスめ (わざ) が 役職に 関係なく 使える
+    const tree = [...TW.TREE_START, 'healer1', 'healer2', 'healer3', 'healer4', 'healer5'];
+    assert.equal(TW.canUnlock(nodes.find(n => n.id === 'healer6'), tree.slice(0, -1)), false);
+    assert.equal(TW.canUnlock(nodes.find(n => n.id === 'healer6'), tree), true);
+    assert.equal(TW.canUnlock(nodes.find(n => n.id === 'o1'), tree), false, '外の 輪は 6 マスめから');
+    tree.push('healer6', 'healer7');
+    assert.equal(TW.canUnlock(nodes.find(n => n.id === 'o1'), tree), true);
+    assert.ok(TW.treeSkills('koori', tree, 'attacker').includes('megumi'), 'アタッカーでも めぐみのあめ');
+    assert.ok(!TW.treeSkills('koori', tree, 'attacker').includes('heal'), '役職の わざは その 役職だけ');
+    const before = TW.treeStats('koori', [...TW.TREE_START]).hp;
+    assert.equal(TW.treeStats('koori', tree).hp - before, 6 + 6 + 10, 'のばした 能力アップも 入る');
+});
+
+test('ストーリーを クリアした 主人公だけ わざを 6 つまで 覚えられる (仲間は 4 つ)', () => {
+    const { game, s, run, choose, asks } = setup({ partner: true });
+    const p = s.player;
+    assert.equal(game.maxSkills(p), 4);
+    s.town = { storyEnd: true };
+    assert.equal(game.maxSkills(p), 6);
+    assert.equal(game.maxSkills(s.allies[0]), 4, 'おにおに (仲間) は 4 つ');
+    p.skills = ['koori_sword', 'koori_breath', 'renzoku', 'todome'].map(globalThis.KD.Units.newSkill);
+    game.learnNow(p, 'mouda');
+    game.learnNow(p, 'senpu');
+    assert.equal(p.skills.length, 6, '聞かずに 6 つめまで 覚える');
+    game.learnNow(p, 'hissatsu');
+    assert.match(asks[0].message, /忘れますか/, '7 つめは 聞く');
+    choose('ひっさつのいちげきを 覚えない');
+    // 5・6 つめの わざも 使える
+    game.useSkill(5);
+    run(800);
+    assert.ok(s.messages.some(m => /せんぷうぎり/.test(m.text)));
+    assert.equal(game.skills().length, 6, 'ボタンも 6 つ');
+});

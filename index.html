@@ -18,7 +18,7 @@
     </div>
     <!-- ダンジョンの外 (タイトル・町・ストーリー) では、聞く画面を ここへ 移す (ゲーム画面に 重ねない。main.js) -->
     <div id="ask-slot" class="ask-slot"></div>
-    <!-- わざ (キーボードは 1〜4)。main.js が作る -->
+    <!-- わざ (キーボードは 1〜6。5・6 は ストーリーを クリアした 主人公)。main.js が作る -->
     <div id="skills" class="skills" aria-label="わざ"></div>
     <!-- スマホの操作 (仕様書 15章)。十字ボタンは長押しでダッシュ -->
     <div class="pad" aria-label="操作">
@@ -45,12 +45,12 @@
             <button type="button" id="btn-status">ステータス</button>
         </div>
     </div>
-    <p class="keys">移動：矢印キー・テンキー（斜めは矢印を2つ同時か、Shift を押しながら）／ダッシュ：B を押しながら移動／向きだけ変える：R を押しながら方向／攻撃・決定：Z・Enter（階段の上なら降りる）／わざ：1〜4／道具：X／仲間の作戦：T／操作するキャラの交代：C／必殺技：V（1 人 1 回・チームで 3 回）／足ぶみ：Space／戻る：X・Esc／ステータス・装備：E／ミニマップ：M／音のオン・オフ：S（「音」ボタンで 音量）</p>
+    <p class="keys">移動：矢印キー・テンキー（斜めは矢印を2つ同時か、Shift を押しながら）／ダッシュ：B を押しながら移動／向きだけ変える：R を押しながら方向／攻撃・決定：Z・Enter（階段の上なら降りる）／わざ：1〜4（ストーリーをクリアした主人公は 1〜6）／道具：X／仲間の作戦：T／操作するキャラの交代：C／必殺技：V（1 人 1 回・チームで 3 回）／足ぶみ：Space／戻る：X・Esc／ステータス・装備：E／ミニマップ：M／音のオン・オフ：S（「音」ボタンで 音量）</p>
 </main>
 <!-- ファイルを直接開いても動くように、モジュールではなく順に読むスクリプトにしている -->
 <script src="js/rng.js?v=d477476e"></script>
 <script src="js/dungeon.js?v=55371617"></script>
-<script src="js/units.js?v=61fa43f8"></script>
+<script src="js/units.js?v=42921896"></script>
 <script src="js/enemies.js?v=64281f04"></script>
 <script src="js/items.js?v=d842a7c1"></script>
 <script src="js/dungeons.js?v=87bf375c"></script>
@@ -59,7 +59,7 @@
 <script src="js/enemies9.js?v=9dffc81b"></script>
 <script src="js/enemies10.js?v=5cfe54c6"></script>
 <script src="js/enemies11.js?v=4cd5c7ea"></script>
-<script src="js/town.js?v=e0fca5cd"></script>
+<script src="js/town.js?v=0f40ec1c"></script>
 <script src="js/art.js?v=8d1ac01c"></script>
 <script src="js/bigart.js?v=8b50860b"></script>
 <script src="js/enemyart.js?v=4369f873"></script>
@@ -71,8 +71,8 @@
 <script src="js/sound.js?v=5ba6fc22"></script>
 <script src="js/config.js?v=3f3ca9fb"></script>
 <script src="js/market.js?v=d35a16b0"></script>
-<script src="js/townui.js?v=ffd068ae"></script>
-<script src="js/game.js?v=384b7bbc"></script>
-<script src="js/main.js?v=2740498f"></script>
+<script src="js/townui.js?v=b3242f22"></script>
+<script src="js/game.js?v=7683e0ad"></script>
+<script src="js/main.js?v=43811346"></script>
 </body>
 </html>

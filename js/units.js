@@ -76,6 +76,7 @@
         habataki: { name: 'はばたき', element: 'かぜ', range: 'line', power: 0.9, acc: 0.9, pp: 15 }
     };
     const MAX_SKILLS = 4;
+    const HERO_MAX_SKILLS = 6;   // ストーリーを クリアした 主人公 (2026-10-23 ユーザー指定)
 
     // ----- 役職 (仕様書 6.3) -----
     //   mod: 能力の変わり方 (1.2 = +20%)。speed: すばやさの段階 (+1 はやい = 2 回に 1 回だけ敵が動く / -1 おそい = 敵が 2 回動く)
@@ -219,7 +220,7 @@
     const damage = (rng, atk, def) => hitDamage(rng, atk, def).dmg;
 
     KD.Units = {
-        ELEMENTS, CHART, effect, STATUS, SKILLS, MAX_SKILLS, ROLES, ROLE_IDS, roleText, HEROES, ENEMIES, FOREST_TABLE, HIT,
+        ELEMENTS, CHART, effect, STATUS, SKILLS, MAX_SKILLS, HERO_MAX_SKILLS, ROLES, ROLE_IDS, roleText, HEROES, ENEMIES, FOREST_TABLE, HIT,
         heroStats, enemyStats, allyStats, enemyAllySkills, startSkills, newSkill, learnedBetween, expToNext, gainExp, hitDamage, damage
     };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);

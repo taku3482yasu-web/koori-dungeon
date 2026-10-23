@@ -283,6 +283,8 @@
                 if (state.allies.length < g.partyMax() - 1) state.allies.push(a);
                 else state.roster.push(a);
             }
+            // ストーリーを クリアすると 主人公は わざを 6 つまで 覚えられる (2026-10-23 ユーザー指定)
+            if (st.last && !town.storyEnd) g.toast(`${p().name}は わざを ${U.HERO_MAX_SKILLS} つまで 覚えられるように なった！`);
             if (st.last) town.storyEnd = true;
             refreshDay();
             save();
@@ -603,7 +605,7 @@
                 hero.hp = hero.stats.hp;
                 save();
                 const after = () => ask(`「${TW.nodeText(n)}」を 開放した！`, ['もどる'], unlock, { list: false });
-                if (n.type === 'skill' && n.role === hero.role) return g.learnNow(hero, n.skill, after);
+                if (n.type === 'skill' && (n.free || n.role === hero.role)) return g.learnNow(hero, n.skill, after);
                 after();
             }, { place: 'bottom' });
         }
@@ -2386,9 +2388,9 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             const hero = p();
             const nodes = TW.treeNodes(hero.kind);
             const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
-            // 下のえらぶ画面に かくれないよう、上のほうに小さく
-            const cx = W / 2, cy = 80, k = 12;
-            const pos = n => [cx + n.x * k * 2.2, cy + n.y * k];
+            // 下のえらぶ画面に かくれないよう、上のほうに小さく (枝を のばしたので 1 マスを 小さめに。2026-10-23)
+            const cx = W / 2, cy = 86, k = 7;
+            const pos = n => [cx + n.x * k * 2.2, cy + n.y * k * 1.05];
             ctx.strokeStyle = '#2a5a4a';
             nodes.forEach(n => n.req.forEach(r => {
                 const [x1, y1] = pos(n), [x2, y2] = pos(byId[r]);
@@ -2402,22 +2404,25 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                 const has = hero.tree.includes(n.id), can = TW.canUnlock(n, hero.tree);
                 ctx.fillStyle = has ? '#ffd84a' : can ? '#1a4a5a' : '#2a3a34';
                 ctx.beginPath();
-                ctx.arc(x, y, n.type === 'core' ? 7 : n.ougi ? 6 : 4, 0, Math.PI * 2);
+                ctx.arc(x, y, n.type === 'core' ? 7 : n.ougi ? 5 : n.type === 'skill' ? 3.5 : 3, 0, Math.PI * 2);
                 ctx.fill();
                 if (can) {
                     ctx.strokeStyle = '#7affff';
                     ctx.stroke();
                 }
-                // 枝の先に、役職の名前と奥義の名前
-                if (n.ougi) {
-                    const [ox, oy] = [Math.sign(Math.round(n.x * 10)) * 4, n.y > 0.1 ? 9 : -14];
+                // 枝の先 (10 マスめ) に、役職の名前と奥義の名前 (まっすぐ上の 枝は 右に)
+                if (n.id === `${n.role}10`) {
+                    const ougi = byId[`${n.role}5`];
+                    const up = Math.abs(n.x) < 0.5;
+                    // 横の 枝は 画面から はみ出さないよう 内がわへ (上の 枝は 先の 上、下の 枝は 先の 下)
+                    const [ox, oy] = up ? [7, -3] : [Math.sign(n.x) * 4, n.y > 0.1 ? 9 : -18];
                     ctx.font = `bold 8px ${FONT}`;
-                    ctx.textAlign = n.x > 0.5 ? 'left' : n.x < -0.5 ? 'right' : 'center';
+                    ctx.textAlign = up || n.x < 0 ? 'left' : 'right';
                     ctx.fillStyle = n.role === hero.role ? '#ffe680' : '#c8d8e8';
                     ctx.fillText(U.ROLES[n.role].name, x + ox, y + oy);
                     ctx.font = `7px ${FONT}`;
-                    ctx.fillStyle = has ? '#ffd84a' : '#8aa898';
-                    ctx.fillText(U.SKILLS[n.skill].name, x + ox, y + oy + 8);
+                    ctx.fillStyle = hero.tree.includes(ougi.id) ? '#ffd84a' : '#8aa898';
+                    ctx.fillText(`奥義 ${U.SKILLS[ougi.skill].name}`, x + ox, y + oy + 8);
                 }
             });
             if (hero) A.drawSprite(ctx, hero.kind, Math.floor(now / 400) % 2, cx - 8, cy - 10);

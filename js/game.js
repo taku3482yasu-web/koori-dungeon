@@ -1775,10 +1775,13 @@
             }
         }
 
-        // わざを覚える。4 つ持っていたら、どれかを忘れるか聞く (仕様書 7章)
+        // 覚えられる わざの 数: 4 つ。ストーリーを クリアした 主人公だけ 6 つ (2026-10-23 ユーザー指定)
+        const maxSkills = u => (u.hero && state.town && state.town.storyEnd ? U.HERO_MAX_SKILLS : U.MAX_SKILLS);
+
+        // わざを覚える。いっぱいなら、どれかを忘れるか聞く (仕様書 7章)
         function learn(p, id) {
             if (p.skills.some(s => s.id === id)) return;
-            if (p.skills.length < U.MAX_SKILLS) return learnNow(p, id);
+            if (p.skills.length < maxSkills(p)) return learnNow(p, id);
             state.queue.push(() => {
                 learnNow(p, id);
                 return 0;
@@ -1789,7 +1792,7 @@
         function learnNow(p, id, done = () => {}) {
             const name = U.SKILLS[id].name;
             if (p.skills.some(s => s.id === id)) return done();
-            if (p.skills.length < U.MAX_SKILLS) {
+            if (p.skills.length < maxSkills(p)) {
                 p.skills.push(U.newSkill(id));
                 say(`${p.name}は ${name}を 覚えた！`);
                 return done();
@@ -3239,7 +3242,7 @@
         const town = KD.createTown({
             state, opts, say, later,
             selectHero, makeHero, makeAlly, recalc, learnNow, startDungeon, resume, resumeSnap, snapshot, backToTown, partyMax, talk, toast, evolve, heroUnit, backToHero,
-            healAll, drawStatus
+            healAll, drawStatus, maxSkills
         }, ui);
 
         if (opts.start === 'dungeon') {
@@ -3250,7 +3253,7 @@
         } else town.title();
         return {
             state, town, draw, moveInput, wait, confirm, attack: attackFront, useSkill, itemMenu, tacticMenu, specialMenu, specialFor, busy, makeEnemy, makeAlly, evolve, startDungeon, switchTo, switchMenu, heroUnit, snapshot, autosave, spawnBoss,
-            statusMenu, equipMenu, equip, unequip, recalc, healAll, resumeSnap,
+            statusMenu, equipMenu, equip, unequip, recalc, healAll, resumeSnap, maxSkills, learnNow,
             skills: () => (state.player && state.phase === 'play' ? state.player.skills.map(skillLabel) : []),
             toggleMinimap() { state.mini = !state.mini; },
             // 「音」ボタン: 音の設定 (音量・オン・オフ。2026-10-22 ユーザー指定)。S キーは これまでどおり オン・オフだけ

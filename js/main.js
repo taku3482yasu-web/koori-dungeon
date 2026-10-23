@@ -4,7 +4,7 @@
 // 仕様書 15章:
 //   移動: 矢印キー・テンキー (斜めはテンキーか、矢印を2つ同時に。Shift を押しているあいだは斜めだけ)
 //   ダッシュ: B を押しながら移動 / 向きだけ変える: R を押しながら方向 / 足踏み: Space / 操作するキャラの交代: C
-//   攻撃・決定: Z・Enter (階段の上なら「降りますか？」) / わざ: 1〜4 / 道具: X (えらぶ画面では戻る) / 作戦: T / 戻る: Esc / ミニマップ: M / 音: S
+//   攻撃・決定: Z・Enter (階段の上なら「降りますか？」) / わざ: 1〜6 (6 つは クリア後の 主人公) / 道具: X (えらぶ画面では戻る) / 作戦: T / 戻る: Esc / ミニマップ: M / 音: S
 //   スマホ: 十字ボタン (斜めあり。長押しでダッシュ)・攻撃・道具・作戦・足踏み・ミニマップ・音・わざのボタン
 //   クリック・タップ (2026-10-22 ユーザー指定): ボタンは 押した瞬間に反応する (すぐ離しても 1 歩動く)。
 //     ゲーム画面を押すと、主人公 (画面のまんなか) から見た その方向へ 1 歩。押しっぱなしで 歩きつづける。主人公を押すと 攻撃・決定
@@ -187,7 +187,7 @@
             else if (k === 'KeyV' && !e.repeat) game.specialMenu();   // 必殺技 (2026-10-22)
             else if (k === 'KeyS' && !e.repeat) game.toggleSound();
             else if (k === 'KeyE' && !e.repeat) game.statusMenu();   // ステータス・装備 (2026-10-23)
-            else if (/^(Digit|Numpad)[1-4]$/.test(k) && !e.repeat && !NUMPAD[k]) game.useSkill(Number(k.slice(-1)) - 1);
+            else if (/^(Digit|Numpad)[1-6]$/.test(k) && !e.repeat && !NUMPAD[k]) game.useSkill(Number(k.slice(-1)) - 1);
         });
         window.addEventListener('keyup', e => {
             const k = e.code;
