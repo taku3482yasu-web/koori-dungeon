@@ -210,7 +210,15 @@
         }
         // 主人公の 操作に もどす (町に戻るとき・セーブのとき)
         // (仲間を 操作しているときに 主人公が たおれても、町では 主人公の 操作に もどす。2026-10-23)
-        const backToHero = () => { if (!state.player.hero) switchTo(heroUnit(), true, true); };
+        //   主人公が たおれて 列から はずれていたら、列に もどしてから 切りかえる
+        const backToHero = () => {
+            const h = heroUnit();
+            if (state.fallen.includes(h)) {
+                state.fallen.splice(state.fallen.indexOf(h), 1);
+                state.allies.push(h);
+            }
+            if (!state.player.hero) switchTo(h, true, true);
+        };
         // 一緒に行ける人数 (ストーリーで ふえる。仕様書 8章)
         const partyMax = () => DG.partyMax(state.town ? state.town.cleared || 0 : 0);
         // 装備は キャラごとに 1 つ (u.gear。つけると 持ち物から なくなる。2026-10-23 ユーザー指定)
@@ -552,7 +560,7 @@
             const units = snap.party.map(d => (d.hero ? apply(hero, d) : build(d)));
             state.player = units[0];
             state.allies = units.slice(1);
-            state.fallen = (snap.fallen || []).map(build);
+            state.fallen = (snap.fallen || []).map(d => (d.hero ? apply(hero, d) : build(d)));
             if (!state.player.hero) shareTeam(state.player);
             recalc(hero);
             state.phase = 'play';
@@ -1619,16 +1627,7 @@
                 t.hp = Math.round(t.stats.hp / 2);
                 return say(`${t.name}「${U.ENEMIES[t.kind].line}」 ……復活した！`);
             }
-            if (t.hero) down();
-            else if (t === state.player) {
-                // 操作している仲間が たおれた: 次の キャラ (いっしょにいる 生きている キャラの はじめ) を 自動で 操作する。
-                //   ターンは すすまない (2026-10-23 ユーザー指定)
-                const next = state.allies.find(a => a.hp > 0) || heroUnit();
-                switchTo(next, true);
-                say(`${t.name}が たおれた！ ${next.name}を 操作する。`);
-                popup(next, '交代！', '#7fd3f7');
-                allyDown(t);
-            } else if (t.side === 'party') allyDown(t);
+            if (t.side === 'party') partyDown(t);
             else defeat(t, from);
         }
 
@@ -1806,21 +1805,39 @@
         }
 
         // 主人公がたおれた (段階 6 で町に戻るようにする。今は B1F からやり直し)
+        // 主人公・仲間が たおれた (2026-10-23 ユーザー指定: 主人公が たおれても、生きている キャラが いれば 続ける)。
+        //   主人公は ふっかつのたね・ふるカワのお守り を持っていたら 1 回だけ復活 (仕様書 9章)。
+        //   操作している キャラが たおれたら、ターンを 使わずに 次の キャラ (いっしょにいる 生きている キャラの はじめ) を 操作する。
+        //   みんな たおれたら 失敗 (町に 運ばれる)
+        function partyDown(t) {
+            if (state.over) return;
+            if (t.hero) {
+                const rv = t.bag.find(it => it.id === 'revive_seed') || t.bag.find(it => it.id === 'omamori');
+                if (rv) {
+                    t.bag.splice(t.bag.indexOf(rv), 1);
+                    t.hp = t.stats.hp;
+                    t.status = null;
+                    popup(t, '復活！', '#ffe680');
+                    return say(`${I.ITEMS[rv.id].name}の 力で 復活した！`);
+                }
+            }
+            if (!party().some(u => u !== t && u.hp > 0)) return down();
+            if (t === state.player) {
+                const next = state.allies.find(a => a.hp > 0);
+                switchTo(next, true);
+                say(`${t.name}が たおれた！ ${next.name}を 操作する。`);
+                popup(next, '交代！', '#7fd3f7');
+            }
+            allyDown(t);
+        }
+
+        // みんな たおれた: 失敗。お金は すべて、道具は 半分 なくす
         function down() {
             const p = heroUnit();
-            // ふっかつのたね・ふるカワのお守り を持っていたら 1 回だけ復活 (仕様書 9章)
-            const rv = p.bag.find(it => it.id === 'revive_seed') || p.bag.find(it => it.id === 'omamori');
-            if (rv) {
-                p.bag.splice(p.bag.indexOf(rv), 1);
-                p.hp = p.stats.hp;
-                p.status = null;
-                popup(p, '復活！', '#ffe680');
-                return say(`${I.ITEMS[rv.id].name}の 力で 復活した！`);
-            }
             state.over = true;
             state.queue.length = 0;
             dash = null;
-            say(`${p.name}は たおれてしまった…`);
+            say(party().length > 1 || state.fallen.length ? 'みんな たおれてしまった…' : `${p.name}は たおれてしまった…`);
             state.queue.push(() => 900, () => {
                 // お金はすべて、道具は半分なくす (仕様書 10章)。倉庫の物は残る
                 const lost = Math.floor(p.bag.length / 2);
@@ -3233,7 +3250,7 @@
         } else town.title();
         return {
             state, town, draw, moveInput, wait, confirm, attack: attackFront, useSkill, itemMenu, tacticMenu, specialMenu, specialFor, busy, makeEnemy, makeAlly, evolve, startDungeon, switchTo, switchMenu, heroUnit, snapshot, autosave, spawnBoss,
-            statusMenu, equipMenu, equip, unequip, recalc, healAll,
+            statusMenu, equipMenu, equip, unequip, recalc, healAll, resumeSnap,
             skills: () => (state.player && state.phase === 'play' ? state.player.skills.map(skillLabel) : []),
             toggleMinimap() { state.mini = !state.mini; },
             // 「音」ボタン: 音の設定 (音量・オン・オフ。2026-10-22 ユーザー指定)。S キーは これまでどおり オン・オフだけ

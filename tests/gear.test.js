@@ -310,7 +310,7 @@ test('操作している 仲間が たおれると、ターンを 使わずに �
     assert.equal(s.turn, turnAt, '交代で ターンは すすまない');
 });
 
-test('仲間を 操作しているときに 主人公が たおれても、町では 主人公の 操作に もどり、みんな 全回復', () => {
+test('主人公が たおれても 生きている キャラが いれば 続く。みんな たおれたら 町へ (主人公の 操作に もどり、全回復)', () => {
     const { game, s, asks, choose, run } = townGame();
     choose('ダンジョンへ');
     choose('ハリーの森');
@@ -318,33 +318,65 @@ test('仲間を 操作しているときに 主人公が たおれても、町�
     run(1500);
     asks.length = 0;
     const hero = game.heroUnit(), oni = s.allies[0];
-    game.switchTo(oni);
-    oni.hp = 3;
-    oni.skills[0].pp = 0;
     hero.bag.length = 0;
-    const e = game.makeEnemy('haribaby', 1, hero.x + 1, hero.y);
+    oni.skills[0].pp = 0;
+    const e = game.makeEnemy('haribaby', 1, 0, 0);
     Object.assign(e, { awake: true, hp: 99999 });
     e.stats.hp = 99999;
     e.stats.atk = 9999;
     s.enemies.length = 0;
     s.enemies.push(e);
-    for (let i = 0; i < 40 && s.phase === 'play' && !s.over && s.map; i++) {
-        const [dx, dy] = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([x, y]) => D.walkable(s.map, hero.x + x, hero.y + y) && !s.allies.concat(s.player).some(a => a.x === hero.x + x && a.y === hero.y + y));
-        e.x = e.fx = hero.x + dx;
-        e.y = e.fy = hero.y + dy;
-        hero.hp = 1;
-        if (!game.busy()) game.wait();
-        run(600);
-        while (asks.length) asks.shift().done(0);
-    }
+    // 敵を victim の となりに 置いて、たおれるまで ターンを すすめる
+    const beat = (victim, until) => {
+        for (let i = 0; i < 40 && !until() && s.map && !s.over; i++) {
+            const [dx, dy] = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([x, y]) => D.walkable(s.map, victim.x + x, victim.y + y) && !s.allies.concat(s.player).some(a => a.x === victim.x + x && a.y === victim.y + y));
+            e.x = e.fx = victim.x + dx;
+            e.y = e.fy = victim.y + dy;
+            if (!game.busy()) game.wait();
+            run(600);
+            while (asks.length) asks.shift().done(0);
+        }
+    };
+    // 1. 主人公 (操作している) が たおれる → おにおにを 操作して 続く (おにおには たおれないように)
+    oni.hp = 1e9;
+    beat(hero, () => hero.hp <= 0);
+    run(600);
+    assert.equal(s.phase, 'play', '失敗に ならない');
+    assert.equal(s.over, false);
+    assert.equal(s.player, oni, 'おにおにを 操作する');
+    assert.ok(s.fallen.includes(hero) && !s.allies.includes(hero), '主人公は たおれた 列へ');
+    assert.ok(s.messages.some(m => /こおりくんが たおれた！ おにおにを 操作する/.test(m.text)));
+    assert.equal(oni.bag, hero.bag, '道具袋は そのまま 使える');
+    // 2. おにおにも たおれる → みんな たおれたので 町へ
+    oni.hp = 1;
+    beat(oni, () => s.over);
     run(3000);
     assert.equal(s.phase, 'town', s.messages.slice(-5).map(m => m.text).join(' / '));
     assert.equal(s.player, hero, '主人公の 操作に もどった');
-    assert.ok(!s.allies.includes(hero), '主人公は 仲間の 列に 残らない');
+    assert.ok(!s.allies.includes(hero) && !s.fallen.includes(hero), '主人公は 仲間の 列に 残らない');
     assert.ok(s.allies.includes(oni));
     assert.equal(hero.hp, hero.stats.hp, '主人公 全回復');
     assert.equal(oni.hp, oni.stats.hp, '仲間 全回復');
     assert.equal(oni.skills[0].pp, oni.skills[0].max, 'PP も');
+});
+
+test('主人公が たおれて 仲間で 続けているときも、中断の 続きから 遊べる', () => {
+    const { game, s } = setup({ partner: true });
+    const hero = s.player, oni = s.allies[0];
+    game.switchTo(oni);
+    s.allies.splice(s.allies.indexOf(hero), 1);
+    hero.hp = 0;
+    s.fallen.push(hero);
+    const snap = game.snapshot();
+    assert.ok(snap.fallen.some(d => d.hero));
+    // 読み込みと 同じ: セーブから 作った 主人公を 操作している ところへ 続きを 入れる
+    s.player = hero;
+    s.allies = [];
+    s.fallen = [];
+    game.resumeSnap(snap);
+    assert.equal(game.heroUnit(), hero, '主人公は 同じ もの (道具袋など)');
+    assert.ok(s.fallen.includes(hero));
+    assert.equal(s.player.kind, 'onioni');
 });
 
 test('広場: 主人公と 仲間の ステータス・装備を 見られ、町でも 装備を つけ外し できる', () => {

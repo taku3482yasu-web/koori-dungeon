@@ -351,7 +351,7 @@ test('ダンジョンで倒れると町へ。お金はなくなり、借金に�
     e.awake = true;
     e.stats.atk = 99;
     s.enemies.splice(0, s.enemies.length, e);
-    s.allies.forEach(a => { a.x = a.y = 1; });
+    s.fallen.push(...s.allies.splice(0));   // 仲間は もう たおれている (みんな たおれると 失敗)
     for (let i = 0; i < 30 && s.phase === 'play'; i++) { game.wait(); run(1500); }
     assert.equal(s.phase, 'town');
     assert.match(asks[0].message, /利子/);
