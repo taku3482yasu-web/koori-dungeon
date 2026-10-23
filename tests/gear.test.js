@@ -457,3 +457,62 @@ test('ストーリーを クリアした 主人公だけ わざを 6 つまで �
     assert.ok(s.messages.some(m => /せんぷうぎり/.test(m.text)));
     assert.equal(game.skills().length, 6, 'ボタンも 6 つ');
 });
+
+test('わざの 説明: どの わざも 威力・命中・PP を 出せる', () => {
+    const U = globalThis.KD.Units;
+    for (const id of Object.keys(U.SKILLS)) {
+        const t = U.skillShort(id);
+        assert.match(t, /PP \d+/, `${id}: ${t}`);
+        assert.ok(!/undefined|NaN/.test(U.skillFull(id)), `${id}: ${U.skillFull(id)}`);
+    }
+    assert.match(U.skillShort('el_tsurara'), /こおり・直線　威力 \d+・命中 \d+%・PP \d+/);
+    assert.match(U.skillShort('heal'), /回復 40%.*ヒーラーのときだけ/);
+});
+
+test('わざを 覚えるとき: 新しい わざと いまの わざの 威力・PP を 出す', () => {
+    const { game, s, asks, choose } = setup();
+    const p = s.player;
+    p.skills = ['koori_sword', 'koori_breath', 'renzoku', 'todome'].map(globalThis.KD.Units.newSkill);
+    game.learnNow(p, 'mouda');
+    assert.match(asks[0].message, /もうだ　ふつう・正面　威力 160・命中 90%・PP 15/);
+    assert.match(asks[0].message, /正面の敵を 強く たたく/);
+    assert.ok(asks[0].options[0].startsWith('コオリソード　こおり・正面　威力'), asks[0].options[0]);
+    choose('もうだを 覚えない');
+});
+
+test('広場: わざを 付け替える (Lv で 覚えた わざ・ツリーの わざ から えらぶ。仲間も)', () => {
+    const { s, asks, choose } = townGame();
+    const hero = s.player, U = globalThis.KD.Units;
+    hero.lv = 20;
+    hero.tree.push('attacker2', 'attacker3');   // きあいため (アタッカーの わざ)
+    const before = hero.skills.map(k => k.id);
+    choose('仲間の広場');
+    choose('（主人公）の ステータス・装備');
+    choose('わざを 付け替える');
+    assert.match(asks[0].message, /わざ（2\/4）/);
+    // 1 つめ (コオリソード) を 入れかえる → 候補に 威力・PP つき
+    choose('1. コオリソード');
+    assert.match(asks[0].message, /いまの わざ：コオリソード　こおり・正面　威力/);
+    assert.ok(asks[0].options.some(o => o.startsWith('きあいため　')), 'ツリーの わざ');
+    assert.ok(!asks[0].options.some(o => o.startsWith('コオリソード　')), '持っている わざは 出ない');
+    const pick = asks[0].options.find(o => !o.startsWith('きあいため') && !o.includes('忘れる') && o !== 'もどる');
+    choose(pick);
+    assert.equal(hero.skills[0].id, Object.keys(U.SKILLS).find(id => pick.startsWith(`${U.SKILLS[id].name}　`)));
+    // あきに 足す
+    choose('（あき）わざを 足す');
+    choose('きあいため');
+    assert.equal(hero.skills.length, 3);
+    assert.ok(hero.skills.some(k => k.id === 'kiai'));
+    // 忘れる
+    choose('3. きあいため');
+    choose('きあいためを 忘れる');
+    assert.equal(hero.skills.length, 2);
+    assert.notDeepEqual(hero.skills.map(k => k.id), before);
+    choose('もどる');
+    choose('もどる');
+    // 仲間 (おにおに) も
+    choose('おにおに');
+    choose('ステータス・装備');
+    choose('わざを 付け替える');
+    assert.match(asks[0].message, /おにおにの わざ/);
+});

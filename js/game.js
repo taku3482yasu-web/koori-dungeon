@@ -33,7 +33,7 @@
     const TACTICS = { fight: 'みんなで戦う', follow: 'ついてきて', flee: 'にげて' };
     const DIRS8 = [[0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]];
     const FONT = '"BIZ UDPGothic", "Yu Gothic", sans-serif';
-    const RANGE_NAMES = { front: '正面', line: '直線', around: '周り', self: '自分', pierce: 'つらぬく', room: '部屋の敵みんな' };
+    const RANGE_NAMES = U.RANGE_NAMES;           // わざの 範囲の 名前 (units.js)
     const ELEMENT_COLORS = { 'こおり': '#bff0ff', 'ほのお': '#ff9a4a', 'みず': '#6ab8ff', 'しぜん': '#9ae07a', 'かぜ': '#e8f4ff', 'ふしぎ': '#d8a8ff', 'ふつう': '#ffffff' };
 
     // ダンジョン 7 つ (仕様書 12章。dungeons.js)。床の道具・ワナの種類は どこも同じ
@@ -1794,10 +1794,11 @@
             if (p.skills.some(s => s.id === id)) return done();
             if (p.skills.length < maxSkills(p)) {
                 p.skills.push(U.newSkill(id));
-                say(`${p.name}は ${name}を 覚えた！`);
+                say(`${p.name}は ${name}を 覚えた！（${U.skillShort(id)}）`);
                 return done();
             }
-            ui.ask(`${p.name}は ${name}を 覚えたい！\nかわりに どれかを 忘れますか？`, [...p.skills.map(s => U.SKILLS[s.id].name), `${name}を 覚えない`], i => {
+            // 新しい わざ・いまの わざの 威力や PP も 出す (2026-10-23 ユーザー指定)
+            ui.ask(`${p.name}は ${name}を 覚えたい！\n${U.skillFull(id)}\nかわりに どれかを 忘れますか？`, [...p.skills.map(s => `${U.SKILLS[s.id].name}　${U.skillShort(s.id)}`), `${name}を 覚えない`], i => {
                 if (i >= p.skills.length) say(`${name}を 覚えなかった。`);
                 else {
                     say(`${U.SKILLS[p.skills[i].id].name}を 忘れて、${name}を 覚えた！`);

@@ -595,7 +595,8 @@
         function unlock() {
             const hero = p();
             const list = TW.treeNodes(hero.kind).filter(n => TW.canUnlock(n, hero.tree));
-            ask(`開放できるマス（BP ${t().bp}）`, [...list.map(n => `${TW.nodeText(n)}　${n.cost} BP`), 'もどる'], i => {
+            // わざの マスは 威力・PP なども 出す (2026-10-23 ユーザー指定)
+            ask(`開放できるマス（BP ${t().bp}）`, [...list.map(n => `${TW.nodeText(n)}　${n.cost} BP${n.type === 'skill' ? `　（${U.skillShort(n.skill)}）` : ''}`), 'もどる'], i => {
                 if (i >= list.length) return tree();
                 const n = list[i];
                 if (t().bp < n.cost) return ask('BP が たりない。借金を返すと BP がたまる。', ['もどる'], unlock, { list: false });
@@ -628,7 +629,7 @@
             const hero = p();
             const list = TW.treeSkills(hero.kind, hero.tree, hero.role).filter(id => !hero.skills.some(k => k.id === id));
             if (!list.length) return ask('思い出せる わざは ない。（いまの役職で開放した わざは、ぜんぶ覚えている）', ['もどる'], tree, { list: false });
-            ask('どのわざを 思い出す？', [...list.map(id => U.SKILLS[id].name), 'もどる'], i => {
+            ask('どのわざを 思い出す？', [...list.map(skillRow), 'もどる'], i => {
                 if (i >= list.length) return tree();
                 g.learnNow(hero, list[i], () => {
                     save();
@@ -1062,15 +1063,54 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
         // 上に ステータス (game.js の drawStatus)、下で 装備を つける・はずす。町では ターンは ない。
         //   つけると 持ち物から なくなり、はずすと 持ち物へ (いっぱいなら 倉庫へ)
         let statusUnit = null;
+        // ----- わざの 付け替え (広場。2026-10-23 ユーザー指定) -----
+        // 覚えられる わざ: 主人公は Lv で 覚える わざ + バトルツリーで 開放した わざ (いまの 役職で 使えるもの)、
+        //   仲間は 役職の わざ + Lv で 覚える わざ。いま 持っている わざも 入れる
+        function skillPool(u) {
+            const ids = u.hero
+                ? [...U.HEROES[u.kind].learn.filter(([lv]) => lv <= u.lv).map(([, id]) => id), ...TW.treeSkills(u.kind, u.tree || [], u.role)]
+                : [U.ROLES[u.role].skill, ...KD.Allies.learnList(u.kind).filter(([lv]) => lv <= u.lv).map(([, id]) => id), ...U.enemyAllySkills(u.kind, u.lv).map(k => k.id)];
+            return [...new Set([...u.skills.map(k => k.id), ...ids])].filter(id => U.SKILLS[id] && (!U.SKILLS[id].role || U.SKILLS[id].role === u.role));
+        }
+        const skillRow = id => `${U.SKILLS[id].name}　${U.skillShort(id)}`;
+        function skillSwap(u, back) {
+            view = 'status';
+            statusUnit = u;
+            const max = g.maxSkills(u);
+            const opts = u.skills.map((k, i) => `${i + 1}. ${skillRow(k.id)}`);
+            if (u.skills.length < max) opts.push('（あき）わざを 足す');
+            opts.push('もどる');
+            ui.ask(`${u.name}の わざ（${u.skills.length}/${max}）　入れかえる わざを えらぶ`, opts, i => {
+                if (i >= opts.length - 1) return back();
+                const slot = i < u.skills.length ? i : -1;
+                const free = skillPool(u).filter(id => !u.skills.some(k => k.id === id));
+                const cur = slot >= 0 ? u.skills[slot].id : null;
+                const list = [...free.map(skillRow), ...(cur && u.skills.length > 1 ? [`${U.SKILLS[cur].name}を 忘れる（あきにする）`] : []), 'もどる'];
+                const head = cur ? `いまの わざ：${U.skillFull(cur)}\n\nかわりに 覚える わざ` : '足す わざを えらぶ';
+                ui.ask(free.length ? head : `${head}\n（ほかに 覚えられる わざが ない。Lv を 上げるか、バトルツリーで 開放しよう）`, list, j => {
+                    if (j < free.length) {
+                        if (slot >= 0) u.skills[slot] = U.newSkill(free[j]);
+                        else u.skills.push(U.newSkill(free[j]));
+                        save();
+                    } else if (cur && j === free.length && u.skills.length > 1) {
+                        u.skills.splice(slot, 1);
+                        save();
+                    }
+                    skillSwap(u, back);
+                }, { place: 'bottom', list: true });
+            }, { place: 'bottom', list: true });
+        }
+
         function unitStatus(u, back) {
             view = 'status';
             statusUnit = u;
             const gears = p().bag.filter(it => I.ITEMS[it.id].kind === 'gear');
             const opts = gears.map(it => `つける：${I.ITEMS[it.id].name}　${I.ITEMS[it.id].note}`);
             if (u.gear) opts.push(`はずす：${I.ITEMS[u.gear.id].name}`);
-            opts.push('もどる');
+            opts.push('わざを 付け替える', 'もどる');
             const head = `${u.name}の 装備欄：${u.gear ? I.ITEMS[u.gear.id].name : 'なし'}${gears.length ? '' : '（持ち物に 装備が ない）'}`;
             ui.ask(head, opts, i => {
+                if (opts[i] === 'わざを 付け替える') return skillSwap(u, () => unitStatus(u, back));
                 if (i < gears.length) {
                     const it = gears[i];
                     p().bag.splice(p().bag.indexOf(it), 1);

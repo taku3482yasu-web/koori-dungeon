@@ -189,6 +189,26 @@
     }
     const newSkill = id => ({ id, pp: SKILLS[id].pp, max: SKILLS[id].pp });
 
+    // わざの 説明 (覚えるとき・忘れるとき・付け替えに 出す。2026-10-23 ユーザー指定)。
+    //   short: 「こおり・直線　威力 140・命中 90%・PP 15」 / full: short の あとに 何が 起きるか (note)
+    const RANGE_NAMES = { front: '正面', line: '直線', around: '周り', self: '自分', pierce: 'つらぬく', room: '部屋の敵みんな' };
+    function skillShort(id) {
+        const m = SKILLS[id];
+        const where = m.team ? '近くの仲間みんな' : RANGE_NAMES[m.range] || m.range;
+        const parts = [m.range === 'self' && !m.element ? where : `${m.element || 'ふつう'}・${where}`];
+        const nums = [];
+        if (m.power > 0) nums.push(`威力 ${Math.round(m.power * 100)}${m.hits > 1 ? ` ×${m.hits}回` : ''}`);
+        if (m.heal) nums.push(`回復 ${Math.round(m.heal * 100)}%`);
+        if (m.range !== 'self' && m.acc) nums.push(`命中 ${Math.round(m.acc * 100)}%`);
+        nums.push(`PP ${m.pp}`);
+        parts.push(nums.join('・'));
+        const st = m.status === 'flinch' ? 'ひるみ' : STATUS[m.status] && STATUS[m.status].name;
+        if (st) parts.push(`状態：${st} ${Math.round((m.chance || 1) * 100)}%`);
+        if (m.role) parts.push(`${ROLES[m.role].name}のときだけ`);
+        return parts.join('　');
+    }
+    const skillFull = id => `${SKILLS[id].name}　${skillShort(id)}${SKILLS[id].note ? `\n　${SKILLS[id].note}` : ''}`;
+
     // Lv が from より上で to 以下になったときに覚えるわざ
     const learnedBetween = (id, from, to) => HEROES[id].learn.filter(([lv]) => lv > from && lv <= to).map(([, s]) => s);
 
@@ -220,7 +240,7 @@
     const damage = (rng, atk, def) => hitDamage(rng, atk, def).dmg;
 
     KD.Units = {
-        ELEMENTS, CHART, effect, STATUS, SKILLS, MAX_SKILLS, HERO_MAX_SKILLS, ROLES, ROLE_IDS, roleText, HEROES, ENEMIES, FOREST_TABLE, HIT,
+        ELEMENTS, CHART, effect, STATUS, SKILLS, MAX_SKILLS, HERO_MAX_SKILLS, ROLES, RANGE_NAMES, skillShort, skillFull, ROLE_IDS, roleText, HEROES, ENEMIES, FOREST_TABLE, HIT,
         heroStats, enemyStats, allyStats, enemyAllySkills, startSkills, newSkill, learnedBetween, expToNext, gainExp, hitDamage, damage
     };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);
