@@ -1037,21 +1037,62 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
         function plaza() {
             const max = g.partyMax() - 1;
             const all = [...state.allies, ...sorted(state.roster)];
-            if (!all.length) return ask('広場には だれも いない。', ['もどる'], menu, { list: false });
-            ask(`連れていく仲間をえらぶ（主人公のほかに ${max} 人まで。えらぶと 入れかわる）`,
-                [`並べかえ：${SORTS[plazaSort]}`, ...all.map(a => `${state.allies.includes(a) ? '【いっしょ】' : '　　　　　'}${a.name}${KD.Allies.star(a.kind) ? ' ' + '★'.repeat(KD.Allies.star(a.kind)) : ''} Lv${a.lv}　${U.ROLES[a.role].name}`), 'もどる'], i => {
+            // いちばん下 (もどるの 上) に 主人公の ステータス・装備 (2026-10-23 ユーザー指定)
+            const heroRow = `${p().name}（主人公）の ステータス・装備`;
+            ask(`連れていく仲間をえらぶ（主人公のほかに ${max} 人まで。えらぶと 入れかわる）${all.length ? '' : '\n（広場には まだ 仲間が いない）'}`,
+                [`並べかえ：${SORTS[plazaSort]}`, ...all.map(a => `${state.allies.includes(a) ? '【いっしょ】' : '　　　　　'}${a.name}${KD.Allies.star(a.kind) ? ' ' + '★'.repeat(KD.Allies.star(a.kind)) : ''} Lv${a.lv}　${U.ROLES[a.role].name}`), heroRow, 'もどる'], i => {
                     if (i === 0) {
                         const keys = Object.keys(SORTS);
                         plazaSort = keys[(keys.indexOf(plazaSort) + 1) % keys.length];
                         return plaza();
                     }
                     i--;
-                    if (i >= all.length) {
+                    if (i === all.length) return unitStatus(p(), plaza);
+                    if (i > all.length) {
                         save();
                         return menu();
                     }
                     plazaUnit(all[i], max);
                 });
+        }
+
+        // ----- ステータス・装備 (広場。2026-10-23 ユーザー指定) -----
+        // 上に ステータス (game.js の drawStatus)、下で 装備を つける・はずす。町では ターンは ない。
+        //   つけると 持ち物から なくなり、はずすと 持ち物へ (いっぱいなら 倉庫へ)
+        let statusUnit = null;
+        function unitStatus(u, back) {
+            view = 'status';
+            statusUnit = u;
+            const gears = p().bag.filter(it => I.ITEMS[it.id].kind === 'gear');
+            const opts = gears.map(it => `つける：${I.ITEMS[it.id].name}　${I.ITEMS[it.id].note}`);
+            if (u.gear) opts.push(`はずす：${I.ITEMS[u.gear.id].name}`);
+            opts.push('もどる');
+            const head = `${u.name}の 装備欄：${u.gear ? I.ITEMS[u.gear.id].name : 'なし'}${gears.length ? '' : '（持ち物に 装備が ない）'}`;
+            ui.ask(head, opts, i => {
+                if (i < gears.length) {
+                    const it = gears[i];
+                    p().bag.splice(p().bag.indexOf(it), 1);
+                    const old = u.gear;
+                    u.gear = { id: it.id, n: 1 };
+                    if (old) p().bag.push(old);
+                    g.recalc(u);
+                    u.hp = u.stats.hp;
+                    save();
+                    return unitStatus(u, back);
+                }
+                if (u.gear && i === gears.length) {
+                    const old = u.gear;
+                    u.gear = null;
+                    g.recalc(u);
+                    const where = giveItem(old, true);
+                    save();
+                    if (where === 'storage') return ask(`持ち物が いっぱいなので、${I.ITEMS[old.id].name}は 倉庫に 入れた。`, ['もどる'], () => unitStatus(u, back), { list: false });
+                    return unitStatus(u, back);
+                }
+                view = 'town';
+                statusUnit = null;
+                back();
+            }, { place: 'bottom', list: true });
         }
 
         // 仲間 1 人: 連れていく・はずす、進化の アイテムを わたす (進化の条件も出す。enemies9.js の EVOLVE)
@@ -1061,11 +1102,13 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             const opts = [going ? 'はずす' : '連れていく'];
             const giveable = v && v.how === 'item' && countHave(v.item) > 0;
             if (giveable) opts.push(`「${I.ITEMS[v.item].name}」を わたす`);
+            opts.push('ステータス・装備');
             if (!special(a)) opts.push('お別れする');
             opts.push('もどる');
             const info = `${a.name}${KD.Allies.star(a.kind) ? ' ' + '★'.repeat(KD.Allies.star(a.kind)) : ''} Lv${a.lv}　${U.ROLES[a.role].name}`;
             ask(`${info}\n${v ? '進化：' + KD.Allies.evolveText(a.kind) : '進化しない'}`, opts, j => {
                 const pick = opts[j];
+                if (pick === 'ステータス・装備') return unitStatus(a, () => plazaUnit(a, max));
                 if (pick === 'はずす') {
                     state.allies.splice(state.allies.indexOf(a), 1);
                     state.roster.unshift(a);
@@ -1301,6 +1344,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             // ダンジョンの中でやめていたら、その場所から 続ける (階の様子がない 前の版のセーブは その階の はじめから。仕様書 16章)
             if (data.run && data.snap) return g.resumeSnap(data.snap);
             if (data.run) return g.resume(data.run);
+            g.healAll();   // 町では みんな 全回復 (前の版の セーブで 減っていても)
             menu();
             return true;
         }
@@ -1311,6 +1355,11 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             if (view === 'opening') return drawOpening(ctx, now, W, H);
             if (view === 'tree') return drawTree(ctx, now, W, H);
             if (view === 'dex') return drawDex(ctx, now, W, H);
+            if (view === 'status' && statusUnit) {
+                ctx.fillStyle = '#101a24';
+                ctx.fillRect(0, 0, W, H);
+                return g.drawStatus(now, statusUnit);
+            }
             drawTown(ctx, now, W, H);
             if (view === 'loading') {
                 ctx.fillStyle = 'rgba(0,0,0,.6)';

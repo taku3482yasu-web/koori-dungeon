@@ -257,3 +257,125 @@ test('図鑑: キャラを 押しても 前の 画面に もどらず、一覧�
     choose('もどる');
     assert.match(asks[0].message, /図鑑　敵/, '「もどる」で 図鑑の はじめへ');
 });
+
+// 町から 始める (はじめから → オープニングを 飛ばす)
+function townGame() {
+    store.clear();
+    const asks = [];
+    const ui = { ask: (message, options, done, extra) => asks.push({ message, options, done, extra }), asking: () => asks.length > 0 };
+    const game = globalThis.KD.createGame({ getContext: () => ctx }, ui, { seed: 321, things: false, recruit: false, unlockAll: true, market: false, happen: false });
+    const run = ms => { for (let i = 0; i < ms; i += 16) { fakeNow += 16; game.draw(fakeNow); } };
+    const choose = label => {
+        const q = asks.shift();
+        assert.ok(q, `「${label}」をえらぶ画面がない`);
+        const i = q.options.findIndex(o => o.startsWith(label) || o.includes(label));
+        assert.ok(i >= 0, `「${label}」がない: ${q.options.join(' / ')}`);
+        q.done(i);
+    };
+    choose('はじめから');
+    choose('こおりくん');
+    for (let i = 0; i < 5; i++) choose('つぎへ');
+    return { game, s: game.state, asks, choose, run };
+}
+
+test('操作している 仲間が たおれると、ターンを 使わずに 次の キャラを 自動で 操作する', () => {
+    const { game, s, run, asks } = setup({ partner: true });
+    const hero = s.player, oni = s.allies[0];
+    const extra = game.makeAlly('haribaby', 1);
+    s.allies.push(extra);
+    game.switchTo(oni);
+    const e = game.makeEnemy('haribaby', 1, 0, 0);
+    Object.assign(e, { awake: true, hp: 99999 });
+    e.stats.hp = 99999;
+    e.stats.atk = 9999;
+    s.enemies.length = 0;
+    s.enemies.push(e);
+    let turnAt = -1;
+    for (let i = 0; i < 40 && s.player === oni; i++) {
+        // 敵を おにおにの となり (歩けるマス) に 置きなおす
+        const [dx, dy] = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([x, y]) => D.walkable(s.map, oni.x + x, oni.y + y) && !s.allies.some(a => a.x === oni.x + x && a.y === oni.y + y));
+        e.x = e.fx = oni.x + dx;
+        e.y = e.fy = oni.y + dy;
+        hero.hp = hero.stats.hp;
+        game.wait();
+        run(800);
+        turnAt = s.turn;
+        while (asks.length) asks.shift().done(0);
+    }
+    assert.notEqual(s.player, oni, '操作が かわった');
+    assert.ok(s.player.hp > 0, '生きている キャラを 操作する');
+    assert.ok(s.fallen.includes(oni) && !s.allies.includes(oni), 'たおれた 仲間は 列から はずれる');
+    assert.ok(s.messages.some(m => /おにおにが たおれた！ .+を 操作する/.test(m.text)));
+    run(800);
+    assert.equal(s.turn, turnAt, '交代で ターンは すすまない');
+});
+
+test('仲間を 操作しているときに 主人公が たおれても、町では 主人公の 操作に もどり、みんな 全回復', () => {
+    const { game, s, asks, choose, run } = townGame();
+    choose('ダンジョンへ');
+    choose('ハリーの森');
+    if (asks[0] && asks[0].options.includes('スキップ')) choose('スキップ');
+    run(1500);
+    asks.length = 0;
+    const hero = game.heroUnit(), oni = s.allies[0];
+    game.switchTo(oni);
+    oni.hp = 3;
+    oni.skills[0].pp = 0;
+    hero.bag.length = 0;
+    const e = game.makeEnemy('haribaby', 1, hero.x + 1, hero.y);
+    Object.assign(e, { awake: true, hp: 99999 });
+    e.stats.hp = 99999;
+    e.stats.atk = 9999;
+    s.enemies.length = 0;
+    s.enemies.push(e);
+    for (let i = 0; i < 40 && s.phase === 'play' && !s.over && s.map; i++) {
+        const [dx, dy] = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([x, y]) => D.walkable(s.map, hero.x + x, hero.y + y) && !s.allies.concat(s.player).some(a => a.x === hero.x + x && a.y === hero.y + y));
+        e.x = e.fx = hero.x + dx;
+        e.y = e.fy = hero.y + dy;
+        hero.hp = 1;
+        if (!game.busy()) game.wait();
+        run(600);
+        while (asks.length) asks.shift().done(0);
+    }
+    run(3000);
+    assert.equal(s.phase, 'town', s.messages.slice(-5).map(m => m.text).join(' / '));
+    assert.equal(s.player, hero, '主人公の 操作に もどった');
+    assert.ok(!s.allies.includes(hero), '主人公は 仲間の 列に 残らない');
+    assert.ok(s.allies.includes(oni));
+    assert.equal(hero.hp, hero.stats.hp, '主人公 全回復');
+    assert.equal(oni.hp, oni.stats.hp, '仲間 全回復');
+    assert.equal(oni.skills[0].pp, oni.skills[0].max, 'PP も');
+});
+
+test('広場: 主人公と 仲間の ステータス・装備を 見られ、町でも 装備を つけ外し できる', () => {
+    const { game, s, asks, choose, run } = townGame();
+    const hero = s.player;
+    hero.bag.push({ id: 'power_band', n: 1 });
+    const atk = hero.stats.atk;
+    choose('仲間の広場');
+    choose('（主人公）の ステータス・装備');
+    assert.match(asks[0].message, /こおりくんの 装備欄：なし/);
+    run(50);   // ステータスを 描いても こわれない
+    choose('つける：ちからのハチマキ');
+    assert.equal(hero.gear.id, 'power_band');
+    assert.equal(hero.stats.atk, atk + 4);
+    assert.ok(!hero.bag.some(it => it.id === 'power_band'));
+    choose('はずす');
+    assert.equal(hero.gear, null);
+    assert.ok(hero.bag.some(it => it.id === 'power_band'));
+    choose('もどる');
+    // 仲間 (おにおに)
+    choose('おにおに');
+    choose('ステータス・装備');
+    const oni = s.allies[0];
+    choose('つける：ちからのハチマキ');
+    assert.equal(oni.gear.id, 'power_band');
+    // 持ち物が いっぱいで はずすと 倉庫へ
+    while (hero.bag.length < I.BAG_MAX) hero.bag.push({ id: 'onigiri', n: 1 });
+    choose('はずす');
+    assert.equal(oni.gear, null);
+    assert.ok(s.town.storage.some(it => it.id === 'power_band'), '倉庫に 入った');
+    choose('もどる');
+    choose('もどる');
+    assert.match(asks[0].message, /おにおに/, '仲間の 画面に もどる');
+});

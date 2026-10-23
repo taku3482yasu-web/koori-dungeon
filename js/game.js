@@ -179,8 +179,9 @@
             void hero;
         }
         // u を操作する (u は いっしょにいる仲間か 主人公)。quiet: メッセージを出さない
-        function switchTo(u, quiet = false) {
-            if (!u || u === state.player || u.hp <= 0) return false;
+        // force: たおれていても 切りかえる (主人公が たおれて 町に 戻るとき)
+        function switchTo(u, quiet = false, force = false) {
+            if (!u || u === state.player || (u.hp <= 0 && !force)) return false;
             const i = state.allies.indexOf(u);
             if (i < 0) return false;
             const old = state.player;
@@ -208,7 +209,8 @@
                 }, { list: true });
         }
         // 主人公の 操作に もどす (町に戻るとき・セーブのとき)
-        const backToHero = () => { if (!state.player.hero) switchTo(heroUnit(), true); };
+        // (仲間を 操作しているときに 主人公が たおれても、町では 主人公の 操作に もどす。2026-10-23)
+        const backToHero = () => { if (!state.player.hero) switchTo(heroUnit(), true, true); };
         // 一緒に行ける人数 (ストーリーで ふえる。仕様書 8章)
         const partyMax = () => DG.partyMax(state.town ? state.town.cleared || 0 : 0);
         // 装備は キャラごとに 1 つ (u.gear。つけると 持ち物から なくなる。2026-10-23 ユーザー指定)
@@ -580,15 +582,19 @@
         }
 
         function refresh() {
-            const p = state.player;
-            p.belly = I.BELLY_MAX;
+            heroUnit().belly = I.BELLY_MAX;
             state.allies.push(...state.fallen);
             state.fallen = [];
-            party().forEach(u => {
+            healAll();
+        }
+        // みんな 全回復 (HP・状態・PP。広場で 待っている 仲間も)。ダンジョンに 入るとき・町に 戻ったとき (2026-10-23 ユーザー指定)
+        function healAll() {
+            [...party(), ...state.fallen, ...(state.roster || [])].forEach(u => {
                 u.hp = u.stats.hp;
                 u.regen = 0;
                 u.status = null;
                 u.flinch = false;
+                u.pinched = false;
                 u.buffs = { kiai: false, guard: 0 };
                 u.skills.forEach(k => { k.pp = k.max; });
             });
@@ -603,10 +609,7 @@
                 at: performance.now(), label: `${KD.Town.NAME}へ`, then: () => {
                     state.allies.push(...state.fallen);
                     state.fallen = [];
-                    party().forEach(u => {
-                        u.status = null;
-                        u.hp = u.stats.hp;
-                    });
+                    healAll();
                     state.map = null;
                     state.enemies = [];
                     state.items = [];
@@ -1618,10 +1621,12 @@
             }
             if (t.hero) down();
             else if (t === state.player) {
-                // 操作している仲間が たおれた: 主人公の操作に もどって、仲間は たおれる
-                const hero = heroUnit();
-                switchTo(hero, true);
-                say(`${t.name}が たおれた！ ${hero.name}の 操作に もどった。`);
+                // 操作している仲間が たおれた: 次の キャラ (いっしょにいる 生きている キャラの はじめ) を 自動で 操作する。
+                //   ターンは すすまない (2026-10-23 ユーザー指定)
+                const next = state.allies.find(a => a.hp > 0) || heroUnit();
+                switchTo(next, true);
+                say(`${t.name}が たおれた！ ${next.name}を 操作する。`);
+                popup(next, '交代！', '#7fd3f7');
                 allyDown(t);
             } else if (t.side === 'party') allyDown(t);
             else defeat(t, from);
@@ -2736,7 +2741,7 @@
             ctx.font = `bold 11px ${FONT}`;
             ctx.fillStyle = '#ffe680';
             const star = !u.hero && KD.Allies.star(u.kind) ? ' ' + '★'.repeat(KD.Allies.star(u.kind)) : '';
-            ctx.fillText(`${u.name}${star}　Lv${u.lv}${u.hero ? '（主人公）' : ''}${u === state.player ? '　操作中' : ''}`, 82, 16);
+            ctx.fillText(`${u.name}${star}　Lv${u.lv}${u.hero ? '（主人公）' : ''}${u === state.player && state.phase === 'play' ? '　操作中' : ''}`, 82, 16);
             ctx.font = `9px ${FONT}`;
             ctx.fillStyle = ELEMENT_COLORS[u.element] || '#ffffff';
             ctx.fillText(`属性：${u.element}`, 82, 31);
@@ -3216,7 +3221,8 @@
         // 町 (townui.js) に渡す中身
         const town = KD.createTown({
             state, opts, say, later,
-            selectHero, makeHero, makeAlly, recalc, learnNow, startDungeon, resume, resumeSnap, snapshot, backToTown, partyMax, talk, toast, evolve, heroUnit, backToHero
+            selectHero, makeHero, makeAlly, recalc, learnNow, startDungeon, resume, resumeSnap, snapshot, backToTown, partyMax, talk, toast, evolve, heroUnit, backToHero,
+            healAll, drawStatus
         }, ui);
 
         if (opts.start === 'dungeon') {
@@ -3227,7 +3233,7 @@
         } else town.title();
         return {
             state, town, draw, moveInput, wait, confirm, attack: attackFront, useSkill, itemMenu, tacticMenu, specialMenu, specialFor, busy, makeEnemy, makeAlly, evolve, startDungeon, switchTo, switchMenu, heroUnit, snapshot, autosave, spawnBoss,
-            statusMenu, equipMenu, equip, unequip, recalc,
+            statusMenu, equipMenu, equip, unequip, recalc, healAll,
             skills: () => (state.player && state.phase === 'play' ? state.player.skills.map(skillLabel) : []),
             toggleMinimap() { state.mini = !state.mini; },
             // 「音」ボタン: 音の設定 (音量・オン・オフ。2026-10-22 ユーザー指定)。S キーは これまでどおり オン・オフだけ
