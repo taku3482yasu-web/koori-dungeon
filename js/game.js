@@ -2756,6 +2756,17 @@
                     }
                 }
             }
+            // ボスの 闘技場の 見た目 (2026-10-24 ユーザー指定: ボスごとの 特徴・ダンジョンに 合わせる。js/arena.js)
+            if (map.arena >= 0 && KD.Arena) {
+                const key = state.dungeon.rivalFloor ? 'rival' : state.dungeon.boss;
+                KD.Arena.draw(ctx, { key, room: map.rooms[map.arena], camX, camY, T, explored: state.explored, visible: state.visible, mapW: map.w, now });
+                // 階段は 上に 描き直す
+                const st = map.stairs;
+                if (state.explored[idx(st.x, st.y)]) {
+                    A.drawStairs(ctx, th, st.x * T - camX, st.y * T - camY);
+                    if (!state.visible[idx(st.x, st.y)]) { ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(st.x * T - camX, st.y * T - camY, T, T); }
+                }
+            }
             // 見つけたワナと、一度見た場所の道具・お金
             state.traps.forEach(t => {
                 if (t.seen && state.explored[idx(t.x, t.y)]) A.drawTrap(ctx, t.id, t.x * T - camX, t.y * T - camY);
