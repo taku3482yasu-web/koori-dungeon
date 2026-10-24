@@ -302,6 +302,39 @@ try {
     await sleep(500);
     check(/買った/.test(await asking()) && await evaluate('window.kdGame.state.roster.some(a => a.kind === "yukiusapon")'), '交易所で もう片方の バージョンの キャラを 買える');
 
+    // ----- 町の 施設: 鍛冶屋の 拡張・特訓場・遠征所 (2026-10-23 に 追加された もの。2026-10-24 テストを 追加) -----
+    const townMenu = async () => { await evaluate('(window.kdGame.town.menu(), true)'); await sleep(300); };
+    await townMenu();
+    await press('.ask-choices button', { text: '鍛冶屋' });
+    const smithText = await asking();
+    check(/持ち物 \d+ こ まで/.test(smithText) && /倉庫 [\d,]+ こ まで/.test(smithText) && await fits(), '鍛冶屋: 持ち物と 倉庫の 上限が 出て、ボタンが はみ出さない');
+    await press('.ask-choices button', { text: '持ち物拡張ボックス' });
+    check(/持ち物拡張ボックス/.test(await asking()), '鍛冶屋: 持ち物拡張ボックスを えらぶと 説明か 作る 画面が 出る');
+    await townMenu();
+    // 特訓には 仲間が 2 人 いるので、広場に 2 人 足して おく
+    await evaluate('(() => { const g = window.kdGame; g.state.roster.push(g.makeAlly("yukiusapon", 3), g.makeAlly("yukiusapon", 2)); return true; })()');
+    await press('.ask-choices button', { text: '特訓場' });
+    const trainText = await asking();
+    check(/コーチを えらぶ|特訓には 仲間が 2 人|特訓中/.test(trainText) && await fits(), `特訓場: 開けて、ボタンが はみ出さない（${trainText.split('\n')[0]}）`);
+    if (/コーチを えらぶ/.test(trainText)) {
+        await press('.ask-choices button');            // いちばん 上の 仲間を コーチに
+        await press('.ask-choices button');            // いちばん 上の 仲間を 特訓
+        await press('.ask-choices button', { text: '特訓を はじめる' });
+        check(/特訓を はじめた/.test(await asking()) && await evaluate('Boolean(window.kdGame.state.town.training)'), '特訓場: 特訓を はじめられる');
+    }
+    await townMenu();
+    await press('.ask-choices button', { text: '遠征所' });
+    check(/遠征所（チーム/.test(await asking()) && await fits(), '遠征所: 開けて、ボタンが はみ出さない');
+    await press('.ask-choices button', { text: 'チーム 1' });
+    const teamText = await asking();
+    check(/遠征チームを 編成する|遠征できる ダンジョンが ない|遠征に 行ける 仲間が いない/.test(teamText) && await fits(), `遠征所: チームの 編成を 開ける（${teamText.split('\n')[0]}）`);
+    if (/遠征チームを 編成する/.test(teamText)) {
+        await press('.ask-choices button');            // いちばん 上の 仲間を 入れる
+        await press('.ask-choices button', { text: '行き先を えらぶ' });
+        await press('.ask-choices button');            // いちばん 上の 行き先
+        check(/出発した/.test(await asking()) && await evaluate('window.kdGame.state.town.expeditions ? window.kdGame.state.town.expeditions.length > 0 : true'), '遠征所: 遠征に 出せる');
+    }
+
     // ----- 引き継ぎ: コードを 入れる 欄 (スマホの幅。つながらない ことにしてある) -----
     await send('Page.reload');
     await sleep(2500);

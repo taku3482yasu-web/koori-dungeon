@@ -1242,10 +1242,16 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                     const k = Z.CHOICES.findIndex(m => m.id === Z.get());
                     Z.set(Z.CHOICES[(k + 1) % Z.CHOICES.length].id);
                 }],
+                // 文字の 大きさ (2026-10-24 ユーザー指定): ふつう → 大きい → とても大きい (game.js の KD.TextSize)
+                ['文字の大きさを 切りかえる', () => {
+                    const k = TS.CHOICES.findIndex(m => m.id === TS.get());
+                    TS.set(TS.CHOICES[(k + 1) % TS.CHOICES.length].id);
+                }],
                 ['もどる', null]
             ];
+            const TS = KD.TextSize, textName = TS.CHOICES.find(m => m.id === TS.get()).name;
             const Z = KD.MapZoom, zoomName = Z.CHOICES.find(m => m.id === Z.get()).name;
-            ask(`音の設定\nBGM　　${bar(v.bgm)}\n効果音　${bar(v.se)}\n音　　　${S.isOn() ? 'オン' : 'オフ'}（ダンジョンでは S キー・「音」ボタンで オン・オフ）\nマップ　${zoomName}（ダンジョンの 1 マスの 大きさ）`,
+            ask(`音の設定\nBGM　　${bar(v.bgm)}\n効果音　${bar(v.se)}\n音　　　${S.isOn() ? 'オン' : 'オフ'}（ダンジョンでは S キー・「音」ボタンで オン・オフ）\nマップ　${zoomName}（ダンジョンの 1 マスの 大きさ）\n文字　　${textName}（ダンジョンの 中の 文字）`,
                 rows.map(r => r[0]), i => {
                     if (!rows[i][1]) return back();
                     rows[i][1]();

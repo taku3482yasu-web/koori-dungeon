@@ -102,6 +102,22 @@ test('設定: マップの大きさを ふつう → 大きい → とても大�
     choose('もどる');
 });
 
+test('設定: 文字の大きさを ふつう → 大きい → とても大きい と 切りかえられる (はじめは ふつう)', () => {
+    const { asks, choose } = newGame();
+    const TS = globalThis.KD.TextSize;
+    TS.set('normal');
+    choose('設定');
+    assert.match(asks[0].message, /文字　　ふつう/);
+    choose('文字の大きさを 切りかえる');
+    assert.equal(TS.get(), 'big');
+    assert.match(asks[0].message, /文字　　大きい/);
+    choose('文字の大きさを 切りかえる');
+    assert.equal(TS.get(), 'huge');
+    choose('文字の大きさを 切りかえる');
+    assert.equal(TS.get(), 'normal');
+    choose('もどる');
+});
+
 test('町の 図鑑: 町の メニューから 開けて、もどると 町に もどる', () => {
     const { asks, choose, run } = newGame();
     choose('図鑑');

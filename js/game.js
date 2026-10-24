@@ -30,6 +30,12 @@
     let mapZoom = 'big';
     try { const z = localStorage.getItem(ZOOM_KEY); if (MAP_ZOOMS.some(m => m.id === z)) mapZoom = z; } catch (e) { /* 保存できない 環境 (テストも) */ }
     const zoomOf = () => MAP_ZOOMS.find(m => m.id === mapZoom).zoom;
+    // ダンジョンの 中の 文字の 大きさ (2026-10-24 ユーザー指定)。上の 帯・仲間の HP・メッセージ・ボスの HP を 大きく する。マップの大きさと 同じく localStorage
+    const TEXT_SIZES = [{ id: 'normal', name: 'ふつう', scale: 1 }, { id: 'big', name: '大きい', scale: 1.25 }, { id: 'huge', name: 'とても大きい', scale: 1.4 }];
+    const TEXT_KEY = 'koori-dungeon-text-size';
+    let textSize = 'normal';
+    try { const z = localStorage.getItem(TEXT_KEY); if (TEXT_SIZES.some(m => m.id === z)) textSize = z; } catch (e) { /* 保存できない 環境 (テストも) */ }
+    const textScale = () => TEXT_SIZES.find(m => m.id === textSize).scale;
     const STEP_MS = 110, DASH_MS = 45;            // 1 マス動くのにかける時間 (ふつう・ダッシュ)
     const FADE_MS = 1100;                         // 階が変わるときの暗転
     const ATTACK_MS = 240, SHOOT_MS = 300;        // 攻撃 1 回を見せる時間
@@ -2751,11 +2757,21 @@
             drawBubbles(camX, camY, now);
             ctx.restore();
             drawFlash(now);
+            drawOffscreen(camX, camY, now);   // 画面の 外に いる 敵・仲間の 矢印 (2026-10-24)
+            // 文字の 大きさ (設定): 上の 帯と 仲間は 左上を、メッセージは 左下を 中心に 大きく する
+            const ts = textScale();
+            ctx.save();
+            ctx.scale(ts, ts);
             drawHud();
             drawParty();
+            ctx.restore();
             drawBossBar();
             if (state.mini) drawMinimap(th);
+            ctx.save();
+            ctx.translate(0, H * (1 - ts));
+            ctx.scale(ts, ts);
             drawMessages(now);
+            ctx.restore();
             drawCutin(now);
             if (state.statusOf && ui.asking()) drawStatus(now, state.statusOf);
             else state.statusOf = null;
@@ -3056,31 +3072,43 @@
         // 上の帯 (仕様書 14章: 階・Lv・役職・HP・満腹・お金。2 行めに状態。借金は段階 6 から)
         function drawHud() {
             const p = state.player;
+            // 文字を 大きく したとき (設定) は 幅が せまく なるので、つめて ならべ、お金は 2 行めの 右へ
+            const ts = textScale(), Wt = W / ts, big = ts > 1;
             ctx.fillStyle = 'rgba(0,0,0,.6)';
-            ctx.fillRect(0, 0, W, 13);
+            ctx.fillRect(0, 0, Wt, 13);
             ctx.font = `10px ${FONT}`;
             ctx.textBaseline = 'middle';
-            ctx.fillStyle = '#ffe680';
-            ctx.fillText(`B${state.floor}F`, 4, 7);
-            ctx.fillStyle = '#ffffff';
-            ctx.fillText(`Lv${p.lv}`, 28, 7);
-            ctx.fillStyle = '#8fd6f7';
-            ctx.fillText(U.ROLES[p.role].name, 56, 7);
-            ctx.fillStyle = '#ffffff';
-            ctx.fillText('HP', 130, 7);
-            const k = p.hp / p.stats.hp;
+            let hx = 4;
+            const put = (str, color, at) => {
+                ctx.fillStyle = color;
+                const px = big ? hx : at;
+                ctx.fillText(str, px, 7);
+                hx = px + ctx.measureText(str).width + 6;
+            };
+            put(`B${state.floor}F`, '#ffe680', 4);
+            put(`Lv${p.lv}`, '#ffffff', 28);
+            put(U.ROLES[p.role].name, '#8fd6f7', 56);
+            put('HP', '#ffffff', 130);
+            const k = p.hp / p.stats.hp, bx = big ? hx - 2 : 146, bw = big ? 40 : 50;
             ctx.fillStyle = '#3a1010';
-            ctx.fillRect(146, 4, 50, 6);
+            ctx.fillRect(bx, 4, bw, 6);
             ctx.fillStyle = k > 0.5 ? '#6ae06a' : k > 0.25 ? '#f0d040' : '#ff5a4a';
-            ctx.fillRect(146, 4, Math.round(50 * k), 6);
-            ctx.fillStyle = '#ffffff';
-            ctx.fillText(`${p.hp}/${p.stats.hp}`, 200, 7);
+            ctx.fillRect(bx, 4, Math.round(bw * k), 6);
+            hx = bx + bw + 4;
+            put(`${p.hp}/${p.stats.hp}`, '#ffffff', 200);
             const belly = Math.ceil(p.belly);
-            ctx.fillStyle = belly > 20 ? '#ffffff' : belly > 0 ? '#f0d040' : '#ff5a4a';
-            ctx.fillText(`満腹 ${belly}`, 250, 7);
-            ctx.fillStyle = '#ffe680';
+            put(`満腹 ${belly}`, belly > 20 ? '#ffffff' : belly > 0 ? '#f0d040' : '#ff5a4a', 250);
+            const moneyText = `${p.money.toLocaleString()}えん`;
             ctx.textAlign = 'right';
-            ctx.fillText(`${p.money.toLocaleString()}えん`, W - 4, 7);
+            if (big) {
+                ctx.fillStyle = 'rgba(0,0,0,.45)';
+                ctx.fillRect(Wt - ctx.measureText(moneyText).width - 8, 13, ctx.measureText(moneyText).width + 8, 11);
+                ctx.fillStyle = '#ffe680';
+                ctx.fillText(moneyText, Wt - 4, 19);
+            } else {
+                ctx.fillStyle = '#ffe680';
+                ctx.fillText(moneyText, W - 4, 7);
+            }
             ctx.textAlign = 'left';
             // 2 行め: 状態異常・きあいため・まもりのかまえ・装備
             const tags = [];
@@ -3102,11 +3130,43 @@
             });
         }
 
+        // 画面の 外に いる 敵 (見えて いる もの)・仲間の 矢印 (2026-10-24 ユーザー指定: マップを 大きく したので 見える 範囲が せまい)。
+        //   画面の ふちに、その 方向を 指す 三角を 出す。敵は 赤 (ボスは 大きく)、仲間は 水色
+        function drawOffscreen(camX, camY, now) {
+            const z = zoomOf(), top = Math.round((state.hudRows === 2 ? 26 : 15) * textScale()) + 2, m = 7;
+            const foes = state.enemies.filter(e => state.visible[idx(e.x, e.y)] && (e.awake || !(has(e, 'disguise') || has(e, 'mimic'))));
+            const list = [...foes.map(e => [e, e.boss ? '#ff2a2a' : '#ff6a5a', e.boss ? 7 : 5]), ...state.allies.map(a => [a, '#7affff', 4])];
+            const pulse = 0.6 + 0.4 * Math.abs(Math.sin(now / 200));
+            for (const [u, color, size] of list) {
+                const sx = W / 2 + (u.fx * T - camX + T / 2 - W / 2) * z, sy = H / 2 + (u.fy * T - camY + T / 2 - H / 2) * z;
+                if (sx >= 0 && sx <= W && sy >= top && sy <= H) continue;   // 画面の 中
+                const ang = Math.atan2(sy - H / 2, sx - W / 2), dx = Math.cos(ang), dy = Math.sin(ang);
+                const kx = Math.abs(dx) > 1e-6 ? ((dx > 0 ? W - m : m) - W / 2) / dx : Infinity;
+                const ky = Math.abs(dy) > 1e-6 ? ((dy > 0 ? H - m : top + m) - H / 2) / dy : Infinity;
+                const k = Math.min(kx, ky), x = W / 2 + dx * k, y = H / 2 + dy * k;
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(ang);
+                ctx.globalAlpha = pulse;
+                ctx.beginPath();
+                ctx.moveTo(size, 0);
+                ctx.lineTo(-size, -size * 0.8);
+                ctx.lineTo(-size, size * 0.8);
+                ctx.closePath();
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
         // ボスの HP (画面の下のほう、まんなか)
         function drawBossBar() {
             const b = state.boss;
             if (!b || b.hp <= 0 || !b.awake) return;
-            const w = 160, x = (W - w) / 2, y = H - 66;
+            const w = 160, x = (W - w) / 2, y = H - 66 - Math.round((textScale() - 1) * 60);   // 文字が 大きいと メッセージが 高く なるので 上へ
             ctx.fillStyle = 'rgba(0,0,0,.6)';
             ctx.fillRect(x - 4, y - 10, w + 8, 18);
             ctx.font = `bold 9px ${FONT}`;
@@ -3154,7 +3214,7 @@
         // ミニマップ (右上。一度見た場所を残す。見えている敵は赤、仲間は水色)
         function drawMinimap(th) {
             const map = state.map;
-            const s = 2, mx = W - map.w * s - 4, my = 16;
+            const s = 2, mx = W - map.w * s - 4, my = textScale() > 1 ? Math.round(25 * textScale()) + 2 : 16;   // 文字が 大きいと お金が 2 行めに 来るので その下
             ctx.fillStyle = 'rgba(0,0,0,.25)';
             ctx.fillRect(mx - 2, my - 2, map.w * s + 4, map.h * s + 4);
             for (let y = 0; y < map.h; y++) {
@@ -3197,13 +3257,17 @@
             const list = state.messages.filter(m => now - m.at < 4000);
             if (!list.length) return;
             const h = 12 * list.length + 6;
+            const Wt = W / textScale();   // 文字の 大きさの 設定で 幅が せまく なる
             ctx.fillStyle = 'rgba(0,10,20,.7)';
-            ctx.fillRect(4, H - h - 4, W - 8, h);
+            ctx.fillRect(4, H - h - 4, Wt - 8, h);
             ctx.strokeStyle = '#8fd6f7';
-            ctx.strokeRect(4.5, H - h - 3.5, W - 9, h - 1);
-            ctx.font = `10px ${FONT}`;
+            ctx.strokeRect(4.5, H - h - 3.5, Wt - 9, h - 1);
             ctx.textBaseline = 'middle';
             list.forEach((m, i) => {
+                // 長い 文は 幅に 収まるよう 小さく する
+                let size = 10;
+                ctx.font = `${size}px ${FONT}`;
+                while (size > 7 && ctx.measureText(m.text).width > Wt - 16) ctx.font = `${--size}px ${FONT}`;
                 ctx.fillStyle = '#ffffff';
                 ctx.fillText(m.text, 10, H - h + 5 + i * 12);
             });
@@ -3294,6 +3358,16 @@
     // COLS: 画面の 横に 見える マスの 数 (main.js の タップ)
     KD.VIEW = { W, H, get COLS() { return VIEW_W / zoomOf(); } };
     // マップの大きさの 設定 (townui.js の 設定)
+    // 文字の 大きさの 設定 (townui.js の 設定)
+    KD.TextSize = {
+        CHOICES: TEXT_SIZES,
+        get: () => textSize,
+        set(id) {
+            if (!TEXT_SIZES.some(m => m.id === id)) return;
+            textSize = id;
+            try { localStorage.setItem(TEXT_KEY, id); } catch (e) { /* 保存できない 環境 */ }
+        }
+    };
     KD.MapZoom = {
         CHOICES: MAP_ZOOMS,
         get: () => mapZoom,
