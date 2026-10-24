@@ -223,3 +223,13 @@
 
 リポジトリの **Settings → Pages** で、**Source: Deploy from a branch**・**Branch: main / (root)** にすると、
 `https://taku3482yasu-web.github.io/koori-dungeon/` で遊べます。
+
+### アプリにする（ホーム画面に追加。2026-10-25 ユーザー指定）
+
+公開ページ（https）を開いて、ホーム画面に追加すると、アプリのように全画面で遊べます。一度開いたあとは、ネットにつながっていなくても遊べます（交易所・引き継ぎはつながっているときだけ）。
+
+- スマホ（iPhone）：Safari で開いて、共有ボタン →「ホーム画面に追加」
+- スマホ（Android）：Chrome で開いて、メニュー →「ホーム画面に追加」（「アプリをインストール」）
+- パソコン：Chrome / Edge で開いて、アドレスバーの右の「インストール」
+
+しくみ：`manifest.webmanifest`（名前・アイコン・全画面）と `sw.js`（サービスワーカー。ページと、ページが読み込む js / css・アイコンを保存しておく。パチンコ・スロットと同じ作り）。アイコンは `icons/`（`tools/make-icons.html` で作った。こおりくんとダンジョンの階段）。サービスワーカーは https のときだけ登録する（`js/main.js`）。処理を変えたら `sw.js` の `CACHE` の番号を上げる。テストは `tests/pwa.test.js`

@@ -344,6 +344,10 @@
         }
         requestAnimationFrame(frame);
         window.kdGame = game;   // 確認用 (開発者ツールのコンソールから)
+        // アプリ化 (2026-10-25): ホーム画面に 追加したとき、ネットに つながって いなくても 遊べるように (https で 公開して いるときだけ。sw.js)
+        if ('serviceWorker' in navigator && location.protocol === 'https:') {
+            navigator.serviceWorker.register('sw.js').catch(err => console.warn('サービスワーカーを登録できません:', err));
+        }
         // ページを閉じる・ほかのタブに切りかえるときも セーブ (2026-10-22 ユーザー指定)
         const saveNow = () => { try { game.autosave(true); } catch (e) { console.error(e); } };
         window.addEventListener('pagehide', saveNow);

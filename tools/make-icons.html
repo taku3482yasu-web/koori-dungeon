@@ -1,0 +1,49 @@
+<!doctype html>
+<!--
+    アプリの アイコンを 作る (2026-10-25。ホーム画面に 追加したときの 絵)。
+    ブラウザで 開くと 512・192・180 (iPhone) の 絵が 出るので、右クリックで icons/ に 保存する。
+    ?size=512 を つけると その 大きさだけ 描いて body の data-img に 入れる (ヘッドレスの Chrome で 書き出す用)
+-->
+<html lang="ja">
+<head><meta charset="utf-8"><title>アイコンを作る</title></head>
+<body style="background:#333">
+<script>window.KD = {};</script>
+<script src="../js/art.js"></script>
+<script>
+function draw(size) {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    const k = size / 64;
+    // 背景: ダンジョンの 暗い 青と、まんなかの 光
+    g.fillStyle = '#0a1420';
+    g.fillRect(0, 0, size, size);
+    const glow = g.createRadialGradient(size / 2, size * 0.55, size * 0.05, size / 2, size * 0.55, size * 0.5);
+    glow.addColorStop(0, 'rgba(127,211,247,.55)');
+    glow.addColorStop(1, 'rgba(127,211,247,0)');
+    g.fillStyle = glow;
+    g.fillRect(0, 0, size, size);
+    // 石の 床と 下へ 続く 階段
+    g.fillStyle = '#2a3a4a';
+    g.fillRect(0, 46 * k, size, 18 * k);
+    for (let i = 0; i < 4; i++) {
+        g.fillStyle = ['#8a8f9f', '#6a6f7f', '#4a4f5f', '#2a2f3f'][i];
+        g.fillRect((38 + i * 2) * k, (48 + i * 3) * k, (20 - i * 4) * k, 3 * k);
+    }
+    // こおりくん (大きく)
+    KD.Art.drawSprite(g, 'koori', 0, 10 * k, 14 * k, { scale: 2.2 * k });
+    // きらきら
+    g.fillStyle = '#ffffff';
+    [[50, 12, 2], [56, 22, 1.5], [8, 10, 1.5]].forEach(([x, y, s]) => {
+        g.fillRect((x - s) * k, (y - 0.4) * k, s * 2 * k, 0.8 * k);
+        g.fillRect((x - 0.4) * k, (y - s) * k, 0.8 * k, s * 2 * k);
+    });
+    return c;
+}
+const only = Number(new URLSearchParams(location.search).get('size'));
+if (only) document.body.setAttribute('data-img', draw(only).toDataURL('image/png'));
+else [512, 192, 180].forEach(size => { const im = new Image(); im.src = draw(size).toDataURL(); im.title = `${size}px`; im.style.margin = '8px'; document.body.appendChild(im); });
+</script>
+</body>
+</html>
