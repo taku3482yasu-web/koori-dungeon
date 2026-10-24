@@ -260,7 +260,11 @@ try {
     await send('Page.reload');
     await sleep(2500);
     const opText = await asking();
-    await sleep(1500);
+    // 「▶ オープニングを 見る」を 押すと、OP の 曲が 鳴る (2026-10-25 ユーザー指定: OP の 音が 鳴らない)
+    await press('.ask-choices button', { text: 'オープニングを 見る' });
+    await sleep(800);
+    const opSound = JSON.parse(await evaluate('JSON.stringify(KD.Sound.status())'));
+    check(opSound.current === 'op_koori' && opSound.playing && opSound.running, `オープニングを 見ると 曲が 鳴る（${JSON.stringify(opSound)}）`);
     await skipOp();
     check(/オープニング（氷隊）/.test(opText) && /つづきから/.test(await buttons()), `セーブが あると その バージョンの オープニングが 出て、スキップすると タイトル（${opText}）`);
     await press('.ask-choices button', { text: 'つづきから' });

@@ -333,6 +333,17 @@
 
     const SCENES = [[0, sceneRoof], [4, sceneRoll], [16, sceneLetters], [19, sceneLogo], [23, sceneBosses], [29, sceneRivals], [33, sceneLineup], [37, sceneJungle], [40, sceneFinale]];
 
+    // OP の 前の 「▶ オープニングを 見る」の 画面 (押すまで 音が 出せないので。チームの 色と エンブレム)
+    function drawWait(ctx, t, W, H, version, d) {
+        const c = CAST[version] || CAST.koori;
+        pattern(ctx, d, c, W, H, t, c.base, 0.3);
+        ctx.fillStyle = 'rgba(0,0,0,.35)';
+        ctx.fillRect(0, 0, W, H);
+        d.Emblems.draw(ctx, c.team, W / 2, 92, 96 + Math.sin(t * 3) * 4);
+        text(ctx, d, 'こおりくんの大冒険', W / 2, 160, 22, '#ffe040', '#000000');
+        if (Math.floor(t * 2) % 2) text(ctx, d, '▶ を おすと はじまります', W / 2, 196, 12, '#ffffff', '#000000');
+    }
+
     function draw(ctx, t, W, H, version, deps) {
         const c = CAST[version] || CAST.koori;
         let i = SCENES.length - 1;
@@ -345,5 +356,5 @@
         return t >= DURATION;
     }
 
-    KD.Op = { DURATION, CAST, draw };
+    KD.Op = { DURATION, CAST, draw, drawWait };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);

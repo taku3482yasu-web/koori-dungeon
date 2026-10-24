@@ -161,14 +161,23 @@
         }
 
         // ----- 起動時の オープニング (2026-10-25) -----
+        // ブラウザは 画面を さわる・キーを 押すまで 音を 出せない (2026-10-25 ユーザー指定: OP の 音が 鳴らない)。
+        //   なので まず「▶ オープニングを 見る」を 押してもらい、その 操作で 音を 出せるように してから (main.js の unlock)、
+        //   OP を 最初から 曲つきで 流す。スキップも できる
         function playOp(version) {
-            view = 'op';
+            view = 'opWait';
             opInfo = { version, start: null };
-            bgm(`op_${version}`);
-            ask(`オープニング（${DG.VERSIONS[version].name}）`, ['スキップ ▶'], endOp, { place: 'bottom', list: false });
+            ask(`オープニング（${DG.VERSIONS[version].name}）`, ['▶ オープニングを 見る（音が 出ます）', 'スキップ'], i => {
+                if (i !== 0) return endOp();
+                KD.Sound && KD.Sound.unlock();   // 押した ところで 音を 出せるように (main.js の pointerdown より 先に 来ても いいように)
+                view = 'op';
+                opInfo.start = null;
+                bgm(`op_${version}`);
+                ask(`オープニング（${DG.VERSIONS[version].name}）`, ['スキップ ▶'], endOp, { place: 'bottom', list: false });
+            }, { place: 'bottom', list: false });
         }
         function endOp() {
-            if (view !== 'op') return;
+            if (view !== 'op' && view !== 'opWait') return;
             view = 'title';
             opInfo = null;
             title();
@@ -1710,6 +1719,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
         // ----- 絵 -----
         function draw(ctx, now, W, H) {
             if (view === 'title') return drawTitle(ctx, now, W, H);
+            if (view === 'opWait' && opInfo) return KD.Op.drawWait(ctx, now / 1000, W, H, opInfo.version, { A, Big: KD.BigArt, Emblems: KD.Emblems, U, FONT });
             if (view === 'op' && opInfo) {
                 if (opInfo.start === null) opInfo.start = now;
                 const done = KD.Op.draw(ctx, (now - opInfo.start) / 1000, W, H, opInfo.version, { A, Big: KD.BigArt, Emblems: KD.Emblems, U, FONT });
