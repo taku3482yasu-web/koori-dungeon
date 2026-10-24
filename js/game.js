@@ -2759,7 +2759,7 @@
             // ボスの 闘技場の 見た目 (2026-10-24 ユーザー指定: ボスごとの 特徴・ダンジョンに 合わせる。js/arena.js)
             if (map.arena >= 0 && KD.Arena) {
                 const key = state.dungeon.rivalFloor ? 'rival' : state.dungeon.boss;
-                KD.Arena.draw(ctx, { key, room: map.rooms[map.arena], camX, camY, T, explored: state.explored, visible: state.visible, mapW: map.w, now });
+                KD.Arena.draw(ctx, { key, room: map.rooms[map.arena], camX, camY, T, explored: state.explored, visible: state.visible, mapW: map.w, now, teams: state.dungeon.rivalTeams });
                 // 階段は 上に 描き直す
                 const st = map.stairs;
                 if (state.explored[idx(st.x, st.y)]) {
@@ -2996,6 +2996,9 @@
                 ctx.fillStyle = 'rgba(190,240,255,.45)';
                 ctx.fillRect(sx + 1, sy - 2, 14, 16);
             }
+            // ライバル探検隊は 頭の 上に チームエンブレム (2026-10-24。js/emblems.js)
+            const team = KD.Emblems && KD.Emblems.teamOf(u.kind);
+            if (team) KD.Emblems.draw(ctx, team, sx + 14, sy - 4, 9, now);
             // 敵は HP が減っていたら小さなバー (仲間は水色)
             if (!u.hero && u.hp < u.stats.hp) {
                 ctx.fillStyle = 'rgba(0,0,0,.6)';

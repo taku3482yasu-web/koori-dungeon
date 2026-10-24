@@ -573,7 +573,12 @@
                 ctx.fillText('VS', cx, cy);
                 ctx.textAlign = 'left';
             },
-            props: (ctx, list, now) => list.forEach(([x, y], i) => banner(ctx, x + 2, y - 2, i < list.length / 2 ? '#2a5ad8' : '#d82a2a', '★', '#ffffff', now)),
+            // のぼりに 2 チームの エンブレム (左 半分・右 半分。js/emblems.js)
+            props: (ctx, list, now, o) => list.forEach(([x, y], i) => {
+                const left = i < list.length / 2, team = o.teams && o.teams[left ? 0 : 1];
+                banner(ctx, x + 2, y - 2, left ? '#2a5ad8' : '#d82a2a', KD.Emblems && team ? '' : '★', '#ffffff', now);
+                if (KD.Emblems && team) KD.Emblems.draw(ctx, team, x + 8, y + 8, 11, now);
+            }),
             particles: () => {}
         }
     };
@@ -608,7 +613,7 @@
         // 上の 壁の 列に 飾り (見た 壁だけ)
         const list = [];
         for (let tx = room.x; tx < room.x + room.w; tx += 2) if (seen(tx, room.y - 1) || seen(tx, room.y)) list.push([tx * T - camX, (room.y - 1) * T - camY]);
-        look.props(ctx, list, now);
+        look.props(ctx, list, now, o);
         // いま 見えて いない マスは 暗く
         ctx.fillStyle = 'rgba(0,0,0,.55)';
         for (let ty = room.y; ty < room.y + room.h; ty++) {

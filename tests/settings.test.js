@@ -12,7 +12,7 @@ globalThis.performance = { now: () => fakeNow };
 const store = new Map();
 globalThis.localStorage = { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
 globalThis.KD = {};
-for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'enemies9.js', 'enemies10.js', 'enemies11.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'enemyart9.js', 'enemyart10.js', 'enemyart11.js', 'sound.js', 'config.js', 'market.js', 'specials.js', 'townui.js', 'motion.js', 'arena.js', 'game.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
+for (const f of ['rng.js', 'dungeon.js', 'units.js', 'enemies.js', 'items.js', 'dungeons.js', 'collection.js', 'allies.js', 'enemies9.js', 'enemies10.js', 'enemies11.js', 'town.js', 'art.js', 'bigart.js', 'enemyart.js', 'enemyart9.js', 'enemyart10.js', 'enemyart11.js', 'sound.js', 'config.js', 'market.js', 'specials.js', 'townui.js', 'motion.js', 'arena.js', 'emblems.js', 'game.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
 const { Sound: S, Dungeons: DG } = globalThis.KD;
 
 // 描いた 回数を 数える canvas (こわれずに 描けるかを 見る)
@@ -605,4 +605,23 @@ test('新しい わざの 効果: つらぬく・ドレイン・ふきとばし�
     s.enemies.length = 0;
     useNew('ouendan');
     assert.ok(p.buffs.kiai && s.allies.every(x => x.buffs.kiai), '近くの 仲間 みんな');
+});
+
+test('チームの図鑑 (2026-10-24): 7 チームの エンブレム。自分の チームは はじめから、ライバルは メンバーを 見たら わかる', () => {
+    const { s, asks, choose, run } = newGame();
+    assert.equal(Object.keys(globalThis.KD.Emblems.TEAMS).length, 7);
+    choose('図鑑');
+    choose('チームの図鑑');
+    assert.match(asks[0].message, /チームの図鑑 1 \/ 7/);
+    assert.ok(asks[0].options.includes('★ 氷隊'), asks[0].options.join(' / '));
+    assert.ok(!asks[0].options.includes('5DX'), 'まだ 会って いない チームは ？？？');
+    run(100);   // 絵を 描いても 止まらない
+    s.town.dex.seen.okagappa = 1;
+    choose('もどる');
+    choose('チームの図鑑');
+    assert.ok(asks[0].options.includes('5DX'), 'メンバーを 見たら わかる');
+    choose('5DX');
+    run(100);
+    choose('もどる');
+    assert.match(asks[0].message, /図鑑/);
 });

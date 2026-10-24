@@ -35,6 +35,7 @@
         const { state } = g;
         let view = 'town';   // town 町 / tree バトルツリー / title タイトル / loading つないでいる / dex 図鑑
         let dexKind = null;  // 図鑑で えらんでいる敵
+        let dexTeam = null;  // チームの図鑑で えらんでいる チーム (2026-10-24)
         const C = KD.Collection;
         const bgm = name => KD.Sound && KD.Sound.bgm(name);
         let pick = 0;
@@ -1269,9 +1270,10 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             const items = Object.keys(I.ITEMS);
             const nItems = items.filter(id => t().dexItems[id]).length;
             const nTraded = tradedKinds(order).length;
-            ask(`図鑑　敵：見た ${nSeen}・たおした ${nBeat} / ${order.length}${nTraded ? `（交換 ${nTraded}）` : ''}　道具：${nItems} / ${items.length}`, ['敵の図鑑', '道具の図鑑', 'もどる'], i => {
+            ask(`図鑑　敵：見た ${nSeen}・たおした ${nBeat} / ${order.length}${nTraded ? `（交換 ${nTraded}）` : ''}　道具：${nItems} / ${items.length}`, ['敵の図鑑', '道具の図鑑', 'チームの図鑑', 'もどる'], i => {
                 if (i === 0) return enemyDex();
                 if (i === 1) return itemDex();
+                if (i === 2) return teamDex();
                 dexBack();
             }, { list: false });
         }
@@ -1297,6 +1299,62 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                 view = 'town';
                 dexMenu();
             }, { place: 'bottom', list: true, index, onMove: i => { dexKind = order[i] || null; } });
+        }
+
+        // ----- チームの図鑑 (2026-10-24 ユーザー指定: チームエンブレム。js/emblems.js) -----
+        //   自分の チームは はじめから、ライバルは メンバーを 1 人でも 見たら わかる
+        const myTeam = () => DG.VERSIONS[t().version || 'koori'].name;
+        const teamKnown = id => id === myTeam() || KD.Emblems.TEAMS[id].members.some(k => dexKnown(k));
+        function teamDex(index = 0) {
+            const ids = Object.keys(KD.Emblems.TEAMS);
+            view = 'team';
+            dexTeam = ids[Math.min(index, ids.length - 1)];
+            ui.ask(`チームの図鑑 ${ids.filter(teamKnown).length} / ${ids.length}（えらぶと 上に エンブレム）`, [...ids.map(id => (teamKnown(id) ? `${id === myTeam() ? '★ ' : ''}${id}` : '？？？')), 'もどる'], i => {
+                if (i < ids.length) return teamDex(i);
+                view = 'town';
+                dexMenu();
+            }, { place: 'bottom', list: true, index, onMove: i => { dexTeam = ids[i] || null; } });
+        }
+        function drawTeam(ctx, now, W, H) {
+            ctx.fillStyle = '#101a24';
+            ctx.fillRect(0, 0, W, H);
+            const id = dexTeam, tm = id && KD.Emblems.TEAMS[id];
+            if (!tm) return;
+            const known = teamKnown(id);
+            ctx.fillStyle = '#1c2c3c';
+            ctx.fillRect(12, 10, 96, 96);
+            if (known) KD.Emblems.draw(ctx, id, 60, 58, 84, now);
+            else {
+                ctx.font = `bold 30px ${FONT}`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#3a4a5a';
+                ctx.fillText('？', 60, 58);
+                ctx.textAlign = 'left';
+            }
+            ctx.textBaseline = 'middle';
+            ctx.font = `bold 13px ${FONT}`;
+            ctx.fillStyle = known ? tm.color : '#c8d8e8';
+            ctx.fillText(known ? id : '？？？', 120, 20);
+            ctx.font = `9px ${FONT}`;
+            ctx.fillStyle = '#c8d8e8';
+            if (!known) return void ctx.fillText('まだ 出会ったことがない。', 120, 40);
+            ctx.fillText(id === myTeam() ? `あなたの チーム：${tm.motto}` : `メンバー：${tm.motto}`, 120, 40);
+            ctx.fillStyle = '#e8f4ff';
+            ctx.fillText(tm.note, 120, 56);
+            // メンバーの 絵 (見た キャラだけ)
+            tm.members.forEach((k, i) => {
+                const x = 140 + i * 70, seen = id === myTeam() || dexKnown(k);
+                if (!seen) {
+                    ctx.fillStyle = '#3a4a5a';
+                    ctx.font = `bold 20px ${FONT}`;
+                    ctx.fillText('？', x - 6, 88);
+                    ctx.font = `9px ${FONT}`;
+                    return;
+                }
+                if (A.SPRITES[k]) A.drawSprite(ctx, k, Math.floor(now / 400) % 2, x - 16, 70, { scale: 2 });
+                else KD.BigArt.drawBig(ctx, k, Math.floor(now / 400) % 2, x, 104, { height: 34 });
+            });
         }
 
         function itemDex() {
@@ -1632,6 +1690,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             if (view === 'opening') return drawOpening(ctx, now, W, H);
             if (view === 'tree') return drawTree(ctx, now, W, H);
             if (view === 'dex') return drawDex(ctx, now, W, H);
+            if (view === 'team') return drawTeam(ctx, now, W, H);
             if (view === 'status' && statusUnit) {
                 ctx.fillStyle = '#101a24';
                 ctx.fillRect(0, 0, W, H);
