@@ -118,6 +118,7 @@
             shots: [],        // 飛んでいくわざ
             rings: [],        // 周りに当たるわざ
             bigfx: [],        // 必殺技の エフェクト: { type, range, x, y, to, targets, at, ms, color }
+            hitfx: [],        // 当たりの 演出 (キャラの 擬音・属性の つぶ。js/motion.js)
             specials: { used: {}, count: 0 },   // この ダンジョンで 使った 必殺技 (used: キャラの 種類 → true。count: チームで 使った 回数)
             fade: null,       // { at, label, then }
             mini: true,
@@ -271,7 +272,9 @@
         function enterFloor(n) {
             state.floor = n;
             if ((state.dungeon.base || state.dungeon).bonus) state.dungeon = { ...DUNGEONS.find(d => d.bonus), ...DG.atFloor(n) };
-            state.map = D.generate(KD.createRng(state.seed + n * 7919), { pool: state.dungeon.pool });
+            // ボスの 階・ライバルの 階は、戦いやすいよう 広い 闘技場を 作る (2026-10-24 ユーザー指定)
+            const arena = (n >= state.dungeon.floors && Boolean(state.dungeon.boss)) || Boolean(state.dungeon.rivalFloor);
+            state.map = D.generate(KD.createRng(state.seed + n * 7919), { pool: state.dungeon.pool, arena });
             rng = KD.createRng(state.seed + n * 104729);
             state.explored = new Uint8Array(state.map.w * state.map.h);
             const p = state.player;
@@ -566,6 +569,7 @@
             state.bossDown = snap.bossDown;
             state.specials = snap.specials || { used: {}, count: 0 };
             state.bigfx = [];
+            state.hitfx = [];
             state.queue = [];
             state.dying = [];
             state.bubbles = [];
@@ -1440,6 +1444,7 @@
                 const { dmg } = deal(a, t);
                 say(`${a.name}の こうげき！ ${t.name}に ${dmg} のダメージ！`);
                 sfx('hit');
+                KD.Motion.hit(state, t, a);   // キャラの 擬音 (2026-10-24)
                 hurt(t, dmg, a);
             }
             return ATTACK_MS;
@@ -1481,6 +1486,7 @@
             sfx(mv.heal ? 'heal' : 'skill');
             if (u.side === 'party' ? rng.chance(0.15) : foeTalk(u, 0.4)) bubble(u, C.lineFor(u.kind, 'attack', u.side === 'party' ? rng : looks));
             if (mv.role && U.SKILLS[id] && /奥義/.test(mv.note || '')) flash('rgba(255,240,180,.5)');
+            KD.Motion.cast(state, u, mv);   // わざを 使う キャラの まわりの 光 (2026-10-24)
             if (mv.range === 'self') {
                 selfMove(u, mv);
                 return ATTACK_MS;
@@ -1513,6 +1519,7 @@
                 }
                 if (t.hp <= 0) continue;
                 if (mv.power > 0) {
+                    KD.Motion.hit(state, t, u, { element: mv.element, skill: true });   // 属性の 演出と 擬音 (2026-10-24)
                     // とどめ: HP が 少ない 敵には 2 倍
                     const { dmg, eff } = deal(u, t, mv.execute && t.hp < t.stats.hp * mv.execute ? { ...mv, power: mv.power * 2 } : mv);
                     // ミラーマッスル: わざを はね返すことがある
@@ -2445,6 +2452,7 @@
             const { targets, to, ends } = specialTargets(u, sp);
             const now = performance.now();
             state.bigfx.push({ type: sp.fx, range: sp.range, x: u.x, y: u.y, to, ends, dir: u.dir, targets: targets.map(t => [t.x, t.y]), at: now, ms: SPECIAL_FX_MS, color: sp.color });
+            targets.forEach(t => KD.Motion.hit(state, t, u, { element: sp.element, skill: true, big: true }));   // 当たりの 擬音 (2026-10-24)
             u.lunge = { at: now, dir: u.dir };
             flash(sp.fx === 'flash' || sp.fx === 'moon' ? 'rgba(255,255,255,.7)' : 'rgba(255,240,180,.5)');
             shake(sp.range === 'around2' || sp.fx === 'quake' || sp.range === 'front' ? 6 : 4);
@@ -2762,6 +2770,7 @@
             units.forEach(u => drawUnit(u, camX, camY, now));
             drawRings(camX, camY, now);
             drawShots(camX, camY, now);
+            KD.Motion.draw(ctx, state, x => x * T - camX + T / 2, y => y * T - camY + T / 2, now, FONT);   // 当たりの 演出
             drawSpecialFx(camX, camY, now);
             drawPopups(camX, camY, now);
             drawBubbles(camX, camY, now);
@@ -2937,16 +2946,10 @@
         }
 
         function drawUnit(u, camX, camY, now) {
-            let ox = 0, oy = 0;
-            if (u.lunge) {
-                const k = (now - u.lunge.at) / ATTACK_MS;
-                if (k >= 1) u.lunge = null;
-                else {
-                    const s = Math.sin(k * Math.PI) * 5;
-                    ox = u.lunge.dir[0] * s;
-                    oy = u.lunge.dir[1] * s;
-                }
-            }
+            // キャラごとの 動き (2026-10-24 ユーザー指定。js/motion.js): 待っている ときの くせと、攻撃の 動き
+            if (u.lunge && now - u.lunge.at >= ATTACK_MS) u.lunge = null;
+            const mo = KD.Motion.pose(u, now, ATTACK_MS);
+            const ox = mo.ox, oy = mo.oy;
             const sx = Math.round(u.fx * T - camX + ox), sy = Math.round(u.fy * T - camY + oy);
             // 影。仲間は水色の輪で、敵と見分ける
             ctx.fillStyle = 'rgba(0,0,0,.3)';
@@ -2966,7 +2969,18 @@
             if (u.side === 'enemy' && !u.awake && (has(u, 'disguise') || has(u, 'mimic'))) {
                 return A.drawItem(ctx, has(u, 'mimic') ? 'chest' : 'onigiri', has(u, 'mimic') ? 'chest' : 'food', Math.round(u.fx * T - camX), Math.round(u.fy * T - camY));
             }
-            drawBody(u, frame, sx, sy, u.flip);
+            // 残像 (突っこむ 攻撃)
+            mo.ghosts.forEach(gh => drawBody(u, frame, Math.round(u.fx * T - camX + gh.ox), Math.round(u.fy * T - camY + gh.oy), u.flip, gh.alpha));
+            // 回る・つぶれる・うすくなる: 足もとを 中心に
+            if (mo.rot || mo.sx !== 1 || mo.sy !== 1) {
+                ctx.save();
+                ctx.translate(sx + 8, sy + 14);
+                ctx.rotate(mo.rot);
+                ctx.scale(mo.sx, mo.sy);
+                ctx.translate(-(sx + 8), -(sy + 14));
+                drawBody(u, frame, sx, sy, u.flip, mo.alpha);
+                ctx.restore();
+            } else drawBody(u, frame, sx, sy, u.flip, mo.alpha);
             if (hasStatus(u, 'freeze')) {
                 ctx.fillStyle = 'rgba(190,240,255,.45)';
                 ctx.fillRect(sx + 1, sy - 2, 14, 16);

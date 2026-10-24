@@ -36,12 +36,13 @@
         }
     }
 
-    // 階を作る。opts: { w, h, minRooms, maxRooms, pool: { tile: WATER か LAVA, chance: 部屋ごとの確率 } }
+    // 階を作る。opts: { w, h, minRooms, maxRooms, pool: { tile: WATER か LAVA, chance: 部屋ごとの確率 }, arena }
+    //   arena: ボスの 階 (2026-10-24 ユーザー指定: 戦いやすいよう 広く)。はじめの 場所から いちばん 遠い 部屋を ARENA の 広さの 闘技場に して、階段は そこに 置く
     // 戻り値: { w, h, tiles, rooms, roomAt, start, stairs }
     //   tiles: 0 壁 / 1 部屋の床 / 2 通路 / 3 水 (泳げるキャラだけ) / 4 溶岩 (歩けるがダメージ)。roomAt: そのマスの部屋の番号 (部屋でなければ -1)
     function generate(rng, opts = {}) {
         const w = opts.w || 56, h = opts.h || 32;
-        const map = { w, h, tiles: new Uint8Array(w * h), rooms: [], roomAt: new Int16Array(w * h).fill(-1) };
+        const map = { w, h, tiles: new Uint8Array(w * h), rooms: [], roomAt: new Int16Array(w * h).fill(-1), arena: -1 };
         const cw = Math.floor((w - 2) / COLS), chh = Math.floor((h - 2) / ROWS);
         const count = rng.int(opts.minRooms || 4, opts.maxRooms || 8);
         const roomCells = new Set(rng.shuffle([...Array(COLS * ROWS).keys()]).slice(0, count));
@@ -94,20 +95,63 @@
         const spot = room => ({ x: room.x + rng.int(0, room.w - 1), y: room.y + rng.int(0, room.h - 1) });
         map.start = spot(map.rooms[r1]);
         map.stairs = spot(map.rooms[r2]);
+        if (opts.arena) makeArena(map, rng, r1);
         // 水たまり・溶岩 (部屋のふち 1 マスは あける。はじめの場所・階段にかかるなら置かない)
         if (opts.pool) {
-            map.rooms.forEach(room => {
-                if (room.w < 5 || room.h < 4 || !rng.chance(opts.pool.chance)) return;
+            map.rooms.forEach((room, ri) => {
+                if (ri === map.arena || room.w < 5 || room.h < 4 || !rng.chance(opts.pool.chance)) return;   // 闘技場には 置かない
                 const pw = rng.int(1, room.w - 4), ph = rng.int(1, room.h - 3);
                 const px = room.x + 1 + rng.int(0, room.w - 3 - pw), py = room.y + 1 + rng.int(0, room.h - 2 - ph);
                 const inside = q => q.x >= px && q.x < px + pw && q.y >= py && q.y < py + ph;
                 if (inside(map.start) || inside(map.stairs)) return;
+                // 闘技場に かかる 水たまり・溶岩も 置かない (となりの 部屋と 重なる ことが ある)
+                const ar = map.arena >= 0 ? map.rooms[map.arena] : null;
+                if (ar && px < ar.x + ar.w && px + pw > ar.x && py < ar.y + ar.h && py + ph > ar.y) return;
                 for (let y = py; y < py + ph; y++) {
                     for (let x = px; x < px + pw; x++) map.tiles[y * w + x] = opts.pool.tile;
                 }
             });
         }
         return map;
+    }
+
+    // ボスの 闘技場: 広い 部屋 (横 ARENA.w × 縦 ARENA.h)。壁を 床に するだけなので、つながりは 変わらない
+    const ARENA = { w: 24, h: 14 };
+    function makeArena(map, rng, startRoom) {
+        const { w, h } = map;
+        const center = r => [r.x + r.w / 2, r.y + r.h / 2];
+        const [sx, sy] = center(map.rooms[startRoom]);
+        // はじめの 部屋から いちばん 遠い 部屋
+        let ai = -1, best = -1;
+        map.rooms.forEach((r, i) => {
+            if (i === startRoom) return;
+            const [cx, cy] = center(r), d = Math.abs(cx - sx) + Math.abs(cy - sy);
+            if (d > best) { best = d; ai = i; }
+        });
+        if (ai < 0) return;
+        const aw = Math.min(ARENA.w, w - 2), ah = Math.min(ARENA.h, h - 2);
+        const [cx, cy] = center(map.rooms[ai]);
+        const x0 = Math.max(1, Math.min(w - 1 - aw, Math.round(cx - aw / 2))), y0 = Math.max(1, Math.min(h - 1 - ah, Math.round(cy - ah / 2)));
+        for (let y = y0; y < y0 + ah; y++) {
+            for (let x = x0; x < x0 + aw; x++) {
+                map.tiles[y * w + x] = FLOOR;
+                map.roomAt[y * w + x] = ai;
+            }
+        }
+        map.rooms[ai] = { x: x0, y: y0, w: aw, h: ah };
+        map.arena = ai;
+        // 階段は 闘技場の まんなかあたり
+        map.stairs = { x: x0 + (aw >> 1) + rng.int(-2, 2), y: y0 + (ah >> 1) + rng.int(-1, 1) };
+        // はじめの 場所が 闘技場に 入って しまったら、外の 床へ
+        const inside = q => q.x >= x0 && q.x < x0 + aw && q.y >= y0 && q.y < y0 + ah;
+        if (inside(map.start)) {
+            const out = [];
+            for (let i = 0; i < w * h; i++) if (map.tiles[i] === FLOOR && !inside({ x: i % w, y: Math.floor(i / w) })) out.push(i);
+            if (out.length) {
+                const i = out[rng.int(0, out.length - 1)];
+                map.start = { x: i % w, y: Math.floor(i / w) };
+            }
+        }
     }
 
     const at = (map, x, y) => (x < 0 || y < 0 || x >= map.w || y >= map.h ? WALL : map.tiles[y * map.w + x]);
@@ -169,5 +213,5 @@
         return { count: n, seen };
     }
 
-    KD.Dungeon = { WALL, FLOOR, CORRIDOR, WATER, LAVA, generate, at, walkable, canMove, canReach, visibleFrom, reachable };
+    KD.Dungeon = { WALL, FLOOR, CORRIDOR, WATER, LAVA, generate, at, walkable, canMove, canReach, visibleFrom, reachable, ARENA };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);

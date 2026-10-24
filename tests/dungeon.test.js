@@ -56,3 +56,20 @@ test('部屋の中なら部屋全体が見え、通路ならまわり 1 マス�
     const inCorridor = D.visibleFrom(map, cx, cy);
     assert.equal(inCorridor.reduce((n, v) => n + v, 0), 9, '通路はまわり 1 マス (9 マス)');
 });
+
+test('ボスの階 (arena): いちばん遠い部屋が 広い 闘技場に なり、階段は そこ。はじめの場所は 外で、全部の床へ 行ける (2026-10-24)', () => {
+    for (let seed = 1; seed <= 300; seed++) {
+        const map = D.generate(createRng(seed), { arena: true, pool: { tile: D.WATER, chance: 0.5 } });
+        const a = map.rooms[map.arena];
+        assert.ok(a && a.w === D.ARENA.w && a.h === D.ARENA.h, `seed ${seed}: 闘技場の 広さ`);
+        const inA = q => q.x >= a.x && q.x < a.x + a.w && q.y >= a.y && q.y < a.y + a.h;
+        assert.ok(inA(map.stairs), '階段は 闘技場の 中');
+        assert.ok(!inA(map.start), 'はじめの 場所は 闘技場の 外');
+        for (let y = a.y; y < a.y + a.h; y++) for (let x = a.x; x < a.x + a.w; x++) assert.equal(map.tiles[y * map.w + x], D.FLOOR, '闘技場は ぜんぶ 床 (水たまりなし)');
+        const { count, seen } = D.reachable(map, map.start.x, map.start.y, false);
+        assert.ok(seen[map.stairs.y * map.w + map.stairs.x], '階段へ 行ける');
+        assert.ok(count > 0);
+        for (let x = 0; x < map.w; x++) assert.ok(!D.walkable(map, x, 0) && !D.walkable(map, x, map.h - 1));
+        for (let y = 0; y < map.h; y++) assert.ok(!D.walkable(map, 0, y) && !D.walkable(map, map.w - 1, y));
+    }
+});
