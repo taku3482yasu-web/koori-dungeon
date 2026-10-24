@@ -4,8 +4,8 @@
 // ユーザーが 置いた 参考の 動画 (赤猫団の OP → 鬼鬼団、白犬隊の OP → 氷隊) の 流れを まねて、
 // この ゲームの キャラと チームエンブレムで 作った オリジナル (動画・曲は 使わない。著作権のため)。
 //   マスコットが 屋上に 登場 → 斜めに 区切った コマで 仲間を 3 人ずつ 紹介 (背景は チームの 紋の 模様) →
-//   タイトルの 文字が 飛びこむ → チームの バッジ付きの ロゴ → ボスの 顔の アップ → 街の 屋上の ライバル →
-//   みんなの 勢ぞろい → マスコットの 決めポーズ
+//   タイトルの 文字が 飛びこむ → チームの バッジ付きの ロゴ → ボスの 顔の アップ → 街の 屋上の ライバル (その バージョンで 仲間に なる 2 チーム) →
+//   みんなの 勢ぞろい → 宇宙を 飛ぶ チーム・ケモノミチ (どちらでも 出る チーム。動画の 黄色い うさぎの 妖怪の 場面) → マスコットの 決めポーズ
 // Op.draw(ctx, t, W, H, version, deps) を 毎フレーム 呼ぶ (t: はじまってからの 秒)。終わったら true を 返す。
 //   deps: { A (art.js), Big (bigart.js), Emblems, U (units.js), FONT }
 // どちらの OP を 流すかは townui.js が 決める (セーブの ある バージョン。両方 あれば 2 分の 1)。初めて 遊ぶ ときは 流さない
@@ -13,7 +13,7 @@
 (function (KD) {
     'use strict';
 
-    const DURATION = 43;
+    const DURATION = 44;
     const NAMES = { furukawa: 'ふるカワ', tomoishi: 'ともいし', koorimodoki: 'こおりもどき', koori: 'こおりくん', onioni: 'おにおに' };
 
     // バージョンごとの 顔ぶれと 色
@@ -21,16 +21,19 @@
         koori: {
             team: '氷隊', mascot: 'koori', buddy: 'furukawa', shout: 'いくぞ！ 氷隊！',
             base: '#eaf6ff', pat: '#cfe6f8', ink: '#2a6aa8', slash: ['#2a6aa8', '#ffffff'], sky: ['#8fd0ff', '#e8f8ff'],
-            groups: [['furukawa', 'tomoishi', 'koorimodoki'], ['yasu', 'tamu', 'dake'], ['okagappa', 'hibikimakuri', 'yamamou'], ['yukiusapon', 'penguinknight', 'sakurarisu']],
+            // 氷隊で 仲間に なる キャラ (最初の 相棒の おにおにと、雪どけの氷河だけで 出会える 仲間。2026-10-25 ユーザー指定)
+            groups: [['onioni', 'yukiusapon', 'tsurarabo'], ['kakigoora', 'penguinknight', 'shirokumatcho'], ['yukionnan', 'sakurarisu', 'harukazedori'], ['fukinoton', 'hyougaryu', 'yasu']],
             groupColors: [null, '#d8f0c8', '#cfe6f8', '#e8d8f8'],
-            bosses: ['harukirin', 'runaya', 'maou'], rivals: ['チームバータス', 'チーム・ケモノミチ']
+            // ライバルは 氷隊で 仲間に なる 2 チーム (ケモノミチは どちらでも 出るので 宇宙の 場面)
+            bosses: ['harukirin', 'runaya', 'maou'], rivals: ['5DX', 'チームバータス']
         },
         onioni: {
             team: '鬼鬼団', mascot: 'onioni', buddy: 'tomoishi', shout: 'いくぞ！ 鬼鬼団！',
             base: '#c82a2a', pat: '#a81e1e', ink: '#ffd840', slash: ['#ffd840', '#c82a2a'], sky: ['#ffb070', '#fff0c8'],
-            groups: [['furukawa', 'tomoishi', 'yasu'], ['asahara', 'sasaki', 'kotani'], ['ueno', 'shibata', 'ikekimu'], ['konin', 'aoonibo', 'hyoutanoni']],
+            // 鬼鬼団で 仲間に なる キャラ (最初の 相棒の こおりくんと、金色のSE城だけで 出会える 仲間)
+            groups: [['koori', 'konin', 'aoonibo'], ['kanabone', 'tsunodaruma', 'onibin'], ['hyoutanoni', 'taikooni', 'onigirin'], ['setsubunmame', 'goukioni', 'dake']],
             groupColors: [null, '#3a8a4a', '#2a4aa8', '#c82a2a'],
-            bosses: ['kinmetsuki', 'nozoema', 'maou'], rivals: ['5DX', 'チーム・ケモノミチ']
+            bosses: ['kinmetsuki', 'nozoema', 'maou'], rivals: ['ASK-3', 'お願いマッスル']
         }
     };
 
@@ -253,7 +256,7 @@
     // 7. 勢ぞろい (33〜39 秒)
     function sceneLineup(ctx, d, c, W, H, t) {
         pattern(ctx, d, c, W, H, t, t < 3 ? (c.groupColors[1] || c.base) : (c.groupColors[2] || c.base), 0.4);
-        const all = [c.mascot, ...c.groups.flat(), ...c.rivals.flatMap(r => d.Emblems.TEAMS[r].members)];
+        const all = [c.mascot, ...c.groups.flat(), ...[...c.rivals, 'チーム・ケモノミチ'].flatMap(r => d.Emblems.TEAMS[r].members)];
         const scroll = t * 70;
         all.forEach((k, i) => {
             const row = i % 2, x = ((i * 56 - scroll) % (all.length * 56) + all.length * 56) % (all.length * 56) - 40;
@@ -261,7 +264,61 @@
             chara(ctx, d, k, x, row ? 225 : 150, row ? 70 : 60, Math.floor(t * 4 + i) % 2, row === 1);
         });
     }
-    // 8. 決めポーズ (39〜43 秒)
+    // 8. 宇宙を 飛ぶ チーム・ケモノミチ (37〜40 秒)。参考の 動画で 黄色い うさぎの 妖怪が 出る 宇宙の 場面 (どちらの バージョンでも 出る チーム)
+    function sceneSpace(ctx, d, c, W, H, t) {
+        const sky = ctx.createLinearGradient(0, 0, 0, H);
+        sky.addColorStop(0, '#0a1a6a');
+        sky.addColorStop(1, '#2a3ac8');
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, W, H);
+        for (let i = 0; i < 40; i++) {
+            const a = 0.5 + 0.5 * Math.sin(t * 5 + i * 1.7), x = (i * 97) % W, y = (i * 53) % H, s = 1 + (i % 3) * a;
+            ctx.fillStyle = i % 4 ? `rgba(255,255,255,${a})` : `rgba(255,230,120,${a})`;
+            ctx.fillRect(x - s, y - 0.5, s * 2, 1);
+            ctx.fillRect(x - 0.5, y - s, 1, s * 2);
+        }
+        // 輪の ある 星と、大きな 黄色い 星
+        ctx.fillStyle = '#e8a050';
+        ctx.beginPath(); ctx.arc(56, 50, 12, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#ffe0a0'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(56, 50, 22, 6, -0.3, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = '#ffd040';
+        ctx.beginPath(); ctx.arc(W + 20, H + 40, 120, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(200,150,30,.5)';
+        ctx.beginPath(); ctx.arc(W - 50, H - 20, 14, 0, Math.PI * 2); ctx.fill();
+        // ロケットが 横切る
+        const rx = -60 + t * 170, ry = 170 - t * 40;
+        ctx.save();
+        ctx.translate(rx, ry);
+        ctx.rotate(-0.35);
+        ctx.fillStyle = '#ff9a2a'; ctx.fillRect(-26, -9, 40, 18);
+        ctx.fillStyle = '#3ac8c8'; ctx.beginPath(); ctx.moveTo(14, -9); ctx.lineTo(30, 0); ctx.lineTo(14, 9); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(2, 0, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = `rgba(255,${180 + Math.floor(Math.random() * 60)},60,.9)`;
+        ctx.beginPath(); ctx.moveTo(-26, -6); ctx.lineTo(-40 - Math.random() * 8, 0); ctx.lineTo(-26, 6); ctx.closePath(); ctx.fill();
+        ctx.restore();
+        // 宇宙服 (ヘルメットの 泡) の メンバーが ただよう。うさぎの イシイーが 前に 大きく
+        const team = 'チーム・ケモノミチ', members = d.Emblems.TEAMS[team].members;
+        members.forEach((k, i) => {
+            const big = k === 'ishii';
+            const x = big ? 190 + Math.sin(t * 1.5) * 10 : (k === 'mazuda' ? 80 : 310) + Math.sin(t * 2 + i) * 6;
+            const g = big ? 196 + Math.cos(t * 1.3) * 6 : (k === 'mazuda' ? 150 : 140) + Math.cos(t * 2 + i) * 6;
+            const h = big ? 96 : 50;
+            ctx.save();
+            ctx.translate(x, g - h / 2);
+            ctx.rotate(Math.sin(t + i) * 0.15);
+            ctx.translate(-x, -(g - h / 2));
+            chara(ctx, d, k, x, g, h, Math.floor(t * 3 + i) % 2);
+            ctx.strokeStyle = 'rgba(200,240,255,.8)'; ctx.lineWidth = 2;
+            ctx.fillStyle = 'rgba(200,240,255,.18)';
+            ctx.beginPath(); ctx.arc(x, g - h * 0.72, h * 0.36, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.restore();
+        });
+        d.Emblems.draw(ctx, team, 300, 30, 36);
+        text(ctx, d, team, 300, 58, 11, '#ffffff');
+    }
+
+    // 9. 決めポーズ (40〜44 秒)
     function sceneFinale(ctx, d, c, W, H, t) {
         ctx.fillStyle = c.base;
         ctx.fillRect(0, 0, W, H);
@@ -270,10 +327,10 @@
         const jump = t < 0.6 ? -Math.sin(t / 0.6 * Math.PI) * 30 : 0;
         chara(ctx, d, c.mascot, W / 2 + 70, 200 + jump, 96, Math.floor(t * 4) % 2);
         if (t > 0.6) text(ctx, d, c.shout, W / 2, 222, 18 + Math.max(0, 0.9 - t) * 20, '#ffe040', '#000000');
-        if (t > DURATION - 39 - 0.8) { ctx.fillStyle = `rgba(0,0,0,${(t - (DURATION - 39 - 0.8)) / 0.8})`; ctx.fillRect(0, 0, W, H); }
+        if (t > DURATION - 40 - 0.8) { ctx.fillStyle = `rgba(0,0,0,${(t - (DURATION - 40 - 0.8)) / 0.8})`; ctx.fillRect(0, 0, W, H); }
     }
 
-    const SCENES = [[0, sceneRoof], [4, sceneRoll], [16, sceneLetters], [19, sceneLogo], [23, sceneBosses], [29, sceneRivals], [33, sceneLineup], [39, sceneFinale]];
+    const SCENES = [[0, sceneRoof], [4, sceneRoll], [16, sceneLetters], [19, sceneLogo], [23, sceneBosses], [29, sceneRivals], [33, sceneLineup], [37, sceneSpace], [40, sceneFinale]];
 
     function draw(ctx, t, W, H, version, deps) {
         const c = CAST[version] || CAST.koori;
