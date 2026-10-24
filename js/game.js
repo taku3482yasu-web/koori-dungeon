@@ -478,15 +478,25 @@
         }
 
         // 階段に乗った: 「降りますか？」。ボスをたおすまでは使えない
-        function askStairs() {
+        // remote: 「下の階へ」ボタン (2026-10-24 ユーザー指定)。見つけた 階段から、階段の 上に いなくても 降りられる
+        function askStairs(remote = false) {
             const last = state.floor >= state.dungeon.floors;
             if (state.boss && state.boss.hp > 0) return say(`${state.boss.name}を たおさないと、先へ 進めない！`);
-            ui.ask(last ? `階段がある。降りると${state.dungeon.name}を抜けられそうだ。降りますか？` : '階段がある。降りますか？', ['はい', 'いいえ'], choice => {
+            const where = remote ? '見つけた 階段から 下の階へ 行ける。' : '階段がある。';
+            ui.ask(last ? `${where}降りると${state.dungeon.name}を抜けられそうだ。降りますか？` : `${where}降りますか？`, ['はい', 'いいえ'], choice => {
                 if (choice !== 0) return say('降りるのをやめた。');
                 sfx('stairs');
                 if (last) return clear();
                 changeFloor(state.floor + 1, `${state.dungeon.name}  B${state.floor + 1}F`);
             });
+        }
+
+        // この 階の 階段を 見つけたか (一度 見た マス)。見つけたら「下の階へ」ボタンで いつでも 降りられる (2026-10-24 ユーザー指定)
+        const stairsFound = () => Boolean(state.phase === 'play' && state.map && !state.done && !state.over && state.explored && state.explored[idx(state.map.stairs.x, state.map.stairs.y)]);
+        function goDown() {
+            if (busy()) return;
+            if (!stairsFound()) return say('まだ この階の 階段を 見つけていない。');
+            askStairs(true);
         }
 
         // いちばん下の階の階段: 突破して町へ (仕様書 3章)
@@ -3130,12 +3140,14 @@
             });
         }
 
-        // 画面の 外に いる 敵 (見えて いる もの)・仲間の 矢印 (2026-10-24 ユーザー指定: マップを 大きく したので 見える 範囲が せまい)。
-        //   画面の ふちに、その 方向を 指す 三角を 出す。敵は 赤 (ボスは 大きく)、仲間は 水色
+        // 画面の 外に いる 敵 (見えて いる もの)・仲間・見つけた 階段の 矢印 (2026-10-24 ユーザー指定: マップを 大きく したので 見える 範囲が せまい)。
+        //   画面の ふちに、その 方向を 指す 三角を 出す。敵は 赤 (ボスは 大きく)、仲間は 水色、階段は 青
         function drawOffscreen(camX, camY, now) {
             const z = zoomOf(), top = Math.round((state.hudRows === 2 ? 26 : 15) * textScale()) + 2, m = 7;
             const foes = state.enemies.filter(e => state.visible[idx(e.x, e.y)] && (e.awake || !(has(e, 'disguise') || has(e, 'mimic'))));
             const list = [...foes.map(e => [e, e.boss ? '#ff2a2a' : '#ff6a5a', e.boss ? 7 : 5]), ...state.allies.map(a => [a, '#7affff', 4])];
+            // 見つけた 階段 (2026-10-24 ユーザー指定): 青い 大きめの 矢印
+            if (stairsFound()) list.push([{ fx: state.map.stairs.x, fy: state.map.stairs.y }, '#3a8aff', 6]);
             const pulse = 0.6 + 0.4 * Math.abs(Math.sin(now / 200));
             for (const [u, color, size] of list) {
                 const sx = W / 2 + (u.fx * T - camX + T / 2 - W / 2) * z, sy = H / 2 + (u.fy * T - camY + T / 2 - H / 2) * z;
@@ -3342,6 +3354,7 @@
             statusMenu, equipMenu, equip, unequip, recalc, healAll, resumeSnap, maxSkills, learnNow,
             skills: () => (state.player && state.phase === 'play' ? state.player.skills.map(skillLabel) : []),
             toggleMinimap() { state.mini = !state.mini; },
+            goDown, stairsFound,
             // 「音」ボタン: 音の設定 (音量・オン・オフ。2026-10-22 ユーザー指定)。S キーは これまでどおり オン・オフだけ
             soundMenu() {
                 if (!ui.asking()) town.soundSettings(() => {});

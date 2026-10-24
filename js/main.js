@@ -181,6 +181,7 @@
                 game.wait();
             } else if ((k === 'KeyZ' || k === 'Enter') && !e.repeat) game.confirm();
             else if (k === 'KeyM' && !e.repeat) game.toggleMinimap();
+            else if (k === 'KeyD' && !e.repeat) game.goDown();   // 下の階へ (2026-10-24)
             else if (k === 'KeyX' && !e.repeat) game.itemMenu();
             else if (k === 'KeyT' && !e.repeat) game.tacticMenu();
             else if (k === 'KeyC' && !e.repeat) game.switchMenu();   // 操作するキャラの 交代
@@ -272,6 +273,8 @@
         tap('btn-special', () => (ask.asking() ? null : game.specialMenu()));
         tap('btn-sound', () => game.soundMenu());
         tap('btn-status', () => (ask.asking() ? ask.key('back') : game.statusMenu()));
+        tap('btn-down', () => (ask.asking() ? null : game.goDown()));   // 下の階へ (階段を 見つけたら。2026-10-24)
+        const downBtn = document.getElementById('btn-down');
 
         // ----- わざのボタン (変わったときだけ作り直す) -----
         const skillBox = document.getElementById('skills');
@@ -332,6 +335,7 @@
                 if (document.body.dataset.phase !== phase) document.body.dataset.phase = phase;
                 placeAsk(phase);
                 game.draw(now);
+                downBtn.hidden = !game.stairsFound();   // 階段を 見つけたら「下の階へ」
                 renderSkills();
             } catch (e) {
                 console.error(e);

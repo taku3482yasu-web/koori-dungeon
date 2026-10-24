@@ -43,6 +43,29 @@ test('壁には入れず、歩くとターンが進み、見た場所がミニ�
     assert.ok(s.turn > 0);
 });
 
+test('下の階へ (2026-10-24): 階段を 見つけるまでは 降りられず、見つけたら 階段の 上で なくても 降りられる', () => {
+    const { game, s, run, asks, answer } = setup();
+    const st = s.map.stairs;
+    s.explored[st.y * s.map.w + st.x] = 0;
+    assert.equal(game.stairsFound(), false);
+    game.goDown();
+    assert.equal(asks.length, 0, '見つけて いないので 聞かない');
+    assert.equal(s.floor, 1);
+    s.explored[st.y * s.map.w + st.x] = 1;
+    assert.equal(game.stairsFound(), true);
+    assert.ok(s.player.x !== st.x || s.player.y !== st.y, '階段の 上には いない');
+    game.goDown();
+    assert.match(asks[0].message, /見つけた 階段から 下の階へ/);
+    answer(1);   // いいえ
+    run(200);
+    assert.equal(s.floor, 1);
+    game.goDown();
+    answer(0);   // はい
+    run(1500);
+    assert.equal(s.floor, 2, '次の階');
+    assert.equal(game.stairsFound(), false, '次の階では まだ 見つけて いない');
+});
+
 test('ダッシュは部屋の出入り・分かれ道で止まる', () => {
     const { game, s, run } = setup();
     const room = s.map.rooms[s.map.roomAt[s.player.y * s.map.w + s.player.x]];

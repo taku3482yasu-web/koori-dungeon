@@ -184,6 +184,8 @@ h1 .howto:hover { border-color: var(--hot); }
 .acts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; flex: 1; max-width: 330px; }
 .acts button { height: 46px; font-size: 15px; padding: 0 4px; }
 #btn-ok { border-color: var(--hot); }
+#btn-down { border-color: #3a8aff; color: #bfe0ff; }   /* 下の階へ (階段を 見つけたら 出る) */
+.acts button[hidden] { display: none; }
 
 .keys { margin: 12px 0 0; font-size: 12px; color: #a8c0d8; line-height: 1.6; }
 

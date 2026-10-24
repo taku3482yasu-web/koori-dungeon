@@ -236,6 +236,18 @@ try {
     check(/音の設定/.test(await asking()), '「音」ボタンで 音の設定');
     await press('.ask-choices button', { text: 'もどる' });
     await sleep(800);
+    // 下の階へ (2026-10-24): 階段を 見つけるまでは ボタンが 出ず、見つけたら 出て、押すと「降りますか？」
+    const downShown = () => evaluate('!document.getElementById("btn-down").hidden && document.getElementById("btn-down").offsetWidth > 0');
+    await evaluate('(() => { const s = window.kdGame.state; s.explored[s.map.stairs.y * s.map.w + s.map.stairs.x] = 0; return true; })()');
+    await sleep(200);
+    const hiddenBefore = !(await downShown());
+    await evaluate('(() => { const s = window.kdGame.state; s.explored[s.map.stairs.y * s.map.w + s.map.stairs.x] = 1; return true; })()');
+    await sleep(200);
+    const shownAfter = await downShown();
+    await press('#btn-down');
+    const downAsk = /見つけた 階段から 下の階へ/.test(await asking());
+    await press('.ask-choices button', { text: 'いいえ' });
+    check(hiddenBefore && shownAfter && downAsk, `「下の階へ」: 階段を 見つけたら 出て、押すと 降りるか 聞く（${hiddenBefore}・${shownAfter}・${downAsk}）`);
     check(await phase() === 'play', '最後まで 画面が止まらない');
     // ページを 開きなおすと、やめた場所から 続く (オートセーブ)
     await press('#btn-wait');
