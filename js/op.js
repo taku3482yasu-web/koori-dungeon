@@ -5,7 +5,7 @@
 // この ゲームの キャラと チームエンブレムで 作った オリジナル (動画・曲は 使わない。著作権のため)。
 //   マスコットが 屋上に 登場 → 斜めに 区切った コマで 仲間を 3 人ずつ 紹介 (背景は チームの 紋の 模様) →
 //   タイトルの 文字が 飛びこむ → チームの バッジ付きの ロゴ → ボスの 顔の アップ → 街の 屋上の ライバル (その バージョンで 仲間に なる 2 チーム) →
-//   みんなの 勢ぞろい → 宇宙を 飛ぶ チーム・ケモノミチ (どちらでも 出る チーム。動画の 黄色い うさぎの 妖怪の 場面) → マスコットの 決めポーズ
+//   みんなの 勢ぞろい → ジャングルの チーム・ケモノミチ (どちらでも 出る チーム。動画の 黄色い うさぎの 妖怪が 出る ところ) → マスコットの 決めポーズ
 // Op.draw(ctx, t, W, H, version, deps) を 毎フレーム 呼ぶ (t: はじまってからの 秒)。終わったら true を 返す。
 //   deps: { A (art.js), Big (bigart.js), Emblems, U (units.js), FONT }
 // どちらの OP を 流すかは townui.js が 決める (セーブの ある バージョン。両方 あれば 2 分の 1)。初めて 遊ぶ ときは 流さない
@@ -22,9 +22,9 @@
             team: '氷隊', mascot: 'koori', buddy: 'furukawa', shout: 'いくぞ！ 氷隊！',
             base: '#eaf6ff', pat: '#cfe6f8', ink: '#2a6aa8', slash: ['#2a6aa8', '#ffffff'], sky: ['#8fd0ff', '#e8f8ff'],
             // 氷隊で 仲間に なる キャラ (最初の 相棒の おにおにと、雪どけの氷河だけで 出会える 仲間。2026-10-25 ユーザー指定)
-            groups: [['onioni', 'yukiusapon', 'tsurarabo'], ['kakigoora', 'penguinknight', 'shirokumatcho'], ['yukionnan', 'sakurarisu', 'harukazedori'], ['fukinoton', 'hyougaryu', 'yasu']],
+            groups: [['onioni', 'yukiusapon', 'tsurarabo'], ['kakigoora', 'penguinknight', 'shirokumatcho'], ['yukionnan', 'sakurarisu', 'harukazedori'], ['fukinoton', 'hyougaryu', 'tamu']],
             groupColors: [null, '#d8f0c8', '#cfe6f8', '#e8d8f8'],
-            // ライバルは 氷隊で 仲間に なる 2 チーム (ケモノミチは どちらでも 出るので 宇宙の 場面)
+            // ライバルは 氷隊で 仲間に なる 2 チーム (ケモノミチは どちらでも 出るので ジャングルの 場面)
             bosses: ['harukirin', 'runaya', 'maou'], rivals: ['5DX', 'チームバータス']
         },
         onioni: {
@@ -264,56 +264,57 @@
             chara(ctx, d, k, x, row ? 225 : 150, row ? 70 : 60, Math.floor(t * 4 + i) % 2, row === 1);
         });
     }
-    // 8. 宇宙を 飛ぶ チーム・ケモノミチ (37〜40 秒)。参考の 動画で 黄色い うさぎの 妖怪が 出る 宇宙の 場面 (どちらの バージョンでも 出る チーム)
-    function sceneSpace(ctx, d, c, W, H, t) {
+    // 8. ジャングルの チーム・ケモノミチ (37〜40 秒。どちらの バージョンでも 出る チーム。2026-10-25 ユーザー指定で 宇宙から ジャングルに)。
+    //   木もれ日の さす 密林で、つたが ゆれ、うさぎの イシイーが 前で 跳ね、マズダと NAITOON が 木の あいだから 出てくる
+    function sceneJungle(ctx, d, c, W, H, t) {
         const sky = ctx.createLinearGradient(0, 0, 0, H);
-        sky.addColorStop(0, '#0a1a6a');
-        sky.addColorStop(1, '#2a3ac8');
+        sky.addColorStop(0, '#2a6a3a');
+        sky.addColorStop(1, '#0e3a1e');
         ctx.fillStyle = sky;
         ctx.fillRect(0, 0, W, H);
-        for (let i = 0; i < 40; i++) {
-            const a = 0.5 + 0.5 * Math.sin(t * 5 + i * 1.7), x = (i * 97) % W, y = (i * 53) % H, s = 1 + (i % 3) * a;
-            ctx.fillStyle = i % 4 ? `rgba(255,255,255,${a})` : `rgba(255,230,120,${a})`;
-            ctx.fillRect(x - s, y - 0.5, s * 2, 1);
-            ctx.fillRect(x - 0.5, y - s, 1, s * 2);
+        // 木もれ日
+        ctx.fillStyle = 'rgba(255,250,180,.12)';
+        for (let i = 0; i < 4; i++) {
+            const x = 40 + i * 100 + Math.sin(t + i) * 6;
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 30, 0); ctx.lineTo(x + 90, H); ctx.lineTo(x + 40, H); ctx.closePath(); ctx.fill();
         }
-        // 輪の ある 星と、大きな 黄色い 星
-        ctx.fillStyle = '#e8a050';
-        ctx.beginPath(); ctx.arc(56, 50, 12, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = '#ffe0a0'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.ellipse(56, 50, 22, 6, -0.3, 0, Math.PI * 2); ctx.stroke();
-        ctx.fillStyle = '#ffd040';
-        ctx.beginPath(); ctx.arc(W + 20, H + 40, 120, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = 'rgba(200,150,30,.5)';
-        ctx.beginPath(); ctx.arc(W - 50, H - 20, 14, 0, Math.PI * 2); ctx.fill();
-        // ロケットが 横切る
-        const rx = -60 + t * 170, ry = 170 - t * 40;
-        ctx.save();
-        ctx.translate(rx, ry);
-        ctx.rotate(-0.35);
-        ctx.fillStyle = '#ff9a2a'; ctx.fillRect(-26, -9, 40, 18);
-        ctx.fillStyle = '#3ac8c8'; ctx.beginPath(); ctx.moveTo(14, -9); ctx.lineTo(30, 0); ctx.lineTo(14, 9); ctx.closePath(); ctx.fill();
-        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(2, 0, 5, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = `rgba(255,${180 + Math.floor(Math.random() * 60)},60,.9)`;
-        ctx.beginPath(); ctx.moveTo(-26, -6); ctx.lineTo(-40 - Math.random() * 8, 0); ctx.lineTo(-26, 6); ctx.closePath(); ctx.fill();
-        ctx.restore();
-        // 宇宙服 (ヘルメットの 泡) の メンバーが ただよう。うさぎの イシイーが 前に 大きく
-        const team = 'チーム・ケモノミチ', members = d.Emblems.TEAMS[team].members;
-        members.forEach((k, i) => {
-            const big = k === 'ishii';
-            const x = big ? 190 + Math.sin(t * 1.5) * 10 : (k === 'mazuda' ? 80 : 310) + Math.sin(t * 2 + i) * 6;
-            const g = big ? 196 + Math.cos(t * 1.3) * 6 : (k === 'mazuda' ? 150 : 140) + Math.cos(t * 2 + i) * 6;
-            const h = big ? 96 : 50;
-            ctx.save();
-            ctx.translate(x, g - h / 2);
-            ctx.rotate(Math.sin(t + i) * 0.15);
-            ctx.translate(-x, -(g - h / 2));
-            chara(ctx, d, k, x, g, h, Math.floor(t * 3 + i) % 2);
-            ctx.strokeStyle = 'rgba(200,240,255,.8)'; ctx.lineWidth = 2;
-            ctx.fillStyle = 'rgba(200,240,255,.18)';
-            ctx.beginPath(); ctx.arc(x, g - h * 0.72, h * 0.36, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        // 奥の 木の 幹と 葉 (少し ずれて 動く)
+        const pan = t * 12;
+        for (let i = 0; i < 7; i++) {
+            const x = ((i * 70 - pan * 0.5) % (W + 70) + W + 70) % (W + 70) - 35;
+            ctx.fillStyle = '#3a2a1a';
+            ctx.fillRect(x, 40, 14, H - 40);
+            ctx.fillStyle = i % 2 ? '#1e5a2a' : '#2a7a3a';
+            ctx.beginPath(); ctx.ellipse(x + 7, 40, 44, 26, 0, 0, Math.PI * 2); ctx.fill();
+        }
+        // ゆれる つた
+        ctx.strokeStyle = '#4a9a3a';
+        ctx.lineWidth = 3;
+        for (let i = 0; i < 5; i++) {
+            const x = 30 + i * 80, sway = Math.sin(t * 2 + i) * 8;
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.quadraticCurveTo(x + sway, 50, x + sway * 1.5, 90 + (i % 3) * 20); ctx.stroke();
+            ctx.fillStyle = '#6ac84a';
+            ctx.fillRect(x + sway * 1.5 - 3, 88 + (i % 3) * 20, 6, 4);
+        }
+        // 地面と しげみ
+        ctx.fillStyle = '#1a4a1e';
+        ctx.fillRect(0, 196, W, H - 196);
+        // メンバー: マズダ (左の 木の あいだ)・NAITOON (右の 岩の 上)・イシイー (前で 大きく 跳ねる)
+        const team = 'チーム・ケモノミチ';
+        const hop = Math.abs(Math.sin(t * 4)) * 18;
+        chara(ctx, d, 'mazuda', 80 + Math.min(1, t / 0.6) * 10, 196, 60, Math.floor(t * 3) % 2);
+        ctx.fillStyle = '#5a5a4a';
+        ctx.beginPath(); ctx.ellipse(310, 176, 40, 16, 0, 0, Math.PI * 2); ctx.fill();
+        chara(ctx, d, 'naitoon', 310, 170, 56, Math.floor(t * 3 + 1) % 2, true);
+        chara(ctx, d, 'ishii', 196, 226 - hop, 100, hop > 9 ? 1 : 0);
+        // 手前の 大きな 葉 (左右の すみ)
+        ctx.fillStyle = '#2a8a3a';
+        for (const [x, y, r] of [[0, 230, -0.5], [W, 228, 0.5 + Math.PI], [24, 0, 0.8]]) {
+            ctx.save(); ctx.translate(x, y); ctx.rotate(r + Math.sin(t * 2) * 0.05);
+            ctx.beginPath(); ctx.ellipse(40, 0, 50, 16, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#1a5a2a'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(86, 0); ctx.stroke();
             ctx.restore();
-        });
+        }
         d.Emblems.draw(ctx, team, 300, 30, 36);
         text(ctx, d, team, 300, 58, 11, '#ffffff');
     }
@@ -330,7 +331,7 @@
         if (t > DURATION - 40 - 0.8) { ctx.fillStyle = `rgba(0,0,0,${(t - (DURATION - 40 - 0.8)) / 0.8})`; ctx.fillRect(0, 0, W, H); }
     }
 
-    const SCENES = [[0, sceneRoof], [4, sceneRoll], [16, sceneLetters], [19, sceneLogo], [23, sceneBosses], [29, sceneRivals], [33, sceneLineup], [37, sceneSpace], [40, sceneFinale]];
+    const SCENES = [[0, sceneRoof], [4, sceneRoll], [16, sceneLetters], [19, sceneLogo], [23, sceneBosses], [29, sceneRivals], [33, sceneLineup], [37, sceneJungle], [40, sceneFinale]];
 
     function draw(ctx, t, W, H, version, deps) {
         const c = CAST[version] || CAST.koori;
