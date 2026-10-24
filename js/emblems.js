@@ -10,7 +10,7 @@
     'use strict';
 
     const TEAMS = {
-        '氷隊': { color: '#8fd6f7', members: ['koori'], motto: 'こおりくんの 探検隊 (ばりきつよめ 改め)',
+        '氷隊': { color: '#8fd6f7', members: ['koori'], motto: 'こおりくんの 探検隊',
             note: '氷の 結晶の 六角に、こおりくんの 顔。冷たいけど 熱い チーム' },
         '鬼鬼団': { color: '#ff6a4a', members: ['onioni'], motto: 'おにおにの 探検隊 (SE城の 主)',
             note: '赤い 盾に 鬼の 角と 金棒。取り立ては きっちり' },
