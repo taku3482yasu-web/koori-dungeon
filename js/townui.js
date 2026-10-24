@@ -2083,7 +2083,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                 }
                 const pop = Math.min(1, t * 2);
                 label('探検隊', W / 2, 34, 14, '#ffffff');
-                label('ばりきつよめ', W / 2, 62, Math.round(30 * pop) || 1, '#ffe680');
+                label(DG.VERSIONS[(state.town && state.town.version) || 'koori'].name, W / 2, 62, Math.round(30 * pop) || 1, '#ffe680');
                 A.drawSprite(ctx, 'koori', bob, W / 2 - 76, 96 - bob * 3, { scale: 4 });
                 A.drawSprite(ctx, 'onioni', 1 - bob, W / 2 + 12, 96 - (1 - bob) * 3, { scale: 4 });
                 for (let i = 0; i < 10; i++) {

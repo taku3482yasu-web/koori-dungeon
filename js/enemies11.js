@@ -144,7 +144,7 @@
             id: 'glacier', version: 'koori', name: '雪どけの氷河', theme: 'glacier', boss: 'harukirin', bgm: 'cave',
             enemies: ['yukiusapon', 'tsurarabo', 'kakigoora', 'penguinknight', 'shirokumatcho', 'yukionnan', 'sakurarisu', 'harukazedori', 'fukinoton'],
             story: {
-                intro: ['ふるカワ「月の迷宮の むこうに、氷河が 見つかったんだって！ でも 奥から 春の においが するらしいよ」', 'こおりくん「よーし！ばりきつよめ改め、氷隊！出動だ！」'],
+                intro: ['ふるカワ「月の迷宮の むこうに、氷河が 見つかったんだって！ でも 奥から 春の においが するらしいよ」', 'こおりくん「よーし！氷隊！出動だ！」'],
                 boss: ['ハル麒麟「氷は とけ、春が 来る。それが さだめ。こおりの子よ、そなたも 溶けて賢者となりなさい」', 'こおりくん「こおりは とけないよ！ 氷隊の 意地を 見せてやる！」'],
                 clear: ['ハル麒麟「……春を はねかえす 氷か。見事だ」', 'ふるカワ「氷河が 元に もどっていくよ！」', '雪どけの氷河を 突破した！']
             }
@@ -153,7 +153,7 @@
             id: 'onijo', version: 'onioni', name: '金色のSE城', theme: 'onijo', boss: 'kinmetsuki', bgm: 'deep',
             enemies: ['konin', 'aoonibo', 'kanabone', 'tsunodaruma', 'onibin', 'hyoutanoni', 'taikooni', 'onigirin', 'setsubunmame'],
             story: {
-                intro: ['ふるカワ「月の迷宮の むこうに、金ピカの お城が 建ったんだって！ 鬼が いっぱい いるらしいよ」', 'おにおに「鬼の 城だと？ それ俺の城じゃね？　だまってられん！ばりきつよめ改め、鬼鬼団！出陣だ！」'],
+                intro: ['ふるカワ「月の迷宮の むこうに、金ピカの お城が 建ったんだって！ 鬼が いっぱい いるらしいよ」', 'おにおに「鬼の 城だと？ それ俺の城じゃね？　だまってられん！鬼鬼団！出陣だ！」'],
                 boss: ['金滅鬼「金色の 鬼に ひれ伏せ！ 鬼を 名のる 小僧よ、ここで 滅びるがいい！」', 'おにおに「鬼鬼団の 鬼は 負けん！ 金返せ……じゃなくて、城を 返せ！」'],
                 clear: ['金滅鬼「……ぐぬぬ……その 鬼の 心、本物か……」', 'ふるカワ「お城の 金ピカが 消えていくよ！」', '金色のSE城を 突破した！']
             }
