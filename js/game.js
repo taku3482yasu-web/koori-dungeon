@@ -20,10 +20,16 @@
     const T = A.T;
     const VIEW_W = 24, VIEW_H = 15;               // 画面に出すマスの数 (横・縦)
     const W = VIEW_W * T, H = VIEW_H * T;         // canvas の大きさ (ドット)
-    // ダンジョンの中の マップは ZOOM 倍に 大きく 描く (2026-10-24 ユーザー指定: 1 コマが 小さくて 見えづらい)。
-    //   見えるのは 横 16 × 縦 10 マス。文字や まわりの 表示 (HUD) は 今の 大きさの まま。
-    //   ドットが きれいに そろうように、canvas の 中身は RES 倍で 持つ (1 ドット = ZOOM × RES = 3 ピクセル)
-    const ZOOM = 1.5, RES = 2;
+    // ダンジョンの中の マップは 大きく 描く (2026-10-24 ユーザー指定: 1 コマが 小さくて 見えづらい)。文字や まわりの 表示 (HUD) は 今の 大きさの まま。
+    //   大きさは 設定で 選べる (2026-10-24 ユーザー指定): ふつう 1 倍 (24 × 15 マス) / 大きい 1.5 倍 (16 × 10 マス。はじめ) / とても大きい 2 倍 (12 × 7.5 マス)。
+    //   セーブとは べつに localStorage に 取っておく (音量と 同じ)。
+    //   ドットが きれいに そろうように、canvas の 中身は RES 倍で 持つ (1 ドット = 倍率 × RES ピクセルが 整数)
+    const RES = 2;
+    const MAP_ZOOMS = [{ id: 'normal', name: 'ふつう', zoom: 1 }, { id: 'big', name: '大きい', zoom: 1.5 }, { id: 'huge', name: 'とても大きい', zoom: 2 }];
+    const ZOOM_KEY = 'koori-dungeon-map-zoom';
+    let mapZoom = 'big';
+    try { const z = localStorage.getItem(ZOOM_KEY); if (MAP_ZOOMS.some(m => m.id === z)) mapZoom = z; } catch (e) { /* 保存できない 環境 (テストも) */ }
+    const zoomOf = () => MAP_ZOOMS.find(m => m.id === mapZoom).zoom;
     const STEP_MS = 110, DASH_MS = 45;            // 1 マス動くのにかける時間 (ふつう・ダッシュ)
     const FADE_MS = 1100;                         // 階が変わるときの暗転
     const ATTACK_MS = 240, SHOOT_MS = 300;        // 攻撃 1 回を見せる時間
@@ -2700,10 +2706,10 @@
                 }
             }
             const camX = Math.round(p.fx * T - (W - T) / 2) + sx0, camY = Math.round(p.fy * T - (H - T) / 2) + sy0;
-            // マップと キャラは 画面の まんなか (主人公) を 中心に ZOOM 倍
+            // マップと キャラは 画面の まんなか (主人公) を 中心に 拡大 (設定の マップの大きさ)
             ctx.save();
             ctx.translate(W / 2, H / 2);
-            ctx.scale(ZOOM, ZOOM);
+            ctx.scale(zoomOf(), zoomOf());
             ctx.translate(-W / 2, -H / 2);
             const x0 = Math.floor(camX / T), y0 = Math.floor(camY / T);
             for (let ty = y0; ty <= y0 + VIEW_H + 1; ty++) {
@@ -3285,5 +3291,16 @@
     }
 
     KD.createGame = createGame;
-    KD.VIEW = { W, H, COLS: VIEW_W / ZOOM };   // COLS: 画面の 横に 見える マスの 数 (main.js の タップ)
+    // COLS: 画面の 横に 見える マスの 数 (main.js の タップ)
+    KD.VIEW = { W, H, get COLS() { return VIEW_W / zoomOf(); } };
+    // マップの大きさの 設定 (townui.js の 設定)
+    KD.MapZoom = {
+        CHOICES: MAP_ZOOMS,
+        get: () => mapZoom,
+        set(id) {
+            if (!MAP_ZOOMS.some(m => m.id === id)) return;
+            mapZoom = id;
+            try { localStorage.setItem(ZOOM_KEY, id); } catch (e) { /* 保存できない 環境 */ }
+        }
+    };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);

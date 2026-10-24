@@ -1237,9 +1237,15 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                 ['効果音を 大きく', () => { S.setVolume('se', v.se + 1); S.play('pickup'); }],
                 ['効果音を 小さく', () => { S.setVolume('se', v.se - 1); S.play('pickup'); }],
                 [`音を ${S.isOn() ? 'オフ' : 'オン'}にする`, () => S.toggle()],
+                // マップの大きさ (2026-10-24 ユーザー指定): ふつう → 大きい → とても大きい → ふつう と 切りかえる (game.js の KD.MapZoom)
+                ['マップの大きさを 切りかえる', () => {
+                    const k = Z.CHOICES.findIndex(m => m.id === Z.get());
+                    Z.set(Z.CHOICES[(k + 1) % Z.CHOICES.length].id);
+                }],
                 ['もどる', null]
             ];
-            ask(`音の設定\nBGM　　${bar(v.bgm)}\n効果音　${bar(v.se)}\n音　　　${S.isOn() ? 'オン' : 'オフ'}（ダンジョンでは S キー・「音」ボタンで オン・オフ）`,
+            const Z = KD.MapZoom, zoomName = Z.CHOICES.find(m => m.id === Z.get()).name;
+            ask(`音の設定\nBGM　　${bar(v.bgm)}\n効果音　${bar(v.se)}\n音　　　${S.isOn() ? 'オン' : 'オフ'}（ダンジョンでは S キー・「音」ボタンで オン・オフ）\nマップ　${zoomName}（ダンジョンの 1 マスの 大きさ）`,
                 rows.map(r => r[0]), i => {
                     if (!rows[i][1]) return back();
                     rows[i][1]();

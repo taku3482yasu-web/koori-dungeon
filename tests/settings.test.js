@@ -83,6 +83,25 @@ test('設定: 町と タイトルと 家から 開ける。押すと 目もり�
     assert.match(asks[0].message, /^家/);
 });
 
+test('設定: マップの大きさを ふつう → 大きい → とても大きい と 切りかえられる (はじめは 大きい)', () => {
+    const { asks, choose } = newGame();
+    const Z = globalThis.KD.MapZoom;
+    Z.set('big');
+    choose('設定');
+    assert.match(asks[0].message, /マップ　大きい/);
+    assert.equal(globalThis.KD.VIEW.COLS, 16);
+    choose('マップの大きさを 切りかえる');
+    assert.equal(Z.get(), 'huge');
+    assert.equal(globalThis.KD.VIEW.COLS, 12);
+    assert.match(asks[0].message, /マップ　とても大きい/);
+    choose('マップの大きさを 切りかえる');
+    assert.equal(Z.get(), 'normal');
+    assert.equal(globalThis.KD.VIEW.COLS, 24);
+    choose('マップの大きさを 切りかえる');
+    assert.equal(Z.get(), 'big');
+    choose('もどる');
+});
+
 test('町の 図鑑: 町の メニューから 開けて、もどると 町に もどる', () => {
     const { asks, choose, run } = newGame();
     choose('図鑑');
