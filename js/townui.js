@@ -36,6 +36,8 @@
         let view = 'town';   // town 町 / tree バトルツリー / title タイトル / loading つないでいる / dex 図鑑
         let dexKind = null;  // 図鑑で えらんでいる敵
         let dexTeam = null;  // チームの図鑑で えらんでいる チーム (2026-10-24)
+        let opShown = false; // 起動時の オープニングを 流したか (2026-10-25。1 回だけ)
+        let opInfo = null;   // 流している オープニング { version, start }
         const C = KD.Collection;
         const bgm = name => KD.Sound && KD.Sound.bgm(name);
         let pick = 0;
@@ -140,6 +142,13 @@
             bgm('title');
             migrateSave();
             const slots = SLOTS.filter(readSlot);
+            // 起動時の オープニング (2026-10-25 ユーザー指定。js/op.js): はじめて 遊ぶ ときは 出さない。セーブの ある バージョンの OP、
+            //   両方 あれば 2 分の 1。起動して 最初の タイトルだけ
+            if (!opShown && slots.length && KD.Op && !g.opts.noOp && typeof document !== 'undefined') {   // 画面の ない テストでは 流さない
+                opShown = true;
+                return playOp(slots.length > 1 ? slots[Math.random() < 0.5 ? 0 : 1] : slots[0]);
+            }
+            opShown = true;
             // セーブが 1 つなら その バージョン、2 つなら 両方を タイトルに 出す
             titleVersion = slots.length === 1 ? DG.VERSIONS[slots[0]] : slots.length ? { name: slots.map(v => DG.VERSIONS[v].name).join(' ／ '), color: '#ffe680' } : null;
             const label = v => (slots.length > 1 ? `つづきから（${DG.VERSIONS[v].name}）` : 'つづきから');
@@ -149,6 +158,20 @@
                 if (i === slots.length + 1) return transfer();
                 soundSettings(title);
             }, { place: 'bottom', list: false });
+        }
+
+        // ----- 起動時の オープニング (2026-10-25) -----
+        function playOp(version) {
+            view = 'op';
+            opInfo = { version, start: null };
+            bgm(`op_${version}`);
+            ask(`オープニング（${DG.VERSIONS[version].name}）`, ['スキップ ▶'], endOp, { place: 'bottom', list: false });
+        }
+        function endOp() {
+            if (view !== 'op') return;
+            view = 'title';
+            opInfo = null;
+            title();
         }
 
         // ----- 引き継ぎ (スマホと PC で セーブを 移す。2026-10-22 ユーザー指定) -----
@@ -1687,6 +1710,12 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
         // ----- 絵 -----
         function draw(ctx, now, W, H) {
             if (view === 'title') return drawTitle(ctx, now, W, H);
+            if (view === 'op' && opInfo) {
+                if (opInfo.start === null) opInfo.start = now;
+                const done = KD.Op.draw(ctx, (now - opInfo.start) / 1000, W, H, opInfo.version, { A, Big: KD.BigArt, Emblems: KD.Emblems, U, FONT });
+                if (done) endOp();
+                return;
+            }
             if (view === 'opening') return drawOpening(ctx, now, W, H);
             if (view === 'tree') return drawTree(ctx, now, W, H);
             if (view === 'dex') return drawDex(ctx, now, W, H);
@@ -2365,7 +2394,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             yahami: ['お宝の においが するわね♪', '美しさに 磨きを かけてるの'],
             maechokkin: ['チョッキン♪ 前髪 そろえてあげる？', 'お宝も 前髪も きれいに ね'],
             norahan: ['ニャハッ。お財布 ちょうだい♪', 'ダンジョンで また 会おうね♪'],
-            ishii: ['ブヒッ！ 次は 負けないぞ！', 'ダンジョンは おれたちの 家だ！'],
+            ishii: ['ピョンッ！ 次は 負けないぞ！', 'ダンジョンは おれたちの 家だ！'],
             mazuda: ['……修行が 足りんな', '迷宮の 奥で 待っている'],
             naitoon: ['ワォーン！', '夜の 迷宮は おれたちの もの'],
         };

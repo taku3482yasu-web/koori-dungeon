@@ -274,7 +274,7 @@
         asahara: { type: 'duel', dungeon: 'mansion', floor: 10, money: 9000, text: 'KING.ASAHARA「フハハハ！ ひれ伏すのは どちらか……忍びの屋敷の B10F で 決めようではないか」' },
         ueno: { type: 'duel', dungeon: 'mountain', floor: 12, money: 9000, text: 'マッスルウエノーブル「お願いマッスルの 主として、筋肉の勝負を 申しこむ！ 我が筋肉の前に ひれ伏すがよい！ 筋肉の山の B12F で 待つ」' },
         yahami: { type: 'duel', dungeon: 'moon', floor: 10, money: 9000, text: 'ヤーハミー「チームバータスの リーダーとして、あなたを いただくわ。月の迷宮の B10F でね♪」' },
-        ishii: { type: 'duel', dungeon: 'aso', floor: 15, money: 10000, text: 'イシイー「ブヒッ！ ケモノミチの 頭として 勝負だ！ ASOの壺の底の B15F だ！」' }
+        ishii: { type: 'duel', dungeon: 'aso', floor: 15, money: 10000, text: 'イシイー「ピョンッ！ ケモノミチの 頭として 勝負だ！ ASOの壺の底の B15F だ！」' }
     };
     // いま掲示板に出すライバルのクエスト。have: 仲間にいる キャラの種類 / accepted: 受けている クエストの id
     //   teams: クエストを 受けられる チーム (バージョンで ちがう。2026-10-22 ユーザー指定)。なければ ぜんぶ

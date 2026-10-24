@@ -56,7 +56,7 @@
         hyougaryu: { name: '氷河の咆哮', element: 'こおり', range: 'pierce', power: 3, status: 'freeze', chance: 0.5, fx: 'ice', color: '#bff0ff', shout: '凍てつけ！' },
         goukioni: { name: '豪鬼一番槍', element: 'ほのお', range: 'pierce', power: 3, fx: 'dash', color: '#ff5a3a', shout: '一番槍、いくぞ！' },
         yahami: { name: '傲慢な美しき大強奪', element: 'ふしぎ', range: 'room', power: 2.4, fx: 'flash', color: '#ff9ae0', shout: 'お宝も 視線も、ぜんぶ いただくわ！' },
-        ishii: { name: 'ケモノミチ大暴走', element: 'しぜん', range: 'pierce', power: 3, fx: 'dash', color: '#9ae07a', shout: 'ブヒッ！ 突撃だ！' },
+        ishii: { name: 'ケモノミチ大跳躍', element: 'しぜん', range: 'pierce', power: 3, fx: 'dash', color: '#9ae07a', shout: 'ピョンッ！ 跳んで 突撃だ！' },
         // チームバータス・チーム・ケモノミチの メンバー (2026-10-22 ユーザー指定: 新しい チームの メンバーも。決定)
         maechokkin: { name: '前髪そろえ・乱れ切り', element: 'かぜ', range: 'pierce', power: 2.8, fx: 'slash', color: '#e8f4ff', shout: 'チョッキン♪ ぜんぶ 切りそろえて あげる！' },
         norahan: { name: 'ニャハッと大どろぼう', element: 'みず', range: 'room', power: 1.8, kiai: true, fx: 'wave', color: '#4fa0ff', shout: 'ニャハッ♪ ぜんぶ いただき！' },

@@ -128,6 +128,10 @@ try {
     await evaluate('localStorage.clear()');
     await send('Page.reload');
     await sleep(2000);
+    // 起動時の オープニング (2026-10-25): はじめて 遊ぶ ときは 出ない。セーブが あれば 出て、スキップできる
+    const buttons = () => evaluate('[...document.querySelectorAll(".ask-choices button")].map(b => b.textContent).join(" / ")');
+    const skipOp = async () => { if (/スキップ/.test(await buttons())) await press('.ask-choices button', { text: 'スキップ' }); };
+    check(!/スキップ/.test(await buttons()) && /はじめから/.test(await buttons()), 'はじめての 起動では オープニングが 出ない');
 
     // タイトル → はじめから → キャラ選択 → オープニング
     await press('.ask-choices button', { text: 'はじめから' });
@@ -255,6 +259,10 @@ try {
     const was = await evaluate('(() => { const s = window.kdGame.state, h = window.kdGame.heroUnit(); return [s.floor, h.x, h.y, h.hp, s.enemies.length].join(","); })()');
     await send('Page.reload');
     await sleep(2500);
+    const opText = await asking();
+    await sleep(1500);
+    await skipOp();
+    check(/オープニング（氷隊）/.test(opText) && /つづきから/.test(await buttons()), `セーブが あると その バージョンの オープニングが 出て、スキップすると タイトル（${opText}）`);
     await press('.ask-choices button', { text: 'つづきから' });
     await sleep(1200);
     const now = await evaluate('(() => { const s = window.kdGame.state, h = window.kdGame.heroUnit(); return [s.floor, h.x, h.y, h.hp, s.enemies.length].join(","); })()');
@@ -276,6 +284,8 @@ try {
     await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
     await send('Page.reload');
     await sleep(2500);
+    check(/オープニング（(氷隊|鬼鬼団)）/.test(await asking()), `セーブが 2 つ あると どちらかの オープニング（${await asking()}）`);
+    await skipOp();
     const titleBtns = await evaluate('[...document.querySelectorAll(".ask-choices button")].map(b => b.textContent).join(" / ")');
     check(/つづきから（氷隊）/.test(titleBtns) && /つづきから（鬼鬼団）/.test(titleBtns), `タイトルに バージョンごとの つづきから（${titleBtns}）`);
     const fits = () => evaluate(`(() => document.documentElement.scrollWidth <= innerWidth + 1
@@ -350,6 +360,7 @@ try {
     // ----- 引き継ぎ: コードを 入れる 欄 (スマホの幅。つながらない ことにしてある) -----
     await send('Page.reload');
     await sleep(2500);
+    await skipOp();
     await press('.ask-choices button', { text: '引き継ぎ' });
     await press('.ask-choices button', { text: 'コードを入れる' });
     await sleep(300);

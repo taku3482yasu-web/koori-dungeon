@@ -156,7 +156,7 @@
         mirror_charm: f('みりょうの手鏡', 'ふしぎ', 'around', 1.4, { pp: 6, special: true, status: 'confuse', chance: 0.4, note: '美しさで 周りの敵を まどわす（ヤーハミーだけ）' }),
         chokkin: f('チョッキンカット', 'かぜ', 'front', 2.0, { pp: 8, status: 'weak', chance: 0.5, note: '大きなはさみで 切りそろえる（マエチョッキンだけ）' }),
         nekodamashi: f('ねこだまし', 'みず', 'front', 1.2, { pp: 8, status: 'flinch', chance: 1, note: 'かならず ひるませる（ノラハンだけ）' }),
-        inoshishi: f('いのしし突進', 'しぜん', 'front', 2.4, { acc: 0.8, pp: 6, status: 'flinch', chance: 0.3, note: 'まっすぐ 突っこむ（イシイーだけ）' }),
+        inoshishi: f('うさぎ跳びキック', 'しぜん', 'front', 2.4, { acc: 0.8, pp: 6, status: 'flinch', chance: 0.3, note: '大きな 足で 跳びかかって けとばす（イシイーだけ）' }),
         bear_hug: f('ツキノワベアハッグ', 'ふつう', 'front', 1.8, { pp: 8, status: 'bind', chance: 0.5, note: 'だきしめて しばる（マズダだけ）' }),
         night_howl: f('ナイトハウル', 'かぜ', 'around', 0.9, { pp: 8, status: 'weak', chance: 0.6, note: '夜の遠吠えで 周りの敵を よわきにする（NAITOONだけ）' })
     });
