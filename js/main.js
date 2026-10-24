@@ -234,7 +234,7 @@
             const r = screen.getBoundingClientRect();
             const x = (e.clientX - r.left) / r.width * screen.width - screen.width / 2;
             const y = (e.clientY - r.top) / r.height * screen.height - screen.height / 2;
-            const tile = screen.width / 24;
+            const tile = screen.width / KD.VIEW.COLS;   // 1 マスの 大きさ (マップは 拡大して いる)
             if (Math.abs(x) < tile * 0.7 && Math.abs(y) < tile * 0.7) return null;   // 主人公の上
             const a = Math.round(Math.atan2(y, x) / (Math.PI / 4));
             return [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]][(a + 8) % 8];

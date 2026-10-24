@@ -20,6 +20,10 @@
     const T = A.T;
     const VIEW_W = 24, VIEW_H = 15;               // 画面に出すマスの数 (横・縦)
     const W = VIEW_W * T, H = VIEW_H * T;         // canvas の大きさ (ドット)
+    // ダンジョンの中の マップは ZOOM 倍に 大きく 描く (2026-10-24 ユーザー指定: 1 コマが 小さくて 見えづらい)。
+    //   見えるのは 横 16 × 縦 10 マス。文字や まわりの 表示 (HUD) は 今の 大きさの まま。
+    //   ドットが きれいに そろうように、canvas の 中身は RES 倍で 持つ (1 ドット = ZOOM × RES = 3 ピクセル)
+    const ZOOM = 1.5, RES = 2;
     const STEP_MS = 110, DASH_MS = 45;            // 1 マス動くのにかける時間 (ふつう・ダッシュ)
     const FADE_MS = 1100;                         // 階が変わるときの暗転
     const ATTACK_MS = 240, SHOOT_MS = 300;        // 攻撃 1 回を見せる時間
@@ -62,8 +66,8 @@
     //   happen: false でハプニングなし (名前なら そのハプニングを かならず)
     function createGame(canvas, ui, opts = {}) {
         const ctx = canvas.getContext('2d');
-        canvas.width = W;
-        canvas.height = H;
+        canvas.width = W * RES;
+        canvas.height = H * RES;
         ctx.imageSmoothingEnabled = false;
 
         const state = {
@@ -2664,6 +2668,7 @@
         }
 
         function draw(now) {
+            ctx.setTransform(RES, 0, 0, RES, 0, 0);
             update(now);
             if (state.phase === 'play' && state.map && !state.over && !state.done) autosave();
             // state.demo: ダンジョンの中の ストーリーデモ (ボスに 会ったとき)。phase は play の まま
@@ -2695,6 +2700,11 @@
                 }
             }
             const camX = Math.round(p.fx * T - (W - T) / 2) + sx0, camY = Math.round(p.fy * T - (H - T) / 2) + sy0;
+            // マップと キャラは 画面の まんなか (主人公) を 中心に ZOOM 倍
+            ctx.save();
+            ctx.translate(W / 2, H / 2);
+            ctx.scale(ZOOM, ZOOM);
+            ctx.translate(-W / 2, -H / 2);
             const x0 = Math.floor(camX / T), y0 = Math.floor(camY / T);
             for (let ty = y0; ty <= y0 + VIEW_H + 1; ty++) {
                 for (let tx = x0; tx <= x0 + VIEW_W + 1; tx++) {
@@ -2733,6 +2743,7 @@
             drawSpecialFx(camX, camY, now);
             drawPopups(camX, camY, now);
             drawBubbles(camX, camY, now);
+            ctx.restore();
             drawFlash(now);
             drawHud();
             drawParty();
@@ -3274,5 +3285,5 @@
     }
 
     KD.createGame = createGame;
-    KD.VIEW = { W, H };
+    KD.VIEW = { W, H, COLS: VIEW_W / ZOOM };   // COLS: 画面の 横に 見える マスの 数 (main.js の タップ)
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);
