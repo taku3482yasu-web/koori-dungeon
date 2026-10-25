@@ -146,7 +146,7 @@
         { id: 'lv10', name: '一人前', note: '主人公の Lv を 10 にする', test: c => c.player.lv >= 10 },
         { id: 'lv30', name: 'ベテラン', note: '主人公の Lv を 30 にする', test: c => c.player.lv >= 30 },
         { id: 'pay_first', name: 'はじめての返済', note: '借金を 少しでも返す', test: c => c.town.paid > 0 },
-        { id: 'pay_half', name: 'あと半分', note: '借金を 50,000えん 返す', test: c => c.town.paid >= 50000 },
+        { id: 'pay_half', name: 'あと半分', note: '借金を 100,000えん 返す', test: c => c.town.paid >= 100000 },
         { id: 'pay_all', name: '完済！', note: '借金を 全部返す', test: c => c.town.debt <= 0 },
         { id: 'quests_10', name: '頼れる探検隊', note: 'クエストを 10 件 達成する', test: c => c.stats.quests >= 10 },
         { id: 'craft', name: '鍛冶屋の常連', note: '鍛冶屋で 何かを作る', test: c => c.stats.crafted >= 1 },

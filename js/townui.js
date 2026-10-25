@@ -746,16 +746,18 @@
             });
         }
 
-        function sell() {
-            const list = p().bag.filter(it => !it.eq);
-            if (!list.length) return ask('売れる道具を 持っていない。（つけている装備は 売れない）', ['もどる'], shop, { list: false });
-            ask('売る', [...list.map(it => `${I.label(it)}　${money(I.sellPrice(it))}`), 'もどる'], i => {
-                if (i >= list.length) return shop();
-                const it = list[i];
-                p().bag.splice(p().bag.indexOf(it), 1);
-                p().money += I.sellPrice(it);
-                sell();
-            });
+        // 売る: 持ち物と 倉庫の 道具 (2026-10-25 ユーザー指定: 倉庫の ものも 売れる)。倉庫の ものは【倉庫】と 出す
+        function sell(index = 0) {
+            const rows = [...p().bag.filter(it => !it.eq).map(it => ({ it, from: p().bag })), ...t().storage.map(it => ({ it, from: t().storage, store: true }))];
+            if (!rows.length) return ask('売れる道具が ない。（つけている装備は 売れない）', ['もどる'], shop, { list: false });
+            ask(`売る（持ち物と 倉庫の 道具）　お金 ${money(p().money)}`, [...rows.map(r => `${r.store ? '【倉庫】' : ''}${I.label(r.it)}　${money(I.sellPrice(r.it))}`), 'もどる'], i => {
+                if (i >= rows.length) return shop();
+                const r = rows[i];
+                r.from.splice(r.from.indexOf(r.it), 1);
+                p().money += I.sellPrice(r.it);
+                save();
+                sell(Math.min(i, rows.length - 2));
+            }, { index });
         }
 
         // ----- 鍛冶屋 (2026-10-22 追加: 敵が落とした素材で 武器や道具を作る) -----
@@ -2737,7 +2739,13 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             rows.forEach((row, i) => ctx.fillText(row, 108, 40 + i * 14));
             // 説明 (js/profiles.js。前作の 図鑑から。2026-10-22 ユーザー指定)
             const pr = (KD.Profiles || {})[kind];
-            if (!pr) return;
+            if (!pr) {
+                // 説明が まだ ない キャラ (2026-10-25: 説明は js/profiles-new.js に 書くと 出る)
+                ctx.font = `9px ${FONT}`;
+                ctx.fillStyle = '#6a7a8a';
+                ctx.fillText('（説明は まだ ない）', 12, 116);
+                return;
+            }
             ctx.font = `bold 9px ${FONT}`;
             ctx.fillStyle = '#ffd84a';
             ctx.fillText(pr.title, 12, 116);

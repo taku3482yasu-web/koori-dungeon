@@ -132,6 +132,25 @@ test('お店で買う・売る', () => {
     assert.equal(p.money, before + I.ITEMS.ice_shard.price / 2);
 });
 
+test('お店で 倉庫の 道具も 売れる (2026-10-25)', () => {
+    const { s, choose, asks } = newGame();
+    const p = s.player;
+    s.town.storage.push({ id: 'big_onigiri', n: 1 });
+    choose('お店');
+    choose('売る');
+    assert.ok(asks[0].options.some(o => o.startsWith('【倉庫】') && o.includes(I.ITEMS.big_onigiri.name)), asks[0].options.join(' / '));
+    const before = p.money;
+    choose('【倉庫】');
+    assert.equal(p.money, before + I.sellPrice({ id: 'big_onigiri', n: 1 }));
+    assert.ok(!s.town.storage.some(it => it.id === 'big_onigiri'), '倉庫から なくなる');
+});
+
+test('借金は 20 万。倒れたときの 利子は 1%', () => {
+    assert.equal(TW.DEBT_START, 200000);
+    assert.equal(TW.INTEREST, 0.01);
+    assert.ok(TW.bpFor(0, TW.DEBT_START) >= 224, '返しきると バトルツリーを ぜんぶ 開ける BP');
+});
+
 test('鍛冶屋: 素材とお金で 武器を作る。持ち物と倉庫の両方から使う', () => {
     const { s, choose, asks } = newGame();
     const p = s.player;
@@ -478,4 +497,12 @@ test('仲間の広場: 並べかえ (★順・役職順・Lv順) と お別れ�
     choose('もどる');
     choose('おかがっぱ');
     assert.ok(!asks[0].options.includes('お別れする'));
+});
+
+test('キャラの 説明の 枠 (2026-10-25): 図鑑の キャラは みな js/profiles.js か js/profiles-new.js に 枠が ある', () => {
+    for (const f of ['profiles.js', 'profiles-new.js']) vm.runInThisContext(readFileSync(new URL(`../js/${f}`, import.meta.url), 'utf8'));
+    const C = globalThis.KD.Collection, P = globalThis.KD.Profiles || {}, NEW = globalThis.KD.NewProfiles || {};
+    const all = [...new Set([...C.dexOrder('koori'), ...C.dexOrder('onioni')])];
+    const missing = all.filter(k => !P[k] && !NEW[k]);
+    assert.deepEqual(missing, [], `説明の 枠が ない キャラ: ${missing.join(', ')}`);
 });
