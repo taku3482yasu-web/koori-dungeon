@@ -333,6 +333,104 @@
 
     const SCENES = [[0, sceneRoof], [4, sceneRoll], [16, sceneLetters], [19, sceneLogo], [23, sceneBosses], [29, sceneRivals], [33, sceneLineup], [37, sceneJungle], [40, sceneFinale]];
 
+    // ----- OP の 歌 (2026-10-25 ユーザー指定: 曲に 声を 入れる。案 3: ピコピコ音で 声っぽく 歌う) -----
+    // 歌詞は 参考の 動画の 雰囲気 (チーム名を 叫ぶ・仲間と 突き進む 元気な 歌) に ならった オリジナル (Claude の 作詞。動画の 歌詞・メロディは 使わない)。
+    //   sing: 歌う かな (1 文字 = 曲の 1 拍 (8 分音符)。空白は 休み・「ー」は のばす・小さい ゃゅょ は 前の 音に つく・「っ」は 休み)
+    //   show: 画面に 出す 歌詞 (字幕。歌って いる ところが 光る) / at: 歌いだす 拍 (曲の はじめから)
+    // 音の 高さは 曲の 主旋律 (js/sound.js が 鳴らす) に 合わせる
+    const LYRICS = {
+        op_koori: [
+            { at: 16, sing: 'こおりの からだで', show: 'こおりの 体で' },
+            { at: 32, sing: 'だんじょんへ ごー', show: 'ダンジョンへ GO！' },
+            { at: 48, sing: 'しゃっきん かえすぞ', show: '借金 返すぞ' },
+            { at: 64, sing: 'くじけるな', show: 'くじけるな！' },
+            { at: 80, sing: 'みんなで あわせて', show: 'みんなで 合わせて' },
+            { at: 96, sing: 'ひょうたい ひょうたい', show: '氷隊！ 氷隊！' },
+            { at: 112, sing: 'こおりの かぜ', show: 'こおりの 風' },
+            { at: 128, sing: 'ないていつらぬき', show: '内定ツラヌキ' },
+            { at: 144, sing: 'どこまでも', show: 'どこまでも！' },
+            { at: 160, sing: 'とけない こころで', show: 'とけない 心で' },
+            { at: 176, sing: 'つきすすめ', show: '突き進め！' },
+            { at: 192, sing: 'ゆかいな なかまと', show: 'ゆかいな 仲間と' },
+            { at: 208, sing: 'だいぼうけん', show: '大冒険！' },
+            { at: 224, sing: 'いくぞ ひょうたい', show: 'いくぞ 氷隊！' },
+            { at: 240, sing: 'おー', show: 'オー！' }
+        ],
+        op_onioni: [
+            { at: 16, sing: 'おにの つのが', show: '鬼の 角が' },
+            { at: 32, sing: 'うなりだす', show: 'うなり出す！' },
+            { at: 48, sing: 'かねを かえせと', show: '金を 返せと' },
+            { at: 64, sing: 'ほえまくれ', show: 'ほえまくれ！' },
+            { at: 80, sing: 'かなぼう かついで', show: '金棒 かついで' },
+            { at: 96, sing: 'ききだん ききだん', show: '鬼鬼団！ 鬼鬼団！' },
+            { at: 112, sing: 'おにの こえ', show: '鬼の 声' },
+            { at: 128, sing: 'しろを まもって', show: '城を 守って' },
+            { at: 144, sing: 'どこまでも', show: 'どこまでも！' },
+            { at: 160, sing: 'あかい ほのおで', show: '赤い 炎で' },
+            { at: 176, sing: 'だいしゅつじん', show: '大出陣！' },
+            { at: 192, sing: 'なかまと いっしょに', show: '仲間と いっしょに' },
+            { at: 208, sing: 'ぶったおせ', show: 'ぶったおせ！' },
+            { at: 224, sing: 'いくぞ ききだん', show: 'いくぞ 鬼鬼団！' },
+            { at: 240, sing: 'おー', show: 'オー！' }
+        ]
+    };
+    // かなの 母音 (声の 色)。ん は ハミング
+    const VOWEL = {};
+    ['あかさたなはまやらわがざだばぱ', 'いきしちにひみりぎじぢびぴ', 'うくすつぬふむゆるぐずづぶぷ', 'えけせてねへめれげぜでべぺ', 'おこそとのほもよろをごぞどぼぽ']
+        .forEach((row, i) => [...row].forEach(ch => { VOWEL[ch] = 'aiueo'[i]; }));
+    VOWEL['ん'] = 'n';
+    const SMALL = { 'ゃ': 'a', 'ゅ': 'u', 'ょ': 'o', 'ぁ': 'a', 'ぃ': 'i', 'ぅ': 'u', 'ぇ': 'e', 'ぉ': 'o' };
+    // 歌う 音の 並び { 拍: { vowel, len (拍) } } (曲の はじめから 数えた 拍)
+    const voiceCache = {};
+    function voiceSteps(song) {
+        if (voiceCache[song]) return voiceCache[song];
+        const out = {};
+        (LYRICS[song] || []).forEach(line => {
+            let step = line.at, last = null;
+            for (const ch of line.sing) {
+                if (SMALL[ch] && last) { last.vowel = SMALL[ch]; continue; }   // しゃ → しゃ (1 拍)
+                if (ch === 'ー' && last) { last.len++; step++; continue; }
+                if (ch === ' ' || ch === 'っ') { last = null; step++; continue; }
+                const v = VOWEL[ch];
+                if (!v) { step++; continue; }
+                last = out[step] = { vowel: v, len: 1 };
+                step++;
+            }
+        });
+        return (voiceCache[song] = out);
+    }
+    // 歌詞の 字幕 (カラオケ): いまの 拍で 歌って いる 行と、どこまで 歌ったか (0〜1)
+    function lyricAt(song, step) {
+        const lines = LYRICS[song] || [];
+        for (const line of lines) {
+            const len = [...line.sing].filter(ch => !SMALL[ch]).length;
+            if (step >= line.at - 2 && step < line.at + len + 4) return { line, k: Math.max(0, Math.min(1, (step - line.at) / len)) };
+        }
+        return null;
+    }
+
+    // 歌詞の 字幕を 画面の いちばん 下に (歌って いる ところまで 黄色)
+    function drawLyric(ctx, d, t, W, H, version) {
+        const song = `op_${version}`;
+        const tempo = (KD.Sound && KD.Sound.SONGS && KD.Sound.SONGS[song] && KD.Sound.SONGS[song].tempo) || 170;
+        const now = lyricAt(song, t / (30 / tempo));
+        if (!now) return;
+        const chars = [...now.line.show], upto = Math.round(chars.length * now.k);
+        ctx.fillStyle = 'rgba(0,0,0,.55)';
+        ctx.fillRect(0, H - 17, W, 17);
+        ctx.font = `bold 13px ${d.FONT}`;
+        ctx.textBaseline = 'middle';
+        let x = W / 2 - ctx.measureText(now.line.show).width / 2;
+        chars.forEach((ch, i) => {
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = '#000000';
+            ctx.strokeText(ch, x, H - 8.5);
+            ctx.fillStyle = i < upto ? '#ffe040' : '#ffffff';
+            ctx.fillText(ch, x, H - 8.5);
+            x += ctx.measureText(ch).width;
+        });
+    }
+
     // OP の 前の 「▶ オープニングを 見る」の 画面 (押すまで 音が 出せないので。チームの 色と エンブレム)
     function drawWait(ctx, t, W, H, version, d) {
         const c = CAST[version] || CAST.koori;
@@ -351,10 +449,11 @@
         ctx.save();
         SCENES[i][1](ctx, deps, c, W, H, t - SCENES[i][0]);
         ctx.restore();
+        drawLyric(ctx, deps, t, W, H, version);   // 歌詞の 字幕 (2026-10-25)
         ctx.globalAlpha = 1;
         ctx.lineWidth = 1;
         return t >= DURATION;
     }
 
-    KD.Op = { DURATION, CAST, draw, drawWait };
+    KD.Op = { DURATION, CAST, draw, drawWait, LYRICS, voiceSteps, lyricAt };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);

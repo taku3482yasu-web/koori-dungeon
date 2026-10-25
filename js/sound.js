@@ -88,7 +88,7 @@
     const clampVol = v => Math.max(0, Math.min(VOL_MAX, Math.round(v)));
 
     let ctx = null, master = null, bgmBus = null, seBus = null, song = null;
-    let enabled = true, current = null, timer = null, step = 0, next = 0, paused = false;
+    let enabled = true, current = null, timer = null, step = 0, next = 0, paused = false, lastLead = null;
     try {
         enabled = localStorage.getItem(KEY) !== 'off';
         const saved = JSON.parse(localStorage.getItem(VOL_KEY) || 'null') || {};
@@ -172,6 +172,35 @@
     }
 
     const hz = n => 220 * Math.pow(2, n / 12);
+    // 声っぽい 音 (2026-10-25 ユーザー指定: OP の 曲に 声を 入れる)。のこぎり波を 母音ごとの 2 つの 山 (フォルマント) で しぼり、
+    //   ビブラートを かける。vowel: a i u e o (n は ハミング)。言葉は はっきり 聞こえないので、OP の 画面に 歌詞の 字幕を 出す (js/op.js)
+    const FORMANT = { a: [800, 1200], i: [320, 2300], u: [350, 1300], e: [480, 1900], o: [520, 880], n: [280, 1000] };
+    function voice(freq, at, dur, vowel, volume, out) {
+        const [f1, f2] = FORMANT[vowel] || FORMANT.a;
+        const o = ctx.createOscillator(), lfo = ctx.createOscillator(), depth = ctx.createGain(), env = ctx.createGain();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(freq, at);
+        lfo.frequency.setValueAtTime(5.5, at);
+        depth.gain.setValueAtTime(freq * 0.012, at);
+        lfo.connect(depth).connect(o.frequency);
+        env.gain.setValueAtTime(0.0001, at);
+        env.gain.linearRampToValueAtTime(volume, at + 0.03);
+        env.gain.setValueAtTime(volume, at + Math.max(0.04, dur - 0.05));
+        env.gain.linearRampToValueAtTime(0.0001, at + dur);
+        [[f1, 6, 1], [f2, 9, vowel === 'n' ? 0.2 : 0.6]].forEach(([f, q, gain]) => {
+            const bp = ctx.createBiquadFilter(), g = ctx.createGain();
+            bp.type = 'bandpass';
+            bp.frequency.setValueAtTime(f, at);
+            bp.Q.setValueAtTime(q, at);
+            g.gain.setValueAtTime(gain * 3, at);
+            o.connect(bp).connect(g).connect(env);
+        });
+        env.connect(out);
+        o.start(at);
+        lfo.start(at);
+        o.stop(at + dur + 0.02);
+        lfo.stop(at + dur + 0.02);
+    }
     // 曲を 長くする (2026-10-22 ユーザー指定): A (lead・bass) → B (b・bb) → A → B を 5 半音 上げたもの で 1 周 (64 音)
     const up = list => list.map(n => (n === null ? null : n + 5));
     const tunes = {};
@@ -189,6 +218,7 @@
         const out = song = ctx.createGain();
         out.connect(bgmBus);
         step = 0;
+        lastLead = null;
         next = ctx.currentTime + 0.05;
         timer = setInterval(() => {
             if (!SONGS[current]) return;
@@ -199,6 +229,11 @@
             while (next < ctx.currentTime + 0.3) {
                 const n = s.lead[step % s.lead.length];
                 if (n !== null && enabled) tone(hz(n), next, beat * 0.9, s.wave, null, 0.12, out);
+                if (n !== null) lastLead = n;
+                // OP の 歌 (js/op.js の 歌詞): 主旋律の 1 オクターブ 下で 歌う
+                const sungs = KD.Op && KD.Op.voiceSteps ? KD.Op.voiceSteps(current) : null;
+                const vs = sungs && sungs[step];
+                if (vs && enabled && lastLead !== null) voice(hz(lastLead - 12), next, beat * vs.len * 0.95, vs.vowel, 0.22, out);
                 if (step % 4 === 0 && enabled) tone(hz(s.bass[(step / 4) % s.bass.length]), next, beat * 3.6, 'triangle', null, 0.18, out);
                 next += beat;
                 step++;
