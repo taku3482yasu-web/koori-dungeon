@@ -821,7 +821,7 @@
         // ----- 交易所 (2026-10-22 追加: 珍しい道具・ほかのプレイヤーの出品) -----
         // Supabase につながっていれば (config.js)、本当のプレイヤーの出品を買える・自分の出品が ほかのプレイヤーに売れる。
         // つながっていなければ、コンピューターの探検隊 (ライバル探検隊) だけ。自分の出品は 日がたつとコンピューターが買う
-        const myName = () => `${p().name}（ばりきつよめ）`;
+        const myName = () => `${p().name}（${version().name}）`;   // 交易所に 出る 名前 (チーム名は バージョン。2026-10-25)
         const tradable = id => tradeAlly(id) || (Boolean(I.ITEMS[id]) && I.ITEMS[id].only !== 'quest');
         // キャラ交換 (enemies11.js): 'ally_<種類>' (n は Lv) は 限定キャラ
         const tradeAlly = id => { const k = DG.allyOfTradeId && DG.allyOfTradeId(id); return k && DG.tradableAlly(k) ? k : null; };
@@ -1782,7 +1782,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
 
         // ----- オープニングの場面 (はじまりの話の 1 枚ごと) -----
         // 0 摩天楼の財宝と打ち上げ (コインが飛んでいく) / 1 泣くこおりくんに 借用書が降る / 2 ふるカワと 現れるダンジョン /
-        // 3 おにおにの取り立て / 4 探検隊「ばりきつよめ」結成
+        // 3 おにおにの取り立て / 4 探検隊 (氷隊・鬼鬼団) 結成
         const hash = n => { const x = Math.sin(n * 12.9898) * 43758.5453; return x - Math.floor(x); };
         function drawOpening(ctx, now, W, H) {
             const t = (now - opening.at) / 1000;   // この場面になってからの秒
@@ -2070,7 +2070,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                 A.drawSprite(ctx, 'koori', 0, 40, 170 + Math.sin(now / 90) * 2, { scale: 3 });
                 label('金返せ！', W / 2 + 100, 50, 22, '#ffe680');
             } else {
-                // 探検隊「ばりきつよめ」結成
+                // 探検隊 (氷隊・鬼鬼団。バージョンで かわる) 結成
                 sky('#0a2040', '#1a4a3a');
                 for (let i = 0; i < 16; i++) {
                     const a = i / 16 * Math.PI * 2 + t * 0.5;

@@ -16,7 +16,7 @@
     const MAX_TEAM = 3;   // チームで 1 回の ダンジョンに 使える 回数
 
     const LIST = {
-        // ----- 探検隊「ばりきつよめ」 -----
+        // ----- 探検隊 (氷隊・鬼鬼団) -----
         koori: { name: '大腸炎アタック', element: 'こおり', range: 'room', power: 2.2, status: 'colitis', chance: 0.6, fx: 'colitis', color: '#c8a060', shout: 'くらえ！ 大腸炎アタック！' },
         onioni: { name: '鬼鬼の金棒', element: 'ほのお', range: 'around2', power: 3, fx: 'quake', color: '#ff5a3a', shout: '鬼鬼の金棒、くらえ！' },
         yasu: { name: 'やすパンチ・極', element: 'ふつう', range: 'front', power: 3, heal: 0.5, fx: 'punch', color: '#7ae07a', shout: 'いくよ！ やすパンチ・極！' },

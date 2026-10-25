@@ -151,7 +151,7 @@
         { id: 'quests_10', name: '頼れる探検隊', note: 'クエストを 10 件 達成する', test: c => c.stats.quests >= 10 },
         { id: 'craft', name: '鍛冶屋の常連', note: '鍛冶屋で 何かを作る', test: c => c.stats.crafted >= 1 },
         { id: 'recruit', name: '仲間が増えた', note: '敵を仲間にする', test: c => c.stats.recruited >= 1 },
-        { id: 'party5', name: 'ばりきつよめ 全員集合', note: '5 人で冒険に出る', test: c => c.allies.length >= 4 },
+        { id: 'party5', name: '探検隊 全員集合', note: '5 人で冒険に出る', test: c => c.allies.length >= 4 },
         { id: 'trade', name: '商売上手', note: '交易所で 自分の出品が売れる', test: c => c.stats.sold >= 1 },
         { id: 'rich', name: 'お金持ち', note: 'お金を 10,000えん 持つ', test: c => c.player.money >= 10000 },
         { id: 'tree', name: 'バトルツリー', note: '奥義を 1 つ開放する', test: c => c.player.tree.some(id => /5$/.test(id)) },
