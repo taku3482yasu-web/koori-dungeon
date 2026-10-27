@@ -8,7 +8,8 @@
 //   みんなの 勢ぞろい → ジャングルの チーム・ケモノミチ (どちらでも 出る チーム。動画の 黄色い うさぎの 妖怪が 出る ところ) → マスコットの 決めポーズ
 // Op.draw(ctx, t, W, H, version, deps) を 毎フレーム 呼ぶ (t: はじまってからの 秒)。終わったら true を 返す。
 //   deps: { A (art.js), Big (bigart.js), Emblems, U (units.js), FONT }
-// どちらの OP を 流すかは townui.js が 決める (セーブの ある バージョン。両方 あれば 2 分の 1)。初めて 遊ぶ ときは 流さない
+// どちらの OP を 流すかは 起動時に えらぶ (2026-10-27 ユーザー指定。townui.js の chooseOp)。はじめからは 最初の 話の あとに その バージョンの OP
+// Op.drawBurst: タイトルで「つづきから」「はじめから」を 押すと、まわりに キャラが 飛び出す (2026-10-27 ユーザー指定。赤猫団の タイトルの 動画を 参考に)
 // =====================================================================
 (function (KD) {
     'use strict';
@@ -431,15 +432,105 @@
         });
     }
 
-    // OP の 前の 「▶ オープニングを 見る」の 画面 (押すまで 音が 出せないので。チームの 色と エンブレム)
+    // OP の 前の 「どちらの オープニングを 見る？」の 画面 (押すまで 音が 出せないので。チームの 色と エンブレム)。
+    //   version が null の ときは 左に 氷隊・右に 鬼鬼団 (えらんでいる ほうが あれば その チームだけ)
     function drawWait(ctx, t, W, H, version, d) {
+        if (!version) {
+            ['koori', 'onioni'].forEach((v, i) => {
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(i * W / 2, 0, W / 2, H);
+                ctx.clip();
+                pattern(ctx, d, CAST[v], W, H, t, CAST[v].base, 0.3);
+                ctx.restore();
+            });
+            ctx.fillStyle = 'rgba(0,0,0,.35)';
+            ctx.fillRect(0, 0, W, H);
+            d.Emblems.draw(ctx, CAST.koori.team, W / 2 - 80, 92, 80 + Math.sin(t * 3) * 4);
+            d.Emblems.draw(ctx, CAST.onioni.team, W / 2 + 80, 92, 80 + Math.sin(t * 3 + 1.5) * 4);
+            text(ctx, d, 'こおりくんの大冒険', W / 2, 160, 22, '#ffe040', '#000000');
+            if (Math.floor(t * 2) % 2) text(ctx, d, 'どちらの オープニングを 見る？', W / 2, 196, 12, '#ffffff', '#000000');
+            return;
+        }
         const c = CAST[version] || CAST.koori;
         pattern(ctx, d, c, W, H, t, c.base, 0.3);
         ctx.fillStyle = 'rgba(0,0,0,.35)';
         ctx.fillRect(0, 0, W, H);
         d.Emblems.draw(ctx, c.team, W / 2, 92, 96 + Math.sin(t * 3) * 4);
         text(ctx, d, 'こおりくんの大冒険', W / 2, 160, 22, '#ffe040', '#000000');
-        if (Math.floor(t * 2) % 2) text(ctx, d, '▶ を おすと はじまります', W / 2, 196, 12, '#ffffff', '#000000');
+        if (Math.floor(t * 2) % 2) text(ctx, d, `▶ を おすと ${c.team}の オープニング`, W / 2, 196, 12, '#ffffff', '#000000');
+    }
+
+    // ----- タイトルの 飛び出し (2026-10-27 ユーザー指定) -----
+    // 「つづきから」「はじめから」を 押すと、タイトルの まわりに キャラが 一気に 飛び出して 画面を うめ、暗くなって 次へ。
+    //   顔ぶれ: 氷隊 (こおりくん・ふるカワ・氷隊で 仲間に なる キャラ・ボス・ライバルの 5DX と チームバータス) /
+    //   鬼鬼団 (おにおに・ともいし・鬼鬼団で 仲間に なる キャラ・ボス・ライバルの ASK-3 と お願いマッスル)。
+    //   はじめから (バージョンが まだ ない) は 両方から まぜて、どちらでも 出る チーム・ケモノミチも
+    const BURST_TIME = 1.5;
+    // 置く 場所 (画面に 対する 割合 x・足もと y、高さ px)。上の 列 → 横 → 下の 列 の 順に 描く (下の 列が 手前)。
+    //   はみ出して 切れる くらいに 大きく (動画の ように 画面を うめる)。最後が まん中の 手前 (マスコット)
+    const BURST_SLOTS = [
+        [0.06, 0.36, 86], [0.29, 0.27, 74], [0.53, 0.25, 78], [0.76, 0.3, 82], [0.97, 0.4, 92],
+        [0.15, 0.66, 72], [0.86, 0.66, 72], [0.0, 0.84, 100], [1.0, 0.86, 104],
+        [0.16, 1.1, 116], [0.34, 1.14, 104], [0.68, 1.14, 108], [0.86, 1.1, 116], [0.5, 1.12, 124]
+    ];
+    function burstCast(version, teams, rnd = Math.random) {
+        const shuffle = a => { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
+        const members = name => (teams && teams[name] ? teams[name].members : []);
+        const sides = version ? [version] : ['koori', 'onioni'];
+        const heroes = sides.map(v => CAST[v].mascot);
+        const lead = [...heroes, ...sides.map(v => CAST[v].buddy), ...sides.map(v => CAST[v].bosses[0])];
+        const pool = shuffle([
+            ...sides.flatMap(v => CAST[v].groups.flat()),
+            ...sides.flatMap(v => CAST[v].rivals.flatMap(members)),
+            ...(version ? [] : members('チーム・ケモノミチ'))
+        ].filter(k => !lead.includes(k)));
+        const picked = [...lead.slice(1), ...pool].slice(0, BURST_SLOTS.length - 1);
+        // 前に 出る 場所 (下の 列) に 主役たちが 来るように: 先頭 (主役) ほど 後ろの 場所
+        const order = shuffle(picked.slice(lead.length - 1)).concat(picked.slice(0, lead.length - 1).reverse());
+        return [...order, heroes[0]];   // 最後 (まん中の 手前) は マスコット
+    }
+    function drawBurst(ctx, t, W, H, info, d) {
+        const c = CAST[info.version] || CAST.koori;
+        // 後ろ: チームの 色の 集中線 (はじめからは 左右で 2 チーム)
+        const bg = info.version ? [c.base, c.ink] : ['#2a6aa8', '#ffd840'];
+        ctx.fillStyle = bg[0];
+        ctx.fillRect(0, 0, W, H);
+        if (!info.version) {
+            ctx.fillStyle = CAST.onioni.base;
+            ctx.fillRect(W / 2, 0, W / 2, H);
+        }
+        speedLines(ctx, W, H, t, info.version ? c.pat : 'rgba(255,255,255,.25)');
+        const bob = Math.floor(t * 5) % 2;
+        info.cast.forEach((k, i) => {
+            const [fx, fy, h] = BURST_SLOTS[i] || BURST_SLOTS[0];
+            const x = fx * W, ground = fy * H;
+            const delay = i === info.cast.length - 1 ? 0.18 : (i % 7) * 0.03;
+            const p = Math.max(0, Math.min(1, (t - delay) / 0.3));
+            if (p <= 0) return;
+            // まん中から 外へ 向かって 飛び出し、少し 行きすぎて もどる
+            const back = 1 + 2.2 * (p - 1) ** 3 + 1.2 * (p - 1) ** 2;
+            const dx = x - W / 2, dy = ground - h / 2 - H / 2;
+            const sx = W / 2 + dx * back, sy = H / 2 + dy * back + h / 2;
+            chara(ctx, d, k, sx, sy, h * (0.5 + 0.5 * Math.min(1, back)), bob, fx > 0.5);
+        });
+        // まん中の タイトル (キャラより 手前)
+        const pop = 1 + 0.15 * Math.max(0, 1 - t / 0.25);
+        text(ctx, d, 'こおりくんの大冒険', W / 2, H * 0.4, Math.round(26 * pop), '#ffe040', '#000000');
+        text(ctx, d, info.version ? `― ${c.team} ―` : '～ダンジョンドタバタ大道中～', W / 2, H * 0.4 + 26, 13, '#ffffff', '#000000');
+        // はじめは 白く 光り、さいごは 暗くなる
+        if (t < 0.15) {
+            ctx.fillStyle = `rgba(255,255,255,${(1 - t / 0.15) * 0.8})`;
+            ctx.fillRect(0, 0, W, H);
+        }
+        const dark = Math.max(0, Math.min(1, (t - 1.05) / 0.35));
+        if (dark > 0) {
+            ctx.fillStyle = `rgba(0,0,0,${dark})`;
+            ctx.fillRect(0, 0, W, H);
+        }
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = 1;
+        return t >= BURST_TIME;
     }
 
     function draw(ctx, t, W, H, version, deps) {
@@ -455,5 +546,5 @@
         return t >= DURATION;
     }
 
-    KD.Op = { DURATION, CAST, draw, drawWait, LYRICS, voiceSteps, lyricAt };
+    KD.Op = { DURATION, CAST, draw, drawWait, LYRICS, voiceSteps, lyricAt, BURST_TIME, BURST_SLOTS, burstCast, drawBurst };
 })(typeof window !== 'undefined' ? (window.KD = window.KD || {}) : globalThis.KD);

@@ -133,11 +133,16 @@ try {
     const skipOp = async () => { if (/スキップ/.test(await buttons())) await press('.ask-choices button', { text: 'スキップ' }); };
     check(!/スキップ/.test(await buttons()) && /はじめから/.test(await buttons()), 'はじめての 起動では オープニングが 出ない');
 
-    // タイトル → はじめから → キャラ選択 → オープニング
+    // タイトル → はじめから → (キャラが 飛び出す) → キャラ選択 → オープニング
     await press('.ask-choices button', { text: 'はじめから' });
+    check(await evaluate('document.getElementById("ask").hidden'), 'はじめからを 押すと キャラが 飛び出す（えらぶ 画面は いったん 消える）');
+    await sleep(1800);
     await press('.ask-choices button', { text: 'こおりくん' });
     check(/摩天楼/.test(await asking()), 'キャラをえらぶと オープニングが始まる');
     for (let i = 0; i < 5; i++) await press('.ask-choices button', { text: 'つぎへ' });
+    // こおりくんと おにおにの 話の あとに その バージョンの OP (2026-10-27 ユーザー指定)。スキップで 町へ
+    check(/オープニング（氷隊）/.test(await asking()) && /スキップ/.test(await buttons()), `はじめから: 話の あとに 氷隊の OP（${await asking()}）`);
+    await skipOp();
     check(await phase() === 'town' && /日目/.test(await asking()), 'オープニングのあと 町へ');
     check(/仲間の広場/.test(await evaluate('[...document.querySelectorAll(".ask-choices button")].map(b => b.textContent).join(" ")')), '仲間の広場は はじめから使える');
     // PC の 町: メニューは ゲーム画面に 重ならない (2026-10-22 ユーザー指定)
@@ -260,15 +265,18 @@ try {
     await send('Page.reload');
     await sleep(2500);
     const opText = await asking();
-    // 「▶ オープニングを 見る」を 押すと、OP の 曲が 鳴る (2026-10-25 ユーザー指定: OP の 音が 鳴らない)
-    await press('.ask-choices button', { text: 'オープニングを 見る' });
+    // どちらの OP を 見るか えらぶ (2026-10-27 ユーザー指定)。えらぶと OP の 曲が 鳴る (2026-10-25 ユーザー指定: OP の 音が 鳴らない)
+    const waitBtns = await buttons();
+    check(/氷隊の オープニング/.test(waitBtns) && /鬼鬼団の オープニング/.test(waitBtns), `OP の 前に バージョンを えらぶ（${waitBtns}）`);
+    await press('.ask-choices button', { text: '氷隊の オープニング' });
     await sleep(3500);   // 歌が はじまる ところ (16 拍め) まで 流す
     const opSound = JSON.parse(await evaluate('JSON.stringify(KD.Sound.status())'));
     check(opSound.current === 'op_koori' && opSound.playing && opSound.running, `オープニングを 見ると 曲が 鳴る（${JSON.stringify(opSound)}）`);
     await skipOp();
-    check(/オープニング（氷隊）/.test(opText) && /つづきから/.test(await buttons()), `セーブが あると その バージョンの オープニングが 出て、スキップすると タイトル（${opText}）`);
+    check(/どちらの オープニング/.test(opText) && /つづきから/.test(await buttons()), `セーブが あると OP を えらぶ 画面が 出て、スキップすると タイトル（${opText}）`);
     await press('.ask-choices button', { text: 'つづきから' });
-    await sleep(1200);
+    check(await evaluate('document.getElementById("ask").hidden'), 'つづきからを 押すと キャラが 飛び出す');
+    await sleep(2400);
     const now = await evaluate('(() => { const s = window.kdGame.state, h = window.kdGame.heroUnit(); return [s.floor, h.x, h.y, h.hp, s.enemies.length].join(","); })()');
     check(await phase() === 'play' && now === was, `ページを開きなおすと やめた場所から続く（${was} → ${now}）`);
 
@@ -288,7 +296,7 @@ try {
     await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
     await send('Page.reload');
     await sleep(2500);
-    check(/オープニング（(氷隊|鬼鬼団)）/.test(await asking()), `セーブが 2 つ あると どちらかの オープニング（${await asking()}）`);
+    check(/どちらの オープニング/.test(await asking()), `セーブが 2 つ でも OP を えらぶ 画面（${await asking()}）`);
     await skipOp();
     const titleBtns = await evaluate('[...document.querySelectorAll(".ask-choices button")].map(b => b.textContent).join(" / ")');
     check(/つづきから（氷隊）/.test(titleBtns) && /つづきから（鬼鬼団）/.test(titleBtns), `タイトルに バージョンごとの つづきから（${titleBtns}）`);
@@ -296,7 +304,7 @@ try {
         && [...document.querySelectorAll('.ask-choices button')].every(b => b.scrollWidth <= b.clientWidth + 1))()`);
     check(await fits(), 'スマホの幅で タイトルの ボタンが はみ出さない');
     await press('.ask-choices button', { text: 'つづきから（鬼鬼団）' });
-    await sleep(800);
+    await sleep(2300);
     check(await phase() === 'town' && await evaluate('window.kdGame.state.town.version') === 'onioni' && /鬼鬼団/.test(await evaluate('document.title')),
         '鬼鬼団の 続きから（ページの 名前にも 鬼鬼団）');
     // スマホの 町: メニューは ゲーム画面の 下に 出て 全部 見える (スクロールなしで 最後まで)。十字ボタンは かくれる

@@ -38,7 +38,8 @@
         let dexTeam = null;  // チームの図鑑で えらんでいる チーム (2026-10-24)
         let dexItem = null;  // 道具の図鑑で えらんでいる 道具 (2026-10-27)
         let opShown = false; // 起動時の オープニングを 流したか (2026-10-25。1 回だけ)
-        let opInfo = null;   // 流している オープニング { version, start }
+        let opInfo = null;   // 流している オープニング { version, start, after }
+        let burstInfo = null; // タイトルの 飛び出し { version, cast, start, then } (2026-10-27)
         const C = KD.Collection;
         const bgm = name => KD.Sound && KD.Sound.bgm(name);
         let pick = 0;
@@ -160,45 +161,63 @@
             bgm('title');
             migrateSave();
             const slots = SLOTS.filter(readSlot);
-            // 起動時の オープニング (2026-10-25 ユーザー指定。js/op.js): はじめて 遊ぶ ときは 出さない。セーブの ある バージョンの OP、
-            //   両方 あれば 2 分の 1。起動して 最初の タイトルだけ
-            if (!opShown && slots.length && KD.Op && !g.opts.noOp && typeof document !== 'undefined') {   // 画面の ない テストでは 流さない
+            // 起動時の オープニング (2026-10-25 ユーザー指定。js/op.js): はじめて 遊ぶ ときは 出さない (はじめからの 話の あとに 流す)。
+            //   どちらの バージョンの OP に するか えらんでから 流す (2026-10-27 ユーザー指定)。起動して 最初の タイトルだけ
+            if (!opShown && slots.length && opOk()) {
                 opShown = true;
-                return playOp(slots.length > 1 ? slots[Math.random() < 0.5 ? 0 : 1] : slots[0]);
+                return chooseOp();
             }
             opShown = true;
             // セーブが 1 つなら その バージョン、2 つなら 両方を タイトルに 出す
             titleVersion = slots.length === 1 ? DG.VERSIONS[slots[0]] : slots.length ? { name: slots.map(v => DG.VERSIONS[v].name).join(' ／ '), color: '#ffe680' } : null;
             const label = v => (slots.length > 1 ? `つづきから（${DG.VERSIONS[v].name}）` : 'つづきから');
             ask(titleVersion ? `${GAME_TITLE}\n${titleVersion.name}` : GAME_TITLE, [...slots.map(label), 'はじめから', '引き継ぎ', '設定'], i => {
-                if (i < slots.length) return load(false, slots[i]);
-                if (i === slots.length) return newGame();
+                if (i < slots.length) return burst(slots[i], () => load(false, slots[i]));
+                if (i === slots.length) return burst(null, newGame);
                 if (i === slots.length + 1) return transfer();
                 soundSettings(title);
             }, { place: 'bottom', list: false });
         }
 
+        // タイトルで 押した あと、まわりに キャラが 飛び出してから 次へ (2026-10-27 ユーザー指定。js/op.js の drawBurst)
+        function burst(version, then) {
+            if (!opOk()) return then();
+            view = 'burst';
+            burstInfo = { version, cast: KD.Op.burstCast(version, KD.Emblems && KD.Emblems.TEAMS), start: null, then };
+            KD.Sound && KD.Sound.play('levelup');
+        }
+
         // ----- 起動時の オープニング (2026-10-25) -----
         // ブラウザは 画面を さわる・キーを 押すまで 音を 出せない (2026-10-25 ユーザー指定: OP の 音が 鳴らない)。
-        //   なので まず「▶ オープニングを 見る」を 押してもらい、その 操作で 音を 出せるように してから (main.js の unlock)、
-        //   OP を 最初から 曲つきで 流す。スキップも できる
-        function playOp(version) {
+        //   なので まず どちらの バージョンの OP を 見るか えらんでもらい (2026-10-27 ユーザー指定)、その 操作で 音を 出せるように してから
+        //   (main.js の unlock)、OP を 最初から 曲つきで 流す。スキップも できる
+        const opOk = () => Boolean(KD.Op) && !g.opts.noOp && typeof document !== 'undefined';   // 画面の ない テストでは 流さない
+        function chooseOp() {
             view = 'opWait';
-            opInfo = { version, start: null };
-            ask(`オープニング（${DG.VERSIONS[version].name}）`, ['▶ オープニングを 見る（音が 出ます）', 'スキップ'], i => {
-                if (i !== 0) return endOp();
+            opInfo = { version: null, start: null, after: title };
+            ask('どちらの オープニングを 見る？', [...SLOTS.map(v => `▶ ${DG.VERSIONS[v].name}の オープニング（音が 出ます）`), 'スキップ'], i => {
+                if (i >= SLOTS.length) return endOp();
                 KD.Sound && KD.Sound.unlock();   // 押した ところで 音を 出せるように (main.js の pointerdown より 先に 来ても いいように)
-                view = 'op';
-                opInfo.start = null;
-                bgm(`op_${version}`);
-                ask(`オープニング（${DG.VERSIONS[version].name}）`, ['スキップ ▶'], endOp, { place: 'bottom', list: false });
-            }, { place: 'bottom', list: false });
+                playOp(SLOTS[i]);
+            }, { place: 'bottom', list: false, onMove: i => {
+                // えらびなおした ほうの チームを 後ろに 出す (出した ときの 1 回目 (main.js の moveTo(start)) は 両方の まま)
+                if (view !== 'opWait') return;
+                if (opInfo.moved) opInfo.version = SLOTS[i] || null;
+                opInfo.moved = true;
+            } });
+        }
+        function playOp(version, after = opInfo ? opInfo.after : title) {
+            view = 'op';
+            opInfo = { version, start: null, after };
+            bgm(`op_${version}`);
+            ask(`オープニング（${DG.VERSIONS[version].name}）`, ['スキップ ▶'], endOp, { place: 'bottom', list: false });
         }
         function endOp() {
             if (view !== 'op' && view !== 'opWait') return;
+            const after = (opInfo && opInfo.after) || title;
             view = 'title';
             opInfo = null;
-            title();
+            after();
         }
 
         // ----- 引き継ぎ (スマホと PC で セーブを 移す。2026-10-22 ユーザー指定) -----
@@ -281,7 +300,10 @@
             const lines = storyLines(DG.STORY.opening);
             if (i >= lines.length) {
                 save();
-                return menu();
+                // こおりくんと おにおにの 話が 終わったら、その バージョンの OP (2026-10-27 ユーザー指定)。OP が 終わるか スキップで 町へ
+                if (!opOk()) return menu();
+                opShown = true;
+                return playOp(t().version, () => menu());
             }
             state.phase = 'title';   // 町の画面として描く (キャラ選択の画面を出さない)
             view = 'opening';
@@ -1870,6 +1892,16 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
         // ----- 絵 -----
         function draw(ctx, now, W, H) {
             if (view === 'title') return drawTitle(ctx, now, W, H);
+            if (view === 'burst' && burstInfo) {
+                if (burstInfo.start === null) burstInfo.start = now;
+                if (KD.Op.drawBurst(ctx, (now - burstInfo.start) / 1000, W, H, burstInfo, { A, Big: KD.BigArt, Emblems: KD.Emblems, U, FONT })) {
+                    const then = burstInfo.then;
+                    burstInfo = null;
+                    view = 'title';
+                    then();
+                }
+                return;
+            }
             if (view === 'opWait' && opInfo) return KD.Op.drawWait(ctx, now / 1000, W, H, opInfo.version, { A, Big: KD.BigArt, Emblems: KD.Emblems, U, FONT });
             if (view === 'op' && opInfo) {
                 if (opInfo.start === null) opInfo.start = now;
