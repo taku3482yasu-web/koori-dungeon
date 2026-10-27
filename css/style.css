@@ -321,3 +321,56 @@ body:not([data-phase="play"]) .keys { display: none; }
     .dpad { grid-template-columns: repeat(3, 40px); grid-template-rows: repeat(3, 40px); }
     .acts button { height: 34px; font-size: 13px; }
 }
+
+/* 図鑑の 絵の カード・検索・並べ替え (2026-10-27 ユーザー指定。main.js の ask の cards)。ほかの 聞く画面の 決まりより あとに 書いて 上書きする */
+.ask-tools { display: flex; gap: 6px; margin: 0 0 8px; flex: 0 0 auto; }
+.ask-tools[hidden] { display: none; }
+/* 16px より 小さいと iPhone で 画面が 大きくなる */
+.ask-search, .ask-sort {
+    min-width: 0;
+    padding: 6px 8px;
+    font: inherit;
+    font-size: 16px;
+    color: var(--text);
+    background: var(--panel);
+    border: 2px solid var(--line);
+    border-radius: 6px;
+}
+.ask-search { flex: 1 1 auto; }
+.ask-sort { flex: 0 0 auto; max-width: 45%; }
+.ask-search:focus, .ask-sort:focus { outline: none; border-color: var(--hot); }
+.ask.cards .ask-choices, .ask-slot .ask.cards .ask-choices {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+    gap: 6px;
+    min-height: 0;
+    overflow-y: auto;
+    flex: 0 1 auto;
+}
+.ask.cards .ask-choices button.card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+    padding: 4px 3px 5px;
+    text-align: center;
+}
+.ask.cards .card canvas {
+    width: 48px;
+    height: 48px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    background: #1c2c3c;
+    border-radius: 4px;
+}
+.ask.cards .card .nm { max-width: 100%; font-size: 11px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ask.cards .card .sb { font-size: 10px; line-height: 1.2; color: #a8c0d8; }
+.ask.cards .card.on .sb { color: var(--hot); }
+/* もどる などは 横いっぱい */
+.ask.cards .ask-choices button:not(.card) { grid-column: 1 / -1; min-width: 0; text-align: center; }
+.ask-none { grid-column: 1 / -1; margin: 6px 0; font-size: 13px; color: #a8c0d8; text-align: center; }
+/* スマホ: 1 行に 4 枚 (名前が 切れにくいように) */
+@media (max-width: 520px) {
+    .ask.cards .ask-choices button.card { padding: 4px 2px; }
+}

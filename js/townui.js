@@ -36,6 +36,7 @@
         let view = 'town';   // town 町 / tree バトルツリー / title タイトル / loading つないでいる / dex 図鑑
         let dexKind = null;  // 図鑑で えらんでいる敵
         let dexTeam = null;  // チームの図鑑で えらんでいる チーム (2026-10-24)
+        let dexItem = null;  // 道具の図鑑で えらんでいる 道具 (2026-10-27)
         let opShown = false; // 起動時の オープニングを 流したか (2026-10-25。1 回だけ)
         let opInfo = null;   // 流している オープニング { version, start }
         const C = KD.Collection;
@@ -1325,6 +1326,35 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                 if (!t().dex.seen[kind]) return `${no}　？？？`;
                 return `${no}　${e.name}${t().dex.beat[kind] ? `　たおした ${t().dex.beat[kind]}` : ''}`;
             };
+            // 絵の カードで ならべる。名前などで 検索・並べ替え (2026-10-27 ユーザー指定: 文字だけでは わかりづらく 探しづらい。main.js の ask の cards)
+            //   まだ 見ていない キャラは「？」だけ (名前では 検索に かからない。2026-10-27 ユーザー指定)
+            const no = kind => {
+                const e = U.ENEMIES[kind];
+                if (!own.includes(kind)) return '交換';
+                return e.no ? `No.${e.no}` : e.boss ? 'ボス' : e.rival ? 'ライバル' : '強敵';
+            };
+            const roleName = e => (U.ROLES[e.role] ? U.ROLES[e.role].name : '');
+            const cards = order.map(kind => {
+                const e = U.ENEMIES[kind], known = dexKnown(kind);
+                return {
+                    name: known ? e.name : '？？？',
+                    sub: no(kind),
+                    mark: t().dex.beat[kind] ? '✔' : '',
+                    search: known ? [e.name, no(kind), e.element, roleName(e), (DG.VERSIONS[e.version] || {}).name || ''].join(' ') : no(kind),
+                    art: (ctx, w, h) => drawDexArt(ctx, kind, known, w, h)
+                };
+            });
+            // key: その キャラの 並べる 値 (null は 見ていない → いちばん あと)
+            const ifSeen = f => ifKnown(i => dexKnown(order[i]), i => f(U.ENEMIES[order[i]], order[i]));
+            const roleIds = Object.keys(U.ROLES);
+            const sorts = [
+                { name: 'No. 順', key: i => i },
+                { name: 'なまえ順', key: ifSeen(e => e.name) },
+                { name: 'たおした数', key: ifSeen((e, k) => -(t().dex.beat[k] || 0)) },
+                { name: '見た数', key: ifSeen((e, k) => -(t().dex.seen[k] || 0)) },
+                { name: '属性', key: ifSeen(e => U.ELEMENTS.indexOf(e.element)) },
+                { name: '役職', key: ifSeen(e => roleIds.indexOf(e.role)) }
+            ];
             view = 'dex';
             dexKind = order[Math.min(index, order.length - 1)];
             // キャラを 押したら その キャラを 上に 出して 一覧の まま (「もどる」だけで 前の 画面へ。2026-10-23 ユーザー指定)
@@ -1332,8 +1362,31 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                 if (i < order.length) return enemyDex(i);
                 view = 'town';
                 dexMenu();
-            }, { place: 'bottom', list: true, index, onMove: i => { dexKind = order[i] || null; } });
+            }, { place: 'bottom', list: true, index, onMove: i => { dexKind = order[i] || null; }, cards: { id: 'enemyDex', items: cards, sorts, placeholder: 'さがす（名前・No.・属性・役職）' } });
         }
+        // 図鑑の カードの 絵 (w × h に おさめる)。見ていない キャラは「？」
+        function drawDexArt(ctx, kind, known, w, h) {
+            if (!known) return drawUnknown(ctx, w, h);
+            if (A.SPRITES[kind]) {
+                const s = Math.max(1, Math.floor(Math.min(w, h) / 16));
+                A.drawSprite(ctx, kind, 0, Math.round((w - 16 * s) / 2), Math.round((h - 16 * s) / 2), { scale: s });
+            } else if (KD.BigArt.has(kind)) {
+                const art = KD.BigArt.BIG[kind];
+                const height = Math.min(h - 4, (w - 4) * art.h / art.w);
+                KD.BigArt.drawBig(ctx, kind, 0, w / 2, (h + height) / 2, { height });
+            }
+        }
+        // 図鑑の カード: まだ 見ていない ものは「？」だけ
+        function drawUnknown(ctx, w, h) {
+            ctx.font = `bold ${Math.round(h * 0.6)}px ${FONT}`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#3a4a5a';
+            ctx.fillText('？', w / 2, h / 2);
+            ctx.textAlign = 'left';
+        }
+        // なまえ順 など: 見ていない ものは あと (null)
+        const ifKnown = (known, f) => i => (known(i) ? f(i) : null);
 
         // ----- チームの図鑑 (2026-10-24 ユーザー指定: チームエンブレム。js/emblems.js) -----
         //   自分の チームは はじめから、ライバルは メンバーを 1 人でも 見たら わかる
@@ -1343,11 +1396,29 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             const ids = Object.keys(KD.Emblems.TEAMS);
             view = 'team';
             dexTeam = ids[Math.min(index, ids.length - 1)];
+            // 絵の カード (エンブレム)・検索・並べ替え (2026-10-27 ユーザー指定。敵の図鑑と 同じ 形)
+            const known = i => teamKnown(ids[i]);
+            const unitName = k => (U.ENEMIES[k] || U.HEROES[k] || {}).name || '';
+            const cards = ids.map((id, i) => {
+                const tm = KD.Emblems.TEAMS[id];
+                const members = tm.members.filter(k => id === myTeam() || dexKnown(k)).map(unitName);
+                return {
+                    name: known(i) ? `${id === myTeam() ? '★ ' : ''}${id}` : '？？？',
+                    sub: known(i) ? `${tm.members.length} 人` : '',
+                    search: known(i) ? [id, tm.motto, ...members].join(' ') : '',
+                    art: (ctx, w, h) => (known(i) ? KD.Emblems.draw(ctx, id, w / 2, h / 2, Math.min(w, h) - 4, 0) : drawUnknown(ctx, w, h))
+                };
+            });
+            const sorts = [
+                { name: 'いつもの順', key: i => i },
+                { name: 'なまえ順', key: ifKnown(known, i => ids[i]) },
+                { name: '人数', key: ifKnown(known, i => -KD.Emblems.TEAMS[ids[i]].members.length) }
+            ];
             ui.ask(`チームの図鑑 ${ids.filter(teamKnown).length} / ${ids.length}（えらぶと 上に エンブレム）`, [...ids.map(id => (teamKnown(id) ? `${id === myTeam() ? '★ ' : ''}${id}` : '？？？')), 'もどる'], i => {
                 if (i < ids.length) return teamDex(i);
                 view = 'town';
                 dexMenu();
-            }, { place: 'bottom', list: true, index, onMove: i => { dexTeam = ids[i] || null; } });
+            }, { place: 'bottom', list: true, index, onMove: i => { dexTeam = ids[i] || null; }, cards: { id: 'teamDex', items: cards, sorts, placeholder: 'さがす（チーム・メンバーの名前）' } });
         }
         function drawTeam(ctx, now, W, H) {
             ctx.fillStyle = '#101a24';
@@ -1391,9 +1462,68 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             });
         }
 
-        function itemDex() {
+        // 道具の図鑑: 絵の カード・検索・並べ替え。えらぶと 上に くわしく 出る (2026-10-27 ユーザー指定。敵の図鑑と 同じ 形)
+        function itemDex(index = 0) {
             const ids = Object.keys(I.ITEMS);
-            ask('道具の図鑑', [...ids.map(id => (t().dexItems[id] ? `${I.ITEMS[id].name}　${I.ITEMS[id].note}` : '？？？')), 'もどる'], () => dexMenu());
+            const known = i => Boolean(t().dexItems[ids[i]]);
+            const kinds = [...new Set(ids.map(id => I.ITEMS[id].kind))];
+            const cards = ids.map((id, i) => {
+                const it = I.ITEMS[id];
+                return {
+                    name: known(i) ? it.name : '？？？',
+                    sub: known(i) && it.price ? money(it.price) : '',
+                    search: known(i) ? [it.name, it.note].join(' ') : '',
+                    art: (ctx, w, h) => {
+                        if (!known(i)) return drawUnknown(ctx, w, h);
+                        const s = Math.max(1, Math.floor(Math.min(w, h) / 16));
+                        ctx.save();
+                        ctx.translate(Math.round((w - 16 * s) / 2), Math.round((h - 16 * s) / 2));
+                        ctx.scale(s, s);
+                        A.drawItem(ctx, id, it.kind, 0, 0);
+                        ctx.restore();
+                    }
+                };
+            });
+            const sorts = [
+                { name: 'いつもの順', key: i => i },
+                { name: 'なまえ順', key: ifKnown(known, i => I.ITEMS[ids[i]].name) },
+                { name: '種類', key: ifKnown(known, i => kinds.indexOf(I.ITEMS[ids[i]].kind)) },
+                { name: '値段', key: ifKnown(known, i => I.ITEMS[ids[i]].price || 0) }
+            ];
+            view = 'item';
+            dexItem = ids[Math.min(index, ids.length - 1)];
+            ui.ask(`道具の図鑑 ${ids.filter((id, i) => known(i)).length} / ${ids.length}（えらぶと 上に くわしく出る）`, [...ids.map(id => (t().dexItems[id] ? `${I.ITEMS[id].name}　${I.ITEMS[id].note}` : '？？？')), 'もどる'], i => {
+                if (i < ids.length) return itemDex(i);
+                view = 'town';
+                dexMenu();
+            }, { place: 'bottom', list: true, index, onMove: i => { dexItem = ids[i] || null; }, cards: { id: 'itemDex', items: cards, sorts, placeholder: 'さがす（名前・効き目）' } });
+        }
+        // 道具の図鑑: えらんでいる 道具の 絵と くわしいこと
+        function drawItemDex(ctx, now, W, H) {
+            ctx.fillStyle = '#101a24';
+            ctx.fillRect(0, 0, W, H);
+            const it = dexItem && I.ITEMS[dexItem];
+            if (!it) return;
+            const known = Boolean(t().dexItems[dexItem]);
+            ctx.fillStyle = '#1c2c3c';
+            ctx.fillRect(12, 10, 84, 84);
+            ctx.save();
+            ctx.translate(12, 10);
+            if (known) {
+                ctx.translate(18, 18);
+                ctx.scale(3, 3);
+                A.drawItem(ctx, dexItem, it.kind, 0, 0);
+            } else drawUnknown(ctx, 84, 84);
+            ctx.restore();
+            ctx.textBaseline = 'middle';
+            ctx.font = `bold 12px ${FONT}`;
+            ctx.fillStyle = '#ffe680';
+            ctx.fillText(known ? it.name : '？？？', 108, 20);
+            ctx.font = `9px ${FONT}`;
+            ctx.fillStyle = '#c8d8e8';
+            if (!known) return void ctx.fillText('まだ 手に入れたことがない。', 108, 40);
+            ctx.fillText(it.note, 108, 40);
+            if (it.price) ctx.fillText(`値段：${money(it.price)}`, 108, 54);
         }
 
         function achList() {
@@ -1732,6 +1862,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
             if (view === 'tree') return drawTree(ctx, now, W, H);
             if (view === 'dex') return drawDex(ctx, now, W, H);
             if (view === 'team') return drawTeam(ctx, now, W, H);
+            if (view === 'item') return drawItemDex(ctx, now, W, H);
             if (view === 'status' && statusUnit) {
                 ctx.fillStyle = '#101a24';
                 ctx.fillRect(0, 0, W, H);

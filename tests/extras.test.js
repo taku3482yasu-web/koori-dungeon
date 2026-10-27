@@ -197,7 +197,7 @@ test('実績: 手に入れると お知らせ。もう一度は 出ない', () =
 test('町の家から 図鑑と実績を見られる', () => {
     store.clear();
     const asks = [];
-    const ui = { ask: (message, options, done) => asks.push({ message, options, done }), asking: () => asks.length > 0 };
+    const ui = { ask: (message, options, done, extra) => asks.push({ message, options, done, extra }), asking: () => asks.length > 0 };
     const game = globalThis.KD.createGame({ getContext: fakeCtx }, ui, { seed: 5, things: false, market: false, happen: false, unlockAll: true });
     const choose = label => {
         const q = asks.shift();
@@ -213,6 +213,13 @@ test('町の家から 図鑑と実績を見られる', () => {
     assert.match(asks[0].message, /図鑑/);
     choose('敵の図鑑');
     assert.ok(asks[0].options[0].includes('？？？'), 'まだ見ていない');
+    // 絵の カード・検索・並べ替え (2026-10-27)。見ていない キャラは 名前では さがせない
+    const cards = asks[0].extra.cards;
+    assert.equal(cards.items.length, asks[0].options.length - 1, 'もどる 以外は カード');
+    assert.equal(cards.items[0].name, '？？？');
+    assert.ok(!cards.items[0].search.includes(globalThis.KD.Units.ENEMIES[globalThis.KD.Collection.dexOrder(game.state.town.version)[0]].name));
+    assert.ok(cards.sorts.length >= 3 && cards.sorts.every(s => typeof s.key === 'function'));
+    assert.equal(cards.sorts[1].key(0), null, 'なまえ順: 見ていない キャラは あと');
     game.draw(fakeNow);
     choose('もどる');
     choose('もどる');
