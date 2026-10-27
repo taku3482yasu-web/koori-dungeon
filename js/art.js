@@ -488,6 +488,8 @@
     function drawItem(ctx, id, kind, x, y) {
         ctx.fillStyle = 'rgba(0,0,0,.25)';
         ctx.fillRect(x + 4, y + 12, 8, 2);
+        // 道具ごとの 絵 (js/itemart.js。2026-10-27)
+        if (KD.ItemArt && KD.ItemArt.draw(ctx, id, x, y)) return;
         if (id === 'chest') {
             // 宝箱 (タカラミミックが化けている)
             px1(ctx, '#a0602a', x + 2, y + 6, 12, 8);

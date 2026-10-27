@@ -74,7 +74,7 @@
         }
 
         // 図鑑・実績・数 (たおした数など)
-        const collectionData = () => ({ dex: { seen: {}, beat: {} }, dexItems: {}, ach: {}, stats: C.newStats() });
+        const collectionData = () => ({ dex: { seen: {}, beat: {}, joined: {} }, dexItems: {}, ach: {}, stats: C.newStats() });
 
         function seen(kind) {
             t().dex.seen[kind] = (t().dex.seen[kind] || 0) + 1;
@@ -85,6 +85,22 @@
         function noteItem(id) {
             t().dexItems[id] = true;
         }
+        // 仲間に したことの ある キャラ (図鑑の 説明が 見られる。2026-10-27 ユーザー指定)。
+        //   いま いる 仲間 (いっしょ・広場・たおれている・特訓・遠征) を おぼえる。進化・交易所・ライバルの クエストで 来た キャラも 入る
+        function noteJoined() {
+            const town = t();
+            if (!town) return;
+            const joined = town.dex.joined || (town.dex.joined = {});
+            [state.player, ...state.allies, ...(state.roster || []), ...(state.fallen || []), ...awayData()].forEach(u => {
+                if (u && U.ENEMIES[u.kind]) joined[u.kind] = true;
+            });
+        }
+        // 図鑑の 説明を 見られるか: ボス・強敵は たおしたら、ほかは 仲間に したら (交換で 来た キャラも)。見た・たおした だけでは「？？？」
+        function profileOpen(kind) {
+            const e = U.ENEMIES[kind], dex = t().dex;
+            if (e.boss || e.big) return Boolean(dex.beat[kind]);
+            return Boolean((dex.joined || {})[kind] || (dex.traded || {})[kind]);
+        }
         function stat(name, n = 1) {
             t().stats[name] = (t().stats[name] || 0) + n;
             check();
@@ -93,6 +109,7 @@
         function check() {
             const town = t();
             if (!town || !p()) return;
+            noteJoined();
             const c = { town, player: p(), allies: state.allies, roster: [...state.roster, ...awayData()], stats: town.stats };
             C.ACHIEVEMENTS.forEach(a => {
                 if (town.ach[a.id] || !a.test(c)) return;
@@ -1317,6 +1334,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
         const tradedKinds = order => Object.keys(t().dex.traded || {}).filter(k => U.ENEMIES[k] && !order.includes(k));
         const dexKnown = kind => Boolean(t().dex.seen[kind] || (t().dex.traded || {})[kind]);
         function enemyDex(index = 0) {
+            noteJoined();
             const own = C.dexOrder(t().version);
             const order = [...own, ...tradedKinds(own)];
             const label = kind => {
@@ -1794,6 +1812,7 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
         }
         function save() {
             if (g.opts.save === false || !state.town) return false;
+            noteJoined();
             const hero = p();
             const data = {
                 v: 1,
@@ -2875,6 +2894,15 @@ ${state.roster[state.roster.length - 1].name}として 仲間の広場で 待っ
                 ctx.font = `9px ${FONT}`;
                 ctx.fillStyle = '#6a7a8a';
                 ctx.fillText('（説明は まだ ない）', 12, 116);
+                return;
+            }
+            if (!profileOpen(kind)) {
+                ctx.font = `bold 9px ${FONT}`;
+                ctx.fillStyle = '#ffd84a';
+                ctx.fillText('？？？', 12, 116);
+                ctx.font = `9px ${FONT}`;
+                ctx.fillStyle = '#6a7a8a';
+                ctx.fillText(e.boss || e.big ? '（たおすと 説明が 見られる）' : '（仲間に すると 説明が 見られる）', 12, 130);
                 return;
             }
             ctx.font = `bold 9px ${FONT}`;

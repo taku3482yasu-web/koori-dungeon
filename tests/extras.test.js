@@ -329,3 +329,73 @@ test('進化: コガメは 海岸どうくつの B8F に いっしょに着く�
     assert.equal(young.kind, 'kogame', 'Lv が足りないのに 進化した');
     assert.ok(s.messages.some(m => /進化した/.test(m.text)) || kame.name === 'ヒョウガメ');
 });
+
+test('図鑑の 説明 (2026-10-27): 仲間に した キャラだけ 見られる (見た・たおした だけでは ？？？)。ボスは たおしたら 見られる', () => {
+    vm.runInThisContext(readFileSync(new URL('../js/profiles.js', import.meta.url), 'utf8'));
+    vm.runInThisContext(readFileSync(new URL('../js/profiles-new.js', import.meta.url), 'utf8'));
+    store.clear();
+    const texts = [];
+    const ctx = new Proxy({ measureText: t => ({ width: t.length * 9 }), createLinearGradient: () => ({ addColorStop() {} }), fillText: t => texts.push(String(t)) }, {
+        get: (t, k) => (k in t ? t[k] : () => {}), set: (t, k, v) => { t[k] = v; return true; }
+    });
+    const asks = [];
+    const ui = { ask: (message, options, done, extra) => asks.push({ message, options, done, extra }), asking: () => asks.length > 0 };
+    const game = globalThis.KD.createGame({ getContext: () => ctx }, ui, { seed: 5, things: false, market: false, happen: false, partner: false });
+    const choose = label => {
+        const q = asks.shift();
+        const i = q.options.findIndex(o => o.includes(label));
+        assert.ok(i >= 0, `${label}: ${q.options.join('/')}`);
+        q.done(i);
+    };
+    choose('はじめから');
+    choose('こおりくん');
+    for (let i = 0; i < 5; i++) choose('つぎへ');
+    const s = game.state, P = globalThis.KD.Profiles;
+    const boss = C.dexOrder(s.town.version).find(k => U.ENEMIES[k].boss && P[k]);
+    s.town.dex.seen.donguriko = 3;
+    s.town.dex.beat.donguriko = 2;
+    s.town.dex.seen[boss] = 1;
+    // 図鑑で kind を えらんで 描く → 描いた 文字
+    const shown = kind => {
+        choose('図鑑');
+        choose('敵の図鑑');
+        const q = asks[0];
+        q.extra.onMove(C.dexOrder(s.town.version).indexOf(kind));
+        texts.length = 0;
+        game.draw(fakeNow += 16);
+        choose('もどる');
+        choose('もどる');
+        return texts.join('\n');
+    };
+    let t = shown('donguriko');
+    assert.ok(!t.includes(P.donguriko.title) && /仲間に すると 説明/.test(t), '見た・たおした だけでは ？？？');
+    t = shown(boss);
+    assert.ok(!t.includes(P[boss].title) && /たおすと 説明/.test(t), 'ボスは たおすまで ？？？');
+    s.town.dex.beat[boss] = 1;
+    assert.ok(shown(boss).includes(P[boss].title), 'ボスは たおしたら 見られる');
+    // 仲間に する (広場で 待つ) → 見られる。そのあと 別れても おぼえている
+    const a = { kind: 'donguriko' };
+    s.roster.push(a);
+    assert.ok(shown('donguriko').includes(P.donguriko.title), '仲間に したら 見られる');
+    s.roster.splice(s.roster.indexOf(a), 1);
+    assert.ok(shown('donguriko').includes(P.donguriko.title), '別れても 見られる');
+    assert.equal(s.town.dex.joined.donguriko, true);
+});
+
+test('道具の 絵 (2026-10-27): 装備・素材・拡張の 道具は みんな 専用の 絵が あり、形と 色が そろっている', () => {
+    vm.runInThisContext(readFileSync(new URL('../js/itemart.js', import.meta.url), 'utf8'));
+    const { ITEMS } = globalThis.KD.Items, IA = globalThis.KD.ItemArt;
+    for (const [id, it] of Object.entries(ITEMS)) {
+        if (['gear', 'material', 'upgrade'].includes(it.kind)) assert.ok(IA.has(id), `${it.name} の 絵が ない`);
+    }
+    for (const [id, [shape, colors]] of Object.entries(IA.ART)) {
+        assert.ok(ITEMS[id], `${id} は 道具に ない`);
+        const rows = IA.SHAPES[shape];
+        assert.equal(rows.length, 12, shape);
+        rows.forEach(r => assert.match(r, /^[.oabcdw]{12}$/, `${shape}: ${r}`));
+        for (const ch of new Set(rows.join('').replace(/[.o]/g, ''))) assert.ok(colors[ch], `${id} の 色 ${ch}`);
+    }
+    let drawn = 0;
+    assert.ok(IA.draw({ fillRect: () => drawn++ }, 'lucky_coin', 0, 0) && drawn > 20);
+    assert.equal(IA.draw({ fillRect() {} }, 'onigiri', 0, 0), false, 'おにぎりは 今までの 絵');
+});
