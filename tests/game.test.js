@@ -716,6 +716,37 @@ test('たおした敵が仲間になりたそうにする。はいで仲間に�
     assert.ok(s.messages.some(m => /入れかわって/.test(m.text)));
 });
 
+test('たおれている仲間がいるときも 仲間の上限を こえない (たおれた仲間も 数える)', () => {
+    const { game, s, run, asks, answer } = setup({ recruit: 1 });
+    // 1 人目を 仲間にして、たおれさせる
+    let e = besideEnemy(game, s, 'donguriko');
+    e.hp = 1;
+    for (let i = 0; i < 6 && !asks.length; i++) { game.attack(); run(800); }
+    answer(0);
+    run(400);
+    s.fallen.push(...s.allies.splice(0));
+    // 2 人目: 主人公 + たおれた 1 人 → まだ 1 人 入れる
+    e = besideEnemy(game, s, 'donguriko');
+    e.hp = 1;
+    for (let i = 0; i < 6 && !asks.length; i++) { game.attack(); run(800); }
+    answer(0);
+    run(400);
+    assert.equal(s.allies.length, 1);
+    // 3 人目: 主人公 + 1 人 + たおれた 1 人 で いっぱい → 入れかえるか 聞かれる → 入れかえない
+    e = besideEnemy(game, s, 'nemuridake');
+    s.allies.forEach(a => placeAway(s, a));
+    e.hp = 1;
+    for (let i = 0; i < 6 && !asks.length; i++) { game.attack(); run(800); }
+    answer(0);
+    run(400);
+    assert.match(asks[0].message, /いっぱい。だれかと 入れかえますか/);
+    answer(asks[0].options.length - 1);
+    run(200);
+    // 町に戻ると たおれた仲間も 列に もどるので、ここで 上限 (3 人) を こえては いけない
+    assert.equal(s.allies.length + s.fallen.length + 1, 3, '主人公・仲間・たおれた仲間で 上限まで');
+    assert.equal(s.roster.length, 1);
+});
+
 test('操作するキャラの交代: いつでも 仲間を操作できる。道具袋・お金・満腹度は チームで共有。操作している仲間が たおれると 主人公に もどる', () => {
     const { game, s, run, asks, answer } = setup({ enemies: false, partner: true });
     const hero = s.player;

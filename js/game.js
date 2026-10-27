@@ -1251,7 +1251,8 @@
                     if (i !== 0) return say(`${e.name}は さみしそうに 去っていった…`);
                     const a = makeAlly(e.kind, e.lv);
                     if (state.town) town.stat('recruited');
-                    if (party().length < partyMax() && placeNear(a, state.player.x, state.player.y)) {
+                    // たおれている仲間も 数える (町に戻ると 列に もどるので、数えないと 上限を こえる)
+                    if (party().length + state.fallen.length < partyMax() && placeNear(a, state.player.x, state.player.y)) {
                         state.allies.push(a);
                         say(`${a.name}が 仲間になった！（役職：${U.ROLES[a.role].name}）`);
                     } else if (swappable().length) {
