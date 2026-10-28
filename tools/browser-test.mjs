@@ -100,6 +100,10 @@ const openDir = () => evaluate(`(() => { const s = window.kdGame.state, p = s.pl
     const d = [[0,1],[1,0],[0,-1],[-1,0]].find(([dx,dy]) => KD.Dungeon.canMove(s.map, p.x, p.y, dx, dy) && !s.enemies.some(e => e.x === p.x+dx && e.y === p.y+dy) && !s.allies.some(a => a.x === p.x+dx && a.y === p.y+dy) && !s.traps.some(t => t.x === p.x+dx && t.y === p.y+dy));
     return d ? d.join(',') : null; })()`);
 // まわりの敵を いなくして、ワナも消す (確かめるのは ボタンが効くかだけ)
+// 行動 (攻撃・わざ) を 見せ おわるまで 待つ (2026-10-28 から 行動を ゆっくり 見せる)
+async function idle(limit = 4000) {
+    for (let t = 0; t < limit && await evaluate('window.kdGame.busy() && window.kdGame.state.phase === "play" && document.getElementById("ask").hidden'); t += 50) await sleep(50);
+}
 const calm = () => evaluate('(() => { const s = window.kdGame.state; s.enemies.splice(0); s.traps.splice(0); return true; })()');
 
 try {
@@ -211,6 +215,12 @@ try {
     await press('#btn-ok');
     await press('#skills button');
     check((await evaluate('window.kdGame.state.messages.map(m => m.text).join(" ")')).includes('コオリソード'), 'わざのボタンで わざを使う');
+    await idle();
+    // 倍速 (2026-10-28): ボタンで オン・オフ (ボタンが 光る)
+    await press('#btn-fast');
+    check(await evaluate('window.kdGame.isFast() && document.getElementById("btn-fast").classList.contains("on")'), '「倍速」ボタンで 倍速に なる');
+    await press('#btn-fast');
+    check(await evaluate('!window.kdGame.isFast()'), 'もう一度 押すと もどる');
     // 交代: おにおにを 操作して 歩く → 主人公に もどす
     await press('#btn-switch');
     check(/だれを 操作する/.test(await asking()), '「交代」で 操作するキャラを えらぶ画面');

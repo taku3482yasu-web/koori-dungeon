@@ -36,6 +36,13 @@
     let textSize = 'normal';
     try { const z = localStorage.getItem(TEXT_KEY); if (TEXT_SIZES.some(m => m.id === z)) textSize = z; } catch (e) { /* 保存できない 環境 (テストも) */ }
     const textScale = () => TEXT_SIZES.find(m => m.id === textSize).scale;
+    // 行動を 見せる 速さ (2026-10-28 ユーザー指定: 1 回 1 回の 行動が 速いので 遅く する。F キー・「倍速」ボタンで 倍速)。
+    //   攻撃・わざ・動けない ターンなど、順番に 見せる 行動の 時間に かける (歩く 速さは 変わらない)。localStorage に 取っておく。
+    //   画面で 遊ぶ ときだけ (opts.paced。main.js)。自動テスト・バランスの 自動プレイは これまでの 速さ
+    const PACE = { normal: 1.8, fast: 0.9 };
+    const FAST_KEY = 'koori-dungeon-fast';
+    let fastMode = false;
+    try { fastMode = localStorage.getItem(FAST_KEY) === '1'; } catch (e) { /* 保存できない 環境 (テストも) */ }
     const STEP_MS = 110, DASH_MS = 45;            // 1 マス動くのにかける時間 (ふつう・ダッシュ)
     const FADE_MS = 1100;                         // 階が変わるときの暗転
     const ATTACK_MS = 240, SHOOT_MS = 300;        // 攻撃 1 回を見せる時間
@@ -77,6 +84,7 @@
     //   start: 'dungeon' でタイトルと町を飛ばして すぐダンジョンへ (dungeon: どのダンジョンか)・role: はじめの役職 (開放もする)・save: false でセーブしない
     //   happen: false でハプニングなし (名前なら そのハプニングを かならず)
     function createGame(canvas, ui, opts = {}) {
+        const pace = ms => (opts.paced ? Math.round(ms * (fastMode ? PACE.fast : PACE.normal)) : ms);
         const ctx = canvas.getContext('2d');
         canvas.width = W * RES;
         canvas.height = H * RES;
@@ -1298,7 +1306,7 @@
         function allyDown(a) {
             state.allies.splice(state.allies.indexOf(a), 1);
             state.fallen.push(a);
-            state.dying.push({ ...a, at: performance.now() });
+            state.dying.push({ ...a, at: impactNow() });
             say(`${a.name}は たおれてしまった…`);
         }
 
@@ -1478,8 +1486,15 @@
             return path.find(([x, y]) => unitAt(x, y)) || path[path.length - 1] || [u.x, u.y];
         }
 
-        // わざを使う (主人公も敵も)。見せる時間を返す
+        // わざを使う (主人公も敵も)。見せる時間を返す。当たる 瞬間を ずらすのは この わざの あいだだけ
         function useMove(u, id, dir) {
+            try {
+                return doMove(u, id, dir);
+            } finally {
+                state.impactDelay = 0;
+            }
+        }
+        function doMove(u, id, dir) {
             const mv = U.SKILLS[id];
             face(u, dir[0], dir[1]);
             u.lunge = { at: performance.now(), dir: u.dir };
@@ -1488,14 +1503,18 @@
             if (u.side === 'party' ? rng.chance(0.15) : foeTalk(u, 0.4)) bubble(u, C.lineFor(u.kind, 'attack', u.side === 'party' ? rng : looks));
             if (mv.role && U.SKILLS[id] && /奥義/.test(mv.note || '')) flash('rgba(255,240,180,.5)');
             KD.Motion.cast(state, u, mv);   // わざを 使う キャラの まわりの 光 (2026-10-24)
+            // わざ ごとの 動き (2026-10-28 ユーザー指定: コオリソードは 剣で 切りつける など)。見せる 時間は その 長さ
+            const targets = mv.range === 'self' ? [] : targetsOf(u, mv.range, u.dir);
+            const motion = KD.Motion.skill(state, u, id, mv, targets, pace);
+            const motionMs = motion.ms;
+            state.impactDelay = pace(motion.impact);
             if (mv.range === 'self') {
                 selfMove(u, mv);
-                return ATTACK_MS;
+                return Math.max(ATTACK_MS, motionMs);
             }
-            const targets = targetsOf(u, mv.range, u.dir);
             const color = ELEMENT_COLORS[mv.element] || '#ffffff';
-            if (mv.range === 'line') state.shots.push({ from: [u.x, u.y], to: targets[0] ? [targets[0].x, targets[0].y] : lineEnd(u, u.dir), at: performance.now(), ms: SHOOT_MS, color });
-            if (mv.range === 'pierce') state.shots.push({ from: [u.x, u.y], to: pierceEnd(u, u.dir), at: performance.now(), ms: SHOOT_MS, color });
+            if (mv.range === 'line') state.shots.push({ from: [u.x, u.y], to: targets[0] ? [targets[0].x, targets[0].y] : lineEnd(u, u.dir), at: performance.now(), ms: pace(SHOOT_MS), color });
+            if (mv.range === 'pierce') state.shots.push({ from: [u.x, u.y], to: pierceEnd(u, u.dir), at: performance.now(), ms: pace(SHOOT_MS), color });
             if (mv.range === 'around') state.rings.push({ x: u.x, y: u.y, at: performance.now(), color });
             if (mv.range === 'room') targets.forEach(t => state.rings.push({ x: t.x, y: t.y, at: performance.now(), color }));
             if (!targets.length) say('しかし だれにも 当たらなかった。');
@@ -1538,7 +1557,7 @@
                 if (t.hp > 0 && mv.status && rng.chance(mv.chance)) inflict(t, mv.status, mv.power === 0);
                 if (t.hp > 0 && mv.knock) knockBack(t, u.dir, mv.knock);
             }
-            return mv.range === 'line' || mv.range === 'pierce' ? SHOOT_MS : ATTACK_MS;
+            return Math.max(mv.range === 'line' || mv.range === 'pierce' ? SHOOT_MS : ATTACK_MS, motionMs);
         }
 
         // 与えた ダメージで 回復 (ドレイン)
@@ -1630,7 +1649,7 @@
                 t.buffs.counter = 0;   // 1 回 はね返したら おわり (はね返しあいに ならないように)
                 hurt(from, back, t);
             }
-            t.hurtAt = performance.now();
+            t.hurtAt = impactNow();
             popup(t, String(n), t.side === 'party' ? '#ff8a8a' : '#ffffff');
             if (hasStatus(t, 'freeze') && rng.chance(0.5)) {
                 t.status = null;
@@ -1703,7 +1722,7 @@
         function defeat(e, from) {
             if (!state.enemies.includes(e)) return;
             state.enemies.splice(state.enemies.indexOf(e), 1);
-            state.dying.push({ ...e, at: performance.now() });
+            state.dying.push({ ...e, at: impactNow() });
             if (e.loot) {
                 dropItem(e.x, e.y, e.loot);
                 say(`${e.name}は ${I.label(e.loot)}を 落とした。`);
@@ -1894,8 +1913,10 @@
         }
 
         function popup(u, text, color) {
-            state.popups.push({ x: u.x, y: u.y, text, color, at: performance.now() });
+            state.popups.push({ x: u.x, y: u.y, text, color, at: impactNow() });
         }
+        // わざが 当たる 瞬間 (2026-10-28): わざの 動きの とちゅう (剣を ふりおろした ところ) で ダメージの 数字・点滅・たおれるのを 見せる
+        const impactNow = () => performance.now() + (state.impactDelay || 0);
 
         // ----- 主人公の行動 -----
         const onStairs = () => state.player.x === state.map.stairs.x && state.player.y === state.map.stairs.y;
@@ -2296,7 +2317,7 @@
             say(`${p.name}は ${d.name}を 投げた！`);
             const [t] = targetsOf(p, 'line', p.dir);
             const to = t ? [t.x, t.y] : lineEnd(p, p.dir);
-            state.shots.push({ from: [p.x, p.y], to, at: performance.now(), ms: SHOOT_MS, color: d.hit && d.hit.element ? ELEMENT_COLORS[d.hit.element] : '#d8d0b8' });
+            state.shots.push({ from: [p.x, p.y], to, at: performance.now(), ms: pace(SHOOT_MS), color: d.hit && d.hit.element ? ELEMENT_COLORS[d.hit.element] : '#d8d0b8' });
             if (!t) {
                 if (!dropItem(to[0], to[1], one)) say(`${d.name}は どこかへ 行ってしまった。`);
                 return SHOOT_MS;
@@ -2670,7 +2691,7 @@
                 // 順番待ちの攻撃などを、歩き終わってから 1 つずつ
                 while (!state.waitUntil && !moving() && !ui.asking() && state.queue.length) {
                     const ms = state.queue.shift()();
-                    if (ms) state.waitUntil = now + ms;
+                    if (ms) state.waitUntil = now + pace(ms);
                 }
                 if (state.arrived && !moving() && !state.queue.length && !state.waitUntil) {
                     state.arrived = false;
@@ -2959,8 +2980,10 @@
 
         function drawUnit(u, camX, camY, now) {
             // キャラごとの 動き (2026-10-24 ユーザー指定。js/motion.js): 待っている ときの くせと、攻撃の 動き
-            if (u.lunge && now - u.lunge.at >= ATTACK_MS) u.lunge = null;
-            const mo = KD.Motion.pose(u, now, ATTACK_MS);
+            // 攻撃の 動きも 行動の 速さに あわせる。わざの 動き (Motion.skill) は その 長さ (u.lunge.ms)
+            const attackMs = u.lunge && u.lunge.ms ? pace(u.lunge.ms) : pace(ATTACK_MS);
+            if (u.lunge && now - u.lunge.at >= attackMs) u.lunge = null;
+            const mo = KD.Motion.pose(u, now, attackMs);
             const ox = mo.ox, oy = mo.oy;
             const sx = Math.round(u.fx * T - camX + ox), sy = Math.round(u.fy * T - camY + oy);
             // 影。仲間は水色の輪で、敵と見分ける
@@ -2974,7 +2997,7 @@
             }
             // ダメージを受けたら点滅
             const hurt = now - u.hurtAt;
-            if (u.hurtAt && hurt < 360 && Math.floor(hurt / 60) % 2 === 0) return;
+            if (u.hurtAt && hurt >= 0 && hurt < 360 && Math.floor(hurt / 60) % 2 === 0) return;
             // ねむっているあいだは足が止まる
             const frame = hasStatus(u, 'sleep') || hasStatus(u, 'freeze') ? 0 : U.HEROES[u.kind] ? u.step % 2 : (u.step + Math.floor(now / 450)) % 2;
             // 化けている敵は 道具に見える
@@ -3007,6 +3030,8 @@
                 ctx.fillStyle = u.hp / u.stats.hp <= 0.3 ? '#ff6a5a' : u.ally ? '#7affff' : '#7ae07a';
                 ctx.fillRect(sx + 2, sy + 15, Math.max(1, Math.round(12 * u.hp / u.stats.hp)), 2);
             }
+            // まもりの 印 (2026-10-28 ユーザー指定: まもりが 続いて いる あいだ ずっと 出す)。体の まわりに 青い 盾の 光と、左上に 盾の マーク
+            if (u.buffs && u.buffs.guard > 0) drawGuard(sx, sy, now, u.buffs.guard);
             // 状態異常の印 (頭の上)
             if (u.status) {
                 const st = U.STATUS[u.status.id];
@@ -3022,6 +3047,30 @@
                 ctx.textAlign = 'left';
                 ctx.lineWidth = 1;
             }
+        }
+
+        // まもりの 印: うすく 光る 青い 盾の 輪と、左上に 盾の マーク。のこり 2 ターン 以下は 点滅して 切れそうと わかる
+        function drawGuard(sx, sy, now, turns) {
+            if (turns <= 2 && Math.floor(now / 250) % 2) return;
+            const glow = 0.35 + 0.15 * Math.sin(now / 300);
+            ctx.strokeStyle = `rgba(143,214,247,${glow + 0.25})`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.ellipse(sx + 8, sy + 6, 9, 10, 0, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = `rgba(143,214,247,${glow * 0.35})`;
+            ctx.fill();
+            // 盾 (5×6 ドット)
+            const x = sx - 2, y = sy - 4;
+            ctx.fillStyle = '#0a2a44';
+            ctx.fillRect(x - 1, y - 1, 7, 7);
+            ctx.fillRect(x, y + 6, 5, 1);
+            ctx.fillStyle = '#8fd6f7';
+            ctx.fillRect(x, y, 5, 4);
+            ctx.fillRect(x + 1, y + 4, 3, 1);
+            ctx.fillRect(x + 2, y + 5, 1, 1);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(x + 1, y + 1, 1, 2);
         }
 
         // キャラの絵: 小さい絵 (art.js) か、大きい絵 (bigart.js・enemyart.js)。ボスは大きく描く
@@ -3052,7 +3101,7 @@
 
         // たおれた敵は点滅しながら消える
         function drawDying(d, camX, camY, now) {
-            const k = (now - d.at) / 450;
+            const k = Math.max(0, (now - d.at) / 450);   // 当たる 瞬間 までは そのまま
             if (Math.floor(k * 8) % 2) return;
             drawBody(d, 0, Math.round(d.fx * T - camX), Math.round(d.fy * T - camY) - Math.round(k * 4), d.flip, 1 - k);
         }
@@ -3097,6 +3146,7 @@
             ctx.textBaseline = 'middle';
             ctx.lineWidth = 2;
             state.popups.forEach(pp => {
+                if (now < pp.at) return;   // わざが 当たる 瞬間 から
                 const k = (now - pp.at) / 800;
                 const x = pp.x * T - camX + T / 2, y = pp.y * T - camY - 2 - k * 10;
                 ctx.strokeStyle = 'rgba(0,0,0,.8)';
@@ -3153,7 +3203,7 @@
             const tags = [];
             if (p.status) tags.push([U.STATUS[p.status.id].name, U.STATUS[p.status.id].color]);
             if (p.buffs.kiai) tags.push(['きあい', '#ffb060']);
-            if (p.buffs.guard) tags.push(['まもり', '#8fd6f7']);
+            if (p.buffs.guard) tags.push([`まもり（あと${p.buffs.guard}）`, '#8fd6f7']);   // 切れるまで 出す (のこり ターン)
             if (p.gear) tags.push([`そうび：${gearName(p)}`, '#c8d8e8']);
             state.hudRows = tags.length ? 2 : 1;
             if (!tags.length) return;
@@ -3231,7 +3281,7 @@
             ctx.textBaseline = 'middle';
             const rows = [...list, ...state.fallen];
             ctx.fillStyle = 'rgba(0,0,0,.45)';
-            ctx.fillRect(0, y0 - 1, 128, rows.length * 10 + 12);
+            ctx.fillRect(0, y0 - 1, 136, rows.length * 10 + 12);
             ctx.fillStyle = '#8fd6f7';
             ctx.fillText(`作戦：${TACTICS[state.tactic]}`, 4, y0 + 4);
             rows.forEach((a, i) => {
@@ -3245,9 +3295,16 @@
                 const k = a.hp / a.stats.hp;
                 ctx.fillStyle = k > 0.5 ? '#7affff' : k > 0.25 ? '#f0d040' : '#ff5a4a';
                 ctx.fillRect(76, y - 2, Math.round(30 * k), 4);
+                let mx = 110;
                 if (a.status) {
                     ctx.fillStyle = U.STATUS[a.status.id].color;
-                    ctx.fillText(U.STATUS[a.status.id].mark, 110, y);
+                    ctx.fillText(U.STATUS[a.status.id].mark, mx, y);
+                    mx += ctx.measureText(U.STATUS[a.status.id].mark).width + 2;
+                }
+                // まもりの あいだは「守」(2026-10-28)
+                if (a.buffs && a.buffs.guard > 0) {
+                    ctx.fillStyle = '#8fd6f7';
+                    ctx.fillText('守', mx, y);
                 }
             });
         }
@@ -3383,6 +3440,14 @@
             statusMenu, equipMenu, equip, unequip, recalc, healAll, resumeSnap, maxSkills, learnNow,
             skills: () => (state.player && state.phase === 'play' ? state.player.skills.map(skillLabel) : []),
             toggleMinimap() { state.mini = !state.mini; },
+            // 倍速 (2026-10-28 ユーザー指定。F キー・「倍速」ボタン)
+            isFast: () => fastMode,
+            toggleFast() {
+                fastMode = !fastMode;
+                try { localStorage.setItem(FAST_KEY, fastMode ? '1' : '0'); } catch (e) { /* 保存できない 環境 */ }
+                toast(fastMode ? '倍速: オン' : '倍速: オフ');
+                return fastMode;
+            },
             goDown, stairsFound,
             // 「音」ボタン: 音の設定 (音量・オン・オフ。2026-10-22 ユーザー指定)。S キーは これまでどおり オン・オフだけ
             soundMenu() {

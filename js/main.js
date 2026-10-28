@@ -245,7 +245,7 @@
 
     function start() {
         const ask = createAsk(document.getElementById('ask'));
-        const game = KD.createGame(document.getElementById('screen'), ask);
+        const game = KD.createGame(document.getElementById('screen'), ask, { paced: true });   // 行動を 見せる 速さ (2026-10-28。倍速は F キー)
         const held = new Map();     // 押している方向キー → 押した時刻
         let shift = false, dashKey = false, turnKey = false;
         let touch = null;           // 画面の十字ボタン: { dir, at }
@@ -314,6 +314,7 @@
             else if (k === 'KeyV' && !e.repeat) game.specialMenu();   // 必殺技 (2026-10-22)
             else if (k === 'KeyS' && !e.repeat) game.toggleSound();
             else if (k === 'KeyE' && !e.repeat) game.statusMenu();   // ステータス・装備 (2026-10-23)
+            else if (k === 'KeyF' && !e.repeat) toggleFast();   // 倍速 (2026-10-28)
             else if (/^(Digit|Numpad)[1-6]$/.test(k) && !e.repeat && !NUMPAD[k]) game.useSkill(Number(k.slice(-1)) - 1);
         });
         window.addEventListener('keyup', e => {
@@ -398,6 +399,19 @@
         tap('btn-switch', () => (ask.asking() ? ask.key('back') : game.switchMenu()));
         tap('btn-special', () => (ask.asking() ? null : game.specialMenu()));
         tap('btn-sound', () => game.soundMenu());
+        // 倍速 (2026-10-28 ユーザー指定: ふだんは 行動を ゆっくり 見せ、F キー・このボタンで 倍速)。オンの ときは ボタンが 光る
+        const fastBtn = document.getElementById('btn-fast');
+        const showFast = () => {
+            fastBtn.classList.toggle('on', game.isFast());
+            fastBtn.setAttribute('aria-pressed', String(game.isFast()));
+            fastBtn.textContent = game.isFast() ? '倍速：オン' : '倍速';
+        };
+        function toggleFast() {
+            game.toggleFast();
+            showFast();
+        }
+        showFast();
+        tap('btn-fast', toggleFast);
         tap('btn-status', () => (ask.asking() ? ask.key('back') : game.statusMenu()));
         tap('btn-down', () => (ask.asking() ? null : game.goDown()));   // 下の階へ (階段を 見つけたら。2026-10-24)
         const downBtn = document.getElementById('btn-down');
